@@ -1,0 +1,130 @@
+// Prisma schema for intervue
+// Postgres + Prisma. Single-source-of-truth for users, problems, and interview history.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // If you switch DATABASE_URL to a pooler (e.g. Supabase port 6543), uncomment the
+  // line below and set DIRECT_URL to the direct connection (port 5432) for migrations:
+  // directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String?
+  passwordHash String
+  role         Role        @default(USER)
+  flagged      Boolean     @default(false)
+  flagReason   String?
+  // Non-null = the user is disabled and can't sign in. Existing data is retained.
+  disabledAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  interviews   Interview[]
+  auditEntries AuditLog[]  @relation("AdminAudit")
+
+  @@index([role])
+  @@index([flagged])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  admin User @relation("AdminAudit", fields: [adminId], references: [id])
+
+  @@index([createdAt])
+  @@index([adminId])
+  @@index([action])
+}
+
+model Problem {
+  // id is the human-readable slug ("two-sum"), mirroring lib/problems.ts.
+  id           String      @id
+  title        String
+  difficulty   String
+  topic        String
+  leetcodeUrl  String
+  description  String
+  examples     Json
+  constraints  Json
+  optimalTime  String
+  optimalSpace String
+  tags         Json
+  interviews   Interview[]
+
+  @@index([topic])
+  @@index([difficulty])
+}
+
+enum InterviewStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+model Interview {
+  id             String          @id @default(cuid())
+  userId         String
+  problemId      String
+  status         InterviewStatus @default(IN_PROGRESS)
+  language       String          @default("python")
+  code           String          @default("")
+  totalScore     Int?
+  recommendation String?
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  // First time the interviewer emitted [READY] for this candidate's approach.
+  // null when the candidate jumped to code without the interviewer signaling acceptance —
+  // weighted negatively in the debrief's communication / approach_quality scores.
+  approachAcceptedAt DateTime?
+  // Whether the candidate clicked "Start coding" while the latest interviewer
+  // signal was still [CONTINUE]. Persisted for the debrief.
+  movedToCodeEarly   Boolean   @default(false)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem  Problem   @relation(fields: [problemId], references: [id])
+  messages Message[]
+  debrief  Debrief?
+
+  @@index([userId, problemId, completedAt])
+  @@index([userId, startedAt])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  interviewId String
+  phase       String
+  role        String
+  content     String
+  createdAt   DateTime @default(now())
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewId, createdAt])
+}
+
+model Debrief {
+  id          String   @id @default(cuid())
+  interviewId String   @unique
+  payload     Json
+  totalScore  Int
+  createdAt   DateTime @default(now())
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}

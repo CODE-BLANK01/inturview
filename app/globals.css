@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-text font-sans antialiased;
+  /* Soft olive + warm mustard washes — gentle enough not to overwhelm the cream bg. */
+  background-image: radial-gradient(
+      1200px 600px at 80% -10%,
+      rgba(107, 137, 57, 0.08),
+      transparent 60%
+    ),
+    radial-gradient(800px 400px at -10% 10%, rgba(168, 120, 38, 0.05), transparent 60%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4c9a8;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #bfb088;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium
+      transition-colors border border-border hover:border-border-strong
+      bg-bg-elevated hover:bg-bg-surface disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply bg-accent border-accent text-white hover:bg-accent-hover hover:border-accent-hover;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border;
+  }
+  .panel {
+    @apply rounded-lg border border-border bg-bg-elevated;
+  }
+  .input {
+    @apply w-full rounded-md border border-border bg-bg-surface px-3 py-2 text-sm
+      placeholder:text-text-dim focus:outline-none focus:border-accent;
+  }
+}
+
+/* Streaming text caret */
+.cursor-blink::after {
+  content: "▍";
+  margin-left: 2px;
+  animation: blink 1s steps(2, start) infinite;
+  color: #6b8939;
+}
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Skeleton shimmer — applied to .skeleton boxes during route/data loading */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e6dcc2;
+  border-radius: 6px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  /* Dark sweep against the cream skeleton box — more visible on light bg. */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(58, 46, 28, 0.07) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Three-dot typing indicator used in chat bubbles while waiting for the first
+   streamed token (before the typewriter has anything to render). */
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.typing-dots span {
+  display: inline-block;
+  height: 6px;
+  width: 6px;
+  border-radius: 9999px;
+  background: #6b5c3f;
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* Subtle pulse used on placeholder/loading text */
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.animate-soft-pulse {
+  animation: soft-pulse 1.8s ease-in-out infinite;
+}
