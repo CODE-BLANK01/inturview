@@ -1,4 +1,4 @@
-// Prisma schema for intervue
+// Prisma schema for inturview
 // Postgres + Prisma. Single-source-of-truth for users, problems, and interview history.
 
 generator client {

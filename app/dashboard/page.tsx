@@ -11,7 +11,7 @@ import { requireUser } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Dashboard — intervue" };
+export const metadata = { title: "Dashboard — inturview" };
 
 export default async function DashboardPage() {
   const user = await requireUser();

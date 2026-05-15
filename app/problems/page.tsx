@@ -1,7 +1,7 @@
 import { TopNav } from "@/components/TopNav";
 import { ProblemBrowser } from "@/components/ProblemBrowser";
 
-export const metadata = { title: "Problems — intervue" };
+export const metadata = { title: "Problems — inturview" };
 
 export default function ProblemsPage() {
   return (

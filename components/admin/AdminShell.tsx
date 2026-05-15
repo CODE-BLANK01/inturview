@@ -36,7 +36,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
           </span>
           <div className="leading-tight">
             <div className="text-sm font-semibold">
-              intervue<span className="text-accent">.</span>
+              inturview<span className="text-accent">.</span>
             </div>
             <div className="text-[10px] uppercase tracking-[0.14em] text-hard/80">
               admin
@@ -86,7 +86,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
         <header className="lg:hidden h-12 flex items-center gap-2 px-4 border-b border-border bg-bg/85 backdrop-blur sticky top-0 z-10">
           <ShieldCheck className="h-4 w-4 text-hard" />
           <span className="text-sm font-semibold">
-            intervue<span className="text-accent">.</span>{" "}
+            inturview<span className="text-accent">.</span>{" "}
             <span className="text-hard/80 text-xs">admin</span>
           </span>
           <Link

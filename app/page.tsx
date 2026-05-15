@@ -47,7 +47,7 @@ function Hero() {
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-16 items-center">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-text-dim font-medium">
-              intervue · mock interviews, scored properly
+              inturview · mock interviews, scored properly
             </p>
             <h1 className="mt-5 text-4xl sm:text-5xl lg:text-6xl font-semibold leading-[1.02] tracking-tight">
               Practice for the room,
@@ -108,7 +108,7 @@ function HeroPreview() {
             <span className="h-2.5 w-2.5 rounded-full bg-bg-surface border border-border" />
           </div>
           <span className="font-mono text-[10px] text-text-dim tracking-wide">
-            intervue · Two Sum · Approach phase
+            inturview · Two Sum · Approach phase
           </span>
           <span className="text-[10px] text-text-dim">02:14</span>
         </div>
@@ -222,7 +222,7 @@ function PositioningSection() {
             grading a conversation is harder than grading a function.
           </p>
           <p className="text-text">
-            intervue scores the conversation. Five dimensions, one
+            inturview scores the conversation. Five dimensions, one
             recommendation, an interviewer who behaves like one.
           </p>
         </div>
@@ -411,7 +411,7 @@ function RoadmapSection() {
       title: "Public portfolio",
       when: "Soon",
       blurb:
-        "intervue.dev/you — your best debriefs, projects, and progress, shareable as a link.",
+        "inturview.dev/you — your best debriefs, projects, and progress, shareable as a link.",
     },
     {
       icon: GitBranch,
@@ -511,7 +511,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-3">
               <span className="font-semibold tracking-tight">
-                intervue<span className="text-accent">.</span>
+                inturview<span className="text-accent">.</span>
               </span>
             </div>
             <p className="text-xs text-text-dim leading-relaxed max-w-xs">
@@ -532,7 +532,7 @@ function Footer() {
             <FooterLink href="#" disabled>
               Changelog
             </FooterLink>
-            <FooterLink href="mailto:hello@intervue.dev" external>
+            <FooterLink href="mailto:hello@inturview.dev" external>
               Contact
             </FooterLink>
           </FooterCol>
@@ -549,7 +549,7 @@ function Footer() {
           </FooterCol>
         </div>
         <div className="mt-10 pt-6 border-t border-border flex items-center justify-between text-xs text-text-dim">
-          <span>© {new Date().getFullYear()} intervue. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} inturview. All rights reserved.</span>
           <span className="inline-flex items-center gap-1.5">
             <Sparkles className="h-3 w-3" />
             Powered by Anthropic Claude

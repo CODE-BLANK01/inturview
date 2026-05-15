@@ -6,7 +6,7 @@ import { DifficultyBadge, RecommendationBadge, TopicBadge } from "@/components/B
 import type { Difficulty, Debrief } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "History — intervue" };
+export const metadata = { title: "History — inturview" };
 
 export default async function HistoryPage() {
   const user = await requireUser();

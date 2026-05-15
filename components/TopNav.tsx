@@ -21,7 +21,7 @@ export function TopNav() {
         <Link href={isAuthed ? "/dashboard" : "/"} className="flex items-center gap-2">
           <Logo />
           <span className="font-semibold tracking-tight">
-            intervue<span className="text-accent">.</span>
+            inturview<span className="text-accent">.</span>
           </span>
         </Link>
 

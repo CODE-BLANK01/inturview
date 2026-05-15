@@ -17,7 +17,7 @@ const ITEMS: RoadmapItem[] = [
   },
   {
     title: "Public portfolio",
-    blurb: "An intervue.dev/you page with your debriefs and best interviews.",
+    blurb: "An inturview.dev/you page with your debriefs and best interviews.",
     icon: Globe,
     when: "soon",
   },
@@ -75,8 +75,8 @@ export function RoadmapPanel() {
       <div className="mt-5 pt-4 border-t border-border">
         <p className="text-xs text-text-dim leading-relaxed">
           Have a request? Hit{" "}
-          <a href="mailto:hello@intervue.dev" className="text-text-muted hover:text-text underline-offset-2 hover:underline">
-            hello@intervue.dev
+          <a href="mailto:hello@inturview.dev" className="text-text-muted hover:text-text underline-offset-2 hover:underline">
+            hello@inturview.dev
           </a>{" "}
           and we&apos;ll add it to the queue.
         </p>
