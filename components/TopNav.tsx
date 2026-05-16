@@ -1,10 +1,12 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { ChevronDown, LogOut, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function TopNav() {
   const { data, status } = useSession();
@@ -16,13 +18,22 @@ export function TopNav() {
     (data?.user as { role?: "USER" | "ADMIN" } | undefined)?.role === "ADMIN";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/80 bg-bg/85 backdrop-blur">
-      <div className="mx-auto max-w-7xl px-4 h-14 flex items-center justify-between gap-4">
-        <Link href={isAuthed ? "/dashboard" : "/"} className="flex items-center gap-2">
-          <Logo />
-          <span className="font-semibold tracking-tight">
-            inturview<span className="text-accent">.</span>
-          </span>
+    <header className="sticky top-0 z-30 border-b border-border bg-bg/85 backdrop-blur">
+      <div className="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between gap-4">
+        <Link
+          href={isAuthed ? "/dashboard" : "/"}
+          aria-label="inturview home"
+          className="flex items-center"
+        >
+          {/* The SVG is the wordmark — no separate text needed. */}
+          <Image
+            src="/logo.svg"
+            alt="inturview"
+            width={1000}
+            height={500}
+            priority
+            className="h-8 w-auto rounded-[4px]"
+          />
         </Link>
 
         {isAuthed && (
@@ -37,26 +48,19 @@ export function TopNav() {
               History
             </NavLink>
             {isAdmin && (
-              <Link
-                href="/admin"
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
-                  pathname?.startsWith("/admin")
-                    ? "text-hard bg-hard/10"
-                    : "text-hard/80 hover:text-hard hover:bg-hard/5"
-                }`}
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
+              <NavLink href="/admin" active={pathname?.startsWith("/admin") ?? false}>
                 Admin
-              </Link>
+              </NavLink>
             )}
           </nav>
         )}
 
         <nav className="flex items-center gap-2">
+          <ThemeToggle />
           {isAuthed ? (
             <div className="relative">
               <button
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-text-muted hover:text-text hover:bg-bg-surface transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-text-muted hover:text-text hover:bg-bg-inset transition-colors duration-150"
                 onClick={() => setOpen((v) => !v)}
                 onBlur={() => setTimeout(() => setOpen(false), 150)}
               >
@@ -78,11 +82,12 @@ export function TopNav() {
                     <DropdownLink href="/dashboard">Dashboard</DropdownLink>
                     <DropdownLink href="/problems">Practice</DropdownLink>
                     <DropdownLink href="/history">History</DropdownLink>
+                    {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
                     <div className="my-1 border-t border-border" />
                   </div>
                   <button
                     onClick={() => signOut({ callbackUrl: "/" })}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-bg-surface inline-flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-bg-inset inline-flex items-center gap-2"
                   >
                     <LogOut className="h-4 w-4" />
                     Sign out
@@ -118,10 +123,10 @@ function NavLink({
   return (
     <Link
       href={href}
-      className={`px-3 py-1.5 rounded-md transition-colors ${
+      className={`px-3 py-1.5 rounded-md transition-colors duration-150 ${
         active
-          ? "text-text bg-bg-surface"
-          : "text-text-muted hover:text-text hover:bg-bg-surface/60"
+          ? "text-text bg-bg-inset"
+          : "text-text-muted hover:text-text hover:bg-bg-inset/60"
       }`}
     >
       {children}
@@ -131,10 +136,7 @@ function NavLink({
 
 function DropdownLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="block px-3 py-2 text-sm hover:bg-bg-surface"
-    >
+    <Link href={href} className="block px-3 py-2 text-sm hover:bg-bg-inset">
       {children}
     </Link>
   );
@@ -143,19 +145,16 @@ function DropdownLink({ href, children }: { href: string; children: React.ReactN
 function Avatar({ email, name }: { email: string; name: string | null }) {
   const initial = (name?.trim()?.[0] ?? email?.trim()?.[0] ?? "?").toUpperCase();
   return (
-    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 border border-accent/30 text-accent text-xs font-medium">
+    <span
+      className="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs t-data"
+      style={{
+        background: "rgb(var(--bg-inverse))",
+        color: "rgb(var(--text-inverse))",
+        borderColor: "rgb(var(--bg-inverse))",
+      }}
+    >
       {initial}
     </span>
   );
 }
 
-function Logo() {
-  return (
-    <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent/15 border border-accent/30 text-accent">
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 17l5-5-5-5" />
-        <path d="M12 19h8" />
-      </svg>
-    </span>
-  );
-}

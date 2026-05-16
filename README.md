@@ -1,6 +1,14 @@
-# inturview
+<p align="center">
+  <img src="public/logo.svg" alt="inturview" width="320" />
+</p>
 
-> Mock interviews that grade the conversation, not just the function.
+<p align="center">
+  <em>Mock interviews that grade the conversation, not just the function.</em>
+</p>
+
+---
+
+# inturview
 
 inturview is a full-stack web app that simulates real technical interviews using NeetCode-150-style problems. A candidate picks a problem, walks through it in three structured phases — **approach → code → debrief** — and receives a rubric-based score with detailed interviewer feedback.
 

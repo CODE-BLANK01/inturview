@@ -2,24 +2,63 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
-  darkMode: "class",
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        // Light parchment palette — beige canvas, warm whites for panels,
-        // deep brown text, olive green accent.
-        bg: { DEFAULT: "#f5efe0", elevated: "#fdf8ea", surface: "#ede4c8" },
-        border: { DEFAULT: "#d4c9a8", strong: "#bfb088" },
-        text: { DEFAULT: "#3a2e1c", muted: "#6b5c3f", dim: "#9a8a68" },
-        accent: { DEFAULT: "#6b8939", hover: "#7ea047" },
-        easy: "#5d8c2d",
-        medium: "#a87826",
-        hard: "#9a3f2a",
-        hire: { strong: "#5d8c2d", normal: "#6b8939", no: "#9a3f2a" },
+        // All color tokens point at CSS variables defined in globals.css.
+        // Values are stored as space-separated RGB triplets so Tailwind's
+        // /<alpha> modifier works (e.g. bg-bg/85, text-text-ember/50).
+        bg: {
+          DEFAULT: "rgb(var(--bg-page) / <alpha-value>)",
+          elevated: "rgb(var(--bg-surface) / <alpha-value>)",
+          surface: "rgb(var(--bg-inset) / <alpha-value>)",
+          inverse: "rgb(var(--bg-inverse) / <alpha-value>)",
+        },
+        border: {
+          DEFAULT: "rgb(var(--border-base) / <alpha-value>)",
+          strong: "rgb(var(--border-strong) / <alpha-value>)",
+        },
+        text: {
+          DEFAULT: "rgb(var(--text-primary) / <alpha-value>)",
+          muted: "rgb(var(--text-secondary) / <alpha-value>)",
+          dim: "rgb(var(--text-tertiary) / <alpha-value>)",
+          ember: "rgb(var(--text-ember) / <alpha-value>)",
+          inverse: "rgb(var(--text-inverse) / <alpha-value>)",
+        },
+        // `accent` aliases ember so existing components inherit the brand color
+        // without a sweeping rename. On the landing page the Ember rule applies
+        // strictly; inside the product UI it's the primary action color.
+        accent: {
+          DEFAULT: "rgb(var(--text-ember) / <alpha-value>)",
+          hover: "rgb(var(--text-ember) / <alpha-value>)",
+        },
+        easy: "rgb(var(--score-hire) / <alpha-value>)",
+        medium: "rgb(var(--score-maybe) / <alpha-value>)",
+        hard: "rgb(var(--score-no) / <alpha-value>)",
+        "easy-bg": "rgb(var(--score-hire-bg) / <alpha-value>)",
+        "medium-bg": "rgb(var(--score-maybe-bg) / <alpha-value>)",
+        "hard-bg": "rgb(var(--score-no-bg) / <alpha-value>)",
+        hire: {
+          strong: "rgb(var(--score-hire) / <alpha-value>)",
+          normal: "rgb(var(--text-ember) / <alpha-value>)",
+          no: "rgb(var(--score-no) / <alpha-value>)",
+        },
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+        display: ["Clash Display", "system-ui", "sans-serif"],
+        italic: ["Instrument Serif", "Georgia", "serif"],
+        sans: ["Cabinet Grotesk", "system-ui", "sans-serif"],
+        mono: ["Space Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
+      letterSpacing: {
+        display: "-0.04em",
+        headline: "-0.03em",
+        eyebrow: "0.13em",
+        tight: "-0.01em",
+      },
+      transitionDuration: {
+        150: "150ms",
       },
     },
   },

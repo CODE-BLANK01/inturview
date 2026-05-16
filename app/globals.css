@@ -1,9 +1,66 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=cabinet-grotesk@300,400,500,700,800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&family=Space+Mono:wght@400;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Color tokens stored as RGB triplets so Tailwind's /<alpha> modifier works.
+ *
+ *   --bg-page: 250 247 242   ->  bg-bg/85 == rgb(250 247 242 / 0.85)
+ *
+ * Light = Parchment. Dark = Scorched. Apply via [data-theme="dark"].
+ * ------------------------------------------------------------------------- */
+
 :root {
+  --bg-page: 250 247 242; /* Parchment — never #fff */
+  --bg-surface: 255 255 255;
+  --bg-inset: 240 234 224;
+  --bg-inverse: 26 20 16;
+
+  --text-primary: 26 20 16; /* Inkwell */
+  --text-secondary: 107 94 84; /* Clay */
+  --text-tertiary: 184 169 154; /* Whisper */
+  --text-ember: 196 84 26; /* Ember — Instrument Serif italic only on landing */
+  --text-inverse: 250 247 242;
+
+  --border-base: 232 226 217; /* Linen */
+  --border-strong: 212 201 190;
+
+  --score-hire: 45 106 63;
+  --score-hire-bg: 212 237 218;
+  --score-maybe: 122 79 26;
+  --score-maybe-bg: 253 235 200;
+  --score-no: 139 26 26;
+  --score-no-bg: 249 208 208;
+
   color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg-page: 14 12 10; /* Char — never #000 */
+  --bg-surface: 20 18 16;
+  --bg-inset: 30 26 22;
+  --bg-inverse: 240 235 227;
+
+  --text-primary: 240 235 227; /* Bone */
+  --text-secondary: 107 94 84; /* Clay — same in both modes, intentional */
+  --text-tertiary: 74 64 53; /* Ash */
+  --text-ember: 232 132 90; /* Ember warm — brighter for dark bg */
+  --text-inverse: 14 12 10;
+
+  --border-base: 30 26 22; /* Soot */
+  --border-strong: 42 35 24;
+
+  --score-hire: 58 125 82;
+  --score-hire-bg: 26 61 40;
+  --score-maybe: 196 154 58;
+  --score-maybe-bg: 46 32 16;
+  --score-no: 196 80 80;
+  --score-no-bg: 46 16 16;
+
+  color-scheme: dark;
 }
 
 html,
@@ -12,14 +69,15 @@ body {
 }
 
 body {
-  @apply bg-bg text-text font-sans antialiased;
-  /* Soft olive + warm mustard washes — gentle enough not to overwhelm the cream bg. */
-  background-image: radial-gradient(
-      1200px 600px at 80% -10%,
-      rgba(107, 137, 57, 0.08),
-      transparent 60%
-    ),
-    radial-gradient(800px 400px at -10% 10%, rgba(168, 120, 38, 0.05), transparent 60%);
+  background: rgb(var(--bg-page));
+  color: rgb(var(--text-primary));
+  font-family: "Cabinet Grotesk", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -34,40 +92,155 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d4c9a8;
-  border-radius: 8px;
+  background: rgb(var(--border-strong));
+  border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #bfb088;
+  background: rgb(var(--text-tertiary));
 }
+
+::selection {
+  background: rgb(var(--text-ember) / 0.18);
+  color: rgb(var(--text-primary));
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography roles (per the brand brief).
+ *
+ *   .t-display          Clash Display 700 / -0.04em  (the biggest moments)
+ *   .t-section-headline Clash Display 600 / -0.03em
+ *   .t-italic           Instrument Serif italic, Ember color — STRICT RULE:
+ *                       only Ember on the landing. 1-2 words max. Never a
+ *                       full sentence.
+ *   .t-body             Cabinet Grotesk 400 / 1.72
+ *   .t-body-light       Cabinet Grotesk 300 / 1.65
+ *   .t-eyebrow          Space Mono 400, 11px, all-caps, 0.13em
+ *   .t-data             Space Mono 700 (numbers that mean something)
+ *   .t-cta              Cabinet Grotesk 700 / -0.01em
+ * ------------------------------------------------------------------------- */
+
+.t-display {
+  font-family: "Clash Display", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.t-section-headline {
+  font-family: "Clash Display", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.t-italic {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: rgb(var(--text-ember));
+  letter-spacing: 0;
+}
+.t-body {
+  font-family: "Cabinet Grotesk", system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.72;
+}
+.t-body-light {
+  font-family: "Cabinet Grotesk", system-ui, sans-serif;
+  font-weight: 300;
+  line-height: 1.65;
+}
+.t-eyebrow {
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgb(var(--text-tertiary));
+}
+.t-data {
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.t-cta {
+  font-family: "Cabinet Grotesk", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Component utilities — kept compatible with the existing app interior.
+ * The landing page uses raw typography roles + Tailwind tokens directly.
+ * ------------------------------------------------------------------------- */
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium
-      transition-colors border border-border hover:border-border-strong
-      bg-bg-elevated hover:bg-bg-surface disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm
+      border border-border bg-bg-elevated text-text
+      transition-colors duration-150
+      hover:border-border-strong hover:bg-bg-surface
+      disabled:opacity-50 disabled:cursor-not-allowed;
+    font-family: "Cabinet Grotesk", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
   .btn-primary {
-    @apply bg-accent border-accent text-white hover:bg-accent-hover hover:border-accent-hover;
+    background: rgb(var(--bg-inverse));
+    color: rgb(var(--text-inverse));
+    border-color: rgb(var(--bg-inverse));
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: rgb(var(--text-primary));
+    border-color: rgb(var(--text-primary));
+    opacity: 0.92;
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: rgb(var(--border-base));
+    color: rgb(var(--text-secondary));
+  }
+  .btn-ghost:hover:not(:disabled) {
+    color: rgb(var(--text-primary));
+    border-color: rgb(var(--border-strong));
+    background: rgb(var(--bg-inset) / 0.6);
   }
   .badge {
-    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border;
+    @apply inline-flex items-center px-2 py-0.5 text-xs border;
+    font-family: "Space Mono", ui-monospace, monospace;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    border-radius: 4px;
   }
   .panel {
-    @apply rounded-lg border border-border bg-bg-elevated;
+    @apply border;
+    background: rgb(var(--bg-surface));
+    border-color: rgb(var(--border-base));
+    border-radius: 12px;
   }
   .input {
-    @apply w-full rounded-md border border-border bg-bg-surface px-3 py-2 text-sm
-      placeholder:text-text-dim focus:outline-none focus:border-accent;
+    @apply w-full rounded-md px-3 py-2 text-sm border;
+    background: rgb(var(--bg-surface));
+    border-color: rgb(var(--border-base));
+    color: rgb(var(--text-primary));
+    font-family: "Cabinet Grotesk", system-ui, sans-serif;
+  }
+  .input::placeholder {
+    color: rgb(var(--text-tertiary));
+  }
+  .input:focus {
+    outline: none;
+    border-color: rgb(var(--text-primary));
   }
 }
 
-/* Streaming text caret */
+/* ---------------------------------------------------------------------------
+ * Streaming + loading affordances
+ * ------------------------------------------------------------------------- */
+
 .cursor-blink::after {
   content: "▍";
   margin-left: 2px;
   animation: blink 1s steps(2, start) infinite;
-  color: #6b8939;
+  color: rgb(var(--text-ember));
 }
 @keyframes blink {
   to {
@@ -75,11 +248,10 @@ body {
   }
 }
 
-/* Skeleton shimmer — applied to .skeleton boxes during route/data loading */
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: #e6dcc2;
+  background: rgb(var(--bg-inset));
   border-radius: 6px;
 }
 .skeleton::after {
@@ -87,11 +259,10 @@ body {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  /* Dark sweep against the cream skeleton box — more visible on light bg. */
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(58, 46, 28, 0.07) 50%,
+    rgb(var(--text-primary) / 0.06) 50%,
     transparent 100%
   );
   animation: shimmer 1.4s infinite;
@@ -102,8 +273,6 @@ body {
   }
 }
 
-/* Three-dot typing indicator used in chat bubbles while waiting for the first
-   streamed token (before the typewriter has anything to render). */
 .typing-dots {
   display: inline-flex;
   align-items: center;
@@ -115,7 +284,7 @@ body {
   height: 6px;
   width: 6px;
   border-radius: 9999px;
-  background: #6b5c3f;
+  background: rgb(var(--text-secondary));
   animation: typing-bounce 1.2s infinite ease-in-out;
 }
 .typing-dots span:nth-child(2) {
@@ -137,7 +306,6 @@ body {
   }
 }
 
-/* Subtle pulse used on placeholder/loading text */
 @keyframes soft-pulse {
   0%,
   100% {
