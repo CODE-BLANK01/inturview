@@ -18,12 +18,36 @@ enum Role {
   ADMIN
 }
 
+enum PlanTier {
+  FREE
+  PRO
+  TEAM_STARTER
+  TEAM_GROWTH
+  ENTERPRISE
+}
+
+enum OnboardingGoal {
+  PRACTICING
+  RECRUITING
+  COACHING
+  EXPLORING
+}
+
 model User {
   id           String      @id @default(cuid())
   email        String      @unique
   name         String?
   passwordHash String
   role         Role        @default(USER)
+  plan         PlanTier    @default(FREE)
+  goal         OnboardingGoal?
+  /// Non-null once the user clicks the verification link from their inbox.
+  /// Authenticated requests are routed to /verify-email until this is set.
+  emailVerifiedAt DateTime?
+  /// Non-null once the user finishes the onboarding wizard. Until then, any
+  /// authenticated request that lands on /dashboard etc. is redirected back
+  /// to /onboarding.
+  onboardingCompletedAt DateTime?
   flagged      Boolean     @default(false)
   flagReason   String?
   // Non-null = the user is disabled and can't sign in. Existing data is retained.
@@ -33,9 +57,27 @@ model User {
   interviews   Interview[]
   auditEntries AuditLog[]  @relation("AdminAudit")
   resetTokens  PasswordResetToken[]
+  verificationTokens EmailVerificationToken[]
 
   @@index([role])
   @@index([flagged])
+  @@index([plan])
+  @@index([emailVerifiedAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  /// SHA-256 hash of the raw token — the raw token only lives in the email link.
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model PasswordResetToken {

@@ -5,6 +5,10 @@ import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { adminEmails } from "@/lib/auth";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
+import {
+  createVerificationToken,
+  sendVerificationEmail,
+} from "@/lib/emailVerification";
 
 export const runtime = "nodejs";
 
@@ -52,6 +56,20 @@ export async function POST(req: NextRequest) {
       },
       select: { id: true, email: true, name: true, role: true },
     });
+
+    // Fire verification email — don't block the response if Resend hiccups.
+    // The user can hit "Resend verification" from /verify-email if needed.
+    try {
+      const { rawToken } = await createVerificationToken(user.id);
+      await sendVerificationEmail({
+        toEmail: user.email,
+        toName: user.name,
+        rawToken,
+      });
+    } catch (err) {
+      console.error("[signup] verification email failed:", err instanceof Error ? err.message : err);
+    }
+
     return Response.json({ user }, { status: 201 });
   } catch (err) {
     if (

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getProblem } from "@/lib/problems";
+import { getPlan, startOfMonthUTC } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,52 @@ export async function POST(req: NextRequest) {
       { error: err instanceof Error ? err.message : "Invalid input" },
       { status: 400 }
     );
+  }
+
+  // Plan + monthly-cap enforcement. Free tier is capped; paid tiers (when they
+  // exist) pass through. Cap is per UTC calendar month.
+  const profile = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      plan: true,
+      emailVerifiedAt: true,
+      onboardingCompletedAt: true,
+    },
+  });
+  if (!profile) {
+    return Response.json({ error: "Account not found" }, { status: 404 });
+  }
+  if (!profile.emailVerifiedAt) {
+    return Response.json(
+      { error: "Verify your email first.", redirect: "/verify-email" },
+      { status: 403 }
+    );
+  }
+  if (!profile.onboardingCompletedAt) {
+    return Response.json(
+      { error: "Finish onboarding first.", redirect: "/onboarding" },
+      { status: 403 }
+    );
+  }
+
+  const plan = getPlan(profile.plan);
+  if (plan.interviewsPerMonth !== null) {
+    const monthStart = startOfMonthUTC();
+    const used = await prisma.interview.count({
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    });
+    if (used >= plan.interviewsPerMonth) {
+      return Response.json(
+        {
+          error: `You've used all ${plan.interviewsPerMonth} interviews on the ${plan.name} plan this month. Resets on the 1st.`,
+          code: "PLAN_LIMIT_REACHED",
+          plan: plan.tier,
+          used,
+          limit: plan.interviewsPerMonth,
+        },
+        { status: 403 }
+      );
+    }
   }
 
   // Make sure the problem exists in the DB (seeded). If for some reason it isn't

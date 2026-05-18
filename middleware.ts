@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/problems", "/interview", "/history", "/admin"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/problems",
+  "/interview",
+  "/history",
+  "/admin",
+  "/onboarding",
+  "/verify-email",
+  "/account",
+];
 const ADMIN_PREFIXES = ["/admin", "/api/admin"];
 
 export async function middleware(req: NextRequest) {
@@ -41,5 +50,8 @@ export const config = {
     "/history/:path*",
     "/admin/:path*",
     "/api/admin/:path*",
+    "/onboarding/:path*",
+    "/verify-email/:path*",
+    "/account/:path*",
   ],
 };

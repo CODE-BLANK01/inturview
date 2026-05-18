@@ -7,8 +7,11 @@ import { PracticeModes } from "@/components/dashboard/PracticeModes";
 import { TopicMastery } from "@/components/dashboard/TopicMastery";
 import { RecentInterviews } from "@/components/dashboard/RecentInterviews";
 import { RoadmapPanel } from "@/components/dashboard/RoadmapPanel";
+import { PlanUsage } from "@/components/dashboard/PlanUsage";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { loadDashboardData } from "@/lib/dashboard";
+import { getPlan, startOfMonthUTC } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — inturview" };
@@ -16,6 +19,21 @@ export const metadata = { title: "Dashboard — inturview" };
 export default async function DashboardPage() {
   const user = await requireUser();
   if (!user) redirect("/signin?callbackUrl=/dashboard");
+
+  // Gate chain: verify-email → onboarding → dashboard. Each step blocks the next.
+  const profile = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true },
+  });
+  if (!profile) redirect("/signin");
+  if (!profile.emailVerifiedAt) redirect("/verify-email");
+  if (!profile.onboardingCompletedAt) redirect("/onboarding");
+
+  const plan = getPlan(profile.plan);
+  const monthStart = startOfMonthUTC();
+  const interviewsThisMonth = await prisma.interview.count({
+    where: { userId: user.id, startedAt: { gte: monthStart } },
+  });
 
   const data = await loadDashboardData(user.id);
 
@@ -27,6 +45,7 @@ export default async function DashboardPage() {
 
         <div className="space-y-6">
           <StatGrid stats={data.stats} />
+          <PlanUsage plan={plan} interviewsThisMonth={interviewsThisMonth} />
           <ResumeRow inProgress={data.inProgress} lastCompleted={data.recent[0]} />
           <PracticeModes />
 

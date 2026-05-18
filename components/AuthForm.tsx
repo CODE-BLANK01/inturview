@@ -11,7 +11,13 @@ type Mode = "signin" | "signup";
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") || "/dashboard";
+  // New users always land in /verify-email first. Returning users either
+  // honor an explicit callbackUrl (e.g. from a deep link) or get sent to
+  // /dashboard — server-side gates re-route them to /verify-email or
+  // /onboarding as needed.
+  const callbackUrl =
+    params.get("callbackUrl") ||
+    (mode === "signup" ? "/verify-email" : "/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");

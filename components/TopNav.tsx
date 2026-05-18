@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function TopNav() {
@@ -85,6 +85,14 @@ export function TopNav() {
                     {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
                     <div className="my-1 border-t border-border" />
                   </div>
+                  <Link
+                    href="/account"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-bg-inset inline-flex items-center gap-2"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Account settings
+                  </Link>
+                  <div className="my-1 border-t border-border" />
                   <button
                     onClick={() => signOut({ callbackUrl: "/" })}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-bg-inset inline-flex items-center gap-2"
