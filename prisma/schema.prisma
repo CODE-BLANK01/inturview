@@ -48,6 +48,11 @@ model User {
   /// authenticated request that lands on /dashboard etc. is redirected back
   /// to /onboarding.
   onboardingCompletedAt DateTime?
+  /// Monotonic counter bumped to revoke every outstanding JWT for this user
+  /// (password change, role change, disable, manual "sign out everywhere").
+  /// The signed JWT carries the value at issue time; requireUser() compares
+  /// it to the current DB value on every protected request.
+  tokenVersion Int @default(0)
   flagged      Boolean     @default(false)
   flagReason   String?
   // Non-null = the user is disabled and can't sign in. Existing data is retained.

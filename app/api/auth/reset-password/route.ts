@@ -73,7 +73,12 @@ export async function POST(req: NextRequest) {
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        // Revoke every JWT issued before this reset. Any session an attacker
+        // may have established with the old password is killed atomically.
+        tokenVersion: { increment: 1 },
+      },
     }),
     // Burn the used token AND any other live tokens for this user — single
     // password change invalidates every outstanding reset link.

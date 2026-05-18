@@ -40,6 +40,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const data: Record<string, unknown> = {};
   const auditActions: { action: AuditAction; metadata?: unknown }[] = [];
+  // Any admin action that changes the target's authorization surface
+  // (disable, role demotion/promotion) revokes their outstanding JWTs so the
+  // change takes effect on their very next request — not 30 days later.
+  let revokeSessions = false;
 
   if (typeof parsed.flagged === "boolean") {
     data.flagged = parsed.flagged;
@@ -57,6 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       auditActions.push({
         action: parsed.disabled ? "USER_DISABLED" : "USER_ENABLED",
       });
+      if (parsed.disabled) revokeSessions = true;
     }
   }
   if (parsed.role) {
@@ -66,11 +71,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         action: "USER_ROLE_CHANGED",
         metadata: { from: target.role, to: parsed.role },
       });
+      revokeSessions = true;
     }
   }
 
   if (Object.keys(data).length === 0) {
     return Response.json({ ok: true, user: target });
+  }
+  if (revokeSessions) {
+    (data as { tokenVersion?: unknown }).tokenVersion = { increment: 1 };
   }
 
   const updated = await prisma.user.update({

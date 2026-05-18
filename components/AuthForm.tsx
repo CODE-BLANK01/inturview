@@ -62,6 +62,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   };
 
+  const reason = params.get("reason");
+  const reasonBanner =
+    mode === "signin" && reason
+      ? reason === "password-changed"
+        ? "Password updated. Sign in again with your new password."
+        : reason === "revoked"
+        ? "Signed out of every device. Sign in to start a fresh session."
+        : null
+      : null;
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="panel p-7">
@@ -73,6 +83,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
             ? "Sign in to continue practicing."
             : "Start running mock interviews in under a minute."}
         </p>
+
+        {reasonBanner && (
+          <div className="rounded-md border border-border bg-bg-inset/40 px-3 py-2 text-sm text-text mb-4">
+            {reasonBanner}
+          </div>
+        )}
 
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (

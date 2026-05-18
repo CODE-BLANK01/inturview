@@ -71,13 +71,17 @@ export async function POST(req: NextRequest) {
 
   const newHash = await bcrypt.hash(parsed.newPassword, 12);
 
-  // Update the hash AND burn every outstanding password-reset token. A password
-  // change should kill any phishing-stage reset link that's been sitting in an
-  // attacker's hands.
+  // Update the hash, bump tokenVersion (revokes every outstanding JWT —
+  // including the current session), AND burn outstanding reset tokens. A
+  // password change should kill any phishing-stage reset link that's been
+  // sitting in an attacker's hands.
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: newHash },
+      data: {
+        passwordHash: newHash,
+        tokenVersion: { increment: 1 },
+      },
     }),
     prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null },
@@ -85,5 +89,7 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
-  return Response.json({ ok: true });
+  // mustSignInAgain tells the client to call signOut() — the current JWT is
+  // now inert and the next protected request would 401-redirect anyway.
+  return Response.json({ ok: true, mustSignInAgain: true });
 }
