@@ -95,7 +95,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
             />
           </label>
           <label className="block">
-            <span className="text-xs text-text-muted">Password</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-muted">Password</span>
+              {mode === "signin" && (
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-text-muted hover:text-text underline underline-offset-2"
+                >
+                  Forgot Password?
+                </Link>
+              )}
+            </div>
             <input
               className="input mt-1"
               type="password"

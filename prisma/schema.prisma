@@ -32,9 +32,25 @@ model User {
   updatedAt    DateTime    @updatedAt
   interviews   Interview[]
   auditEntries AuditLog[]  @relation("AdminAudit")
+  resetTokens  PasswordResetToken[]
 
   @@index([role])
   @@index([flagged])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  // SHA-256 hash of the raw token — the raw token only ever lives in the email link.
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AuditLog {
