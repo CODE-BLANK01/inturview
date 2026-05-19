@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Eye, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, PauseCircle, RotateCcw, X } from "lucide-react";
 import { TopNav } from "./TopNav";
 import { ChatPanel } from "./ChatPanel";
 import { CodeEditor, LANGUAGES, STARTERS, type Language } from "./CodeEditor";
@@ -11,6 +11,8 @@ import { PhaseIndicator } from "./PhaseIndicator";
 import { ProblemStatement } from "./ProblemStatement";
 import { ReadyPrompt } from "./ReadyPrompt";
 import { Timer } from "./Timer";
+import { PauseOverlay } from "./interview/PauseOverlay";
+import { EndSessionDialog } from "./interview/EndSessionDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useTypewriter } from "@/lib/useTypewriter";
@@ -50,10 +52,42 @@ export function InterviewSession({ problem }: { problem: Problem }) {
   const [followUpStreaming, setFollowUpStreaming] = useState(false);
   const followUpWriter = useTypewriter(45);
 
-  const startedAt = useRef<number>(Date.now());
+  // Authoritative "interview started at" timestamp. Initialized to now() as a
+  // visual placeholder; replaced with the row's actual startedAt as soon as
+  // /api/interview/start resolves — so resumed sessions show real elapsed time
+  // instead of restarting the clock.
+  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
+
+  // Session controls (client-only — pause is a UI freeze, not a persisted state).
+  // When paused, we shift `startedAt` forward by the paused duration on resume
+  // so the timer doesn't snap to include the paused time.
+  const [paused, setPaused] = useState(false);
+  const pausedAtRef = useRef<number | null>(null);
+  const [endDialogOpen, setEndDialogOpen] = useState(false);
+
   const abortRef = useRef<AbortController | null>(null);
   const approachInputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  const pauseSession = useCallback(() => {
+    if (phase === "debrief") return;
+    pausedAtRef.current = Date.now();
+    setPaused(true);
+  }, [phase]);
+
+  const resumeSession = useCallback(() => {
+    if (pausedAtRef.current !== null) {
+      const pausedDuration = Date.now() - pausedAtRef.current;
+      pausedAtRef.current = null;
+      setStartedAt((prev) => prev + pausedDuration);
+    }
+    setPaused(false);
+  }, []);
+
+  const openEndDialog = useCallback(() => {
+    setEndDialogOpen(true);
+  }, []);
+  const closeEndDialog = useCallback(() => setEndDialogOpen(false), []);
 
   const aiTurnsInApproach = useMemo(
     () => approachMessages.filter((m) => m.role === "assistant").length,
@@ -78,7 +112,9 @@ export function InterviewSession({ problem }: { problem: Problem }) {
     return () => clearTimeout(t);
   }, [code, language, interviewId, phase]);
 
-  // Boot: create the Interview row and kick off the approach with no user turn.
+  // Boot: either resume an existing IN_PROGRESS interview for this problem
+  // (most common case — user navigated back, clicked Continue, etc.) or
+  // create a new one. The server tells us which via `resumed`.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -92,10 +128,78 @@ export function InterviewSession({ problem }: { problem: Problem }) {
           const j = await res.json().catch(() => ({}));
           throw new Error(j.error || `Could not start interview (${res.status})`);
         }
-        const data = (await res.json()) as { id: string };
+        const data = (await res.json()) as {
+          id: string;
+          startedAt: string;
+          resumed: boolean;
+        };
         if (cancelled) return;
+
+        // Authoritative timestamp — both fresh and resumed paths set this so
+        // the Timer reflects total elapsed time across reopens.
+        const persistedStart = new Date(data.startedAt).getTime();
+        if (Number.isFinite(persistedStart)) setStartedAt(persistedStart);
+
+        if (!data.resumed) {
+          // Fresh interview — set id, kick off the approach.
+          setInterviewId(data.id);
+          runApproachTurn(data.id, null);
+          return;
+        }
+
+        // Resume — hydrate state from the existing row before showing the UI.
+        const detail = await fetch(`/api/interviews/${data.id}`);
+        if (!detail.ok) {
+          const j = await detail.json().catch(() => ({}));
+          throw new Error(j.error || `Could not load interview (${detail.status})`);
+        }
+        const detailJson = (await detail.json()) as {
+          interview: {
+            language: string;
+            code: string;
+            startedAt: string;
+            approachAcceptedAt: string | null;
+            messages: { phase: string; role: "user" | "assistant"; content: string }[];
+          };
+        };
+        if (cancelled) return;
+
+        const iv = detailJson.interview;
+        const ivStart = new Date(iv.startedAt).getTime();
+        if (Number.isFinite(ivStart)) setStartedAt(ivStart);
+        const approachMsgs: ChatMessage[] = iv.messages
+          .filter((m) => m.phase === "approach")
+          .map((m) => ({ role: m.role, content: m.content }));
+        const codeMsgs: ChatMessage[] = iv.messages
+          .filter((m) => m.phase === "code")
+          .map((m) => ({ role: m.role, content: m.content }));
+
+        const lang = (iv.language as Language) || "python";
+        setLanguage(lang);
+        setCode(iv.code || STARTERS[lang]);
+        setApproachMessages(approachMsgs);
+        setCodeMessages(codeMsgs);
+        // Restore the green-lit state if the AI accepted before they walked away.
+        if (iv.approachAcceptedAt) setApproachReady(true);
+
+        // Pick the phase they were last in:
+        //  - any code-phase messages OR code that's not the starter -> 'code'
+        //  - else 'approach'
+        const hasCodeActivity =
+          codeMsgs.length > 0 ||
+          (typeof iv.code === "string" &&
+            iv.code.trim() !== "" &&
+            iv.code.trim() !== (STARTERS[lang] || "").trim());
+        if (hasCodeActivity) setPhase("code");
+
         setInterviewId(data.id);
-        runApproachTurn(data.id, null);
+
+        // Defensive: if the resumed interview has zero approach messages
+        // (e.g. tab closed during the very first request), kick off the
+        // conversation so the user doesn't land on an empty chat.
+        if (approachMsgs.length === 0) {
+          runApproachTurn(data.id, null);
+        }
       } catch (err) {
         if (cancelled) return;
         setBootError(err instanceof Error ? err.message : "Failed to start interview");
@@ -352,9 +456,32 @@ export function InterviewSession({ problem }: { problem: Problem }) {
             <span className="text-text-dim">/</span>
             <span className="text-sm text-text-muted">{problem.title}</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Timer startedAt={startedAt.current} paused={phase === "debrief"} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <Timer startedAt={startedAt} paused={phase === "debrief" || paused} />
             <PhaseIndicator current={phase} />
+            {phase !== "debrief" && (
+              <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
+                <button
+                  type="button"
+                  onClick={pauseSession}
+                  disabled={paused}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-text-muted hover:text-text hover:bg-bg-inset transition-colors duration-150 disabled:opacity-40"
+                  title="Pause the interview"
+                >
+                  <PauseCircle className="h-3.5 w-3.5" />
+                  Pause
+                </button>
+                <button
+                  type="button"
+                  onClick={openEndDialog}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-text-muted hover:text-text hover:bg-bg-inset transition-colors duration-150"
+                  title="End the interview"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  End
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -369,6 +496,7 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                 onSend={onApproachSend}
                 placeholder="Walk through your approach…"
                 inputRef={approachInputRef}
+                emptyState="The interviewer will start the conversation shortly."
               />
             </div>
             <div className="lg:col-span-2">
@@ -457,6 +585,12 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                 onSend={onCodeSend}
                 placeholder="Quick clarifying question…"
                 compact
+                emptyState={
+                  <>
+                    Ask a quick clarifying question if you need one. The
+                    interviewer answers without giving the solution away.
+                  </>
+                }
               />
             </aside>
           </div>
@@ -537,6 +671,13 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                     disabled={followUpStreaming}
                     onSend={onFollowUpSend}
                     placeholder={`e.g., "What's the optimal approach?"`}
+                    emptyState={
+                      <>
+                        Interview&apos;s over. Ask anything now — the optimal
+                        approach, complexity, edge cases, why your code lost
+                        points. The interviewer can speak freely.
+                      </>
+                    }
                   />
                 </section>
               </>
@@ -550,6 +691,19 @@ export function InterviewSession({ problem }: { problem: Problem }) {
           </div>
         )}
       </main>
+
+      {paused && (
+        <PauseOverlay
+          onResume={resumeSession}
+          onEnd={() => {
+            resumeSession();
+            openEndDialog();
+          }}
+        />
+      )}
+      {endDialogOpen && interviewId && (
+        <EndSessionDialog interviewId={interviewId} onClose={closeEndDialog} />
+      )}
     </>
   );
 }

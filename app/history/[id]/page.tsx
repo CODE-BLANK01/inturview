@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
 import { TopNav } from "@/components/TopNav";
 import { DebriefView } from "@/components/DebriefView";
 import { DifficultyBadge, TopicBadge } from "@/components/Badges";
@@ -24,6 +24,7 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
     select: {
       id: true,
       problemId: true,
+      status: true,
       language: true,
       code: true,
       startedAt: true,
@@ -49,6 +50,17 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
   const followUp = interview.messages.filter((m) => m.phase === "debrief");
 
   const viewingOther = isAdmin && interview.user.email !== user.email;
+  const isAbandoned = interview.status === "ABANDONED";
+  const isCompleted = interview.status === "COMPLETED";
+
+  // Human-readable header tag describing how the session ended.
+  const statusLabel = interview.completedAt
+    ? isAbandoned
+      ? `Ended early ${new Date(interview.completedAt).toLocaleString()}`
+      : isCompleted
+      ? `Completed ${new Date(interview.completedAt).toLocaleString()}`
+      : new Date(interview.completedAt).toLocaleString()
+    : "In progress";
 
   return (
     <>
@@ -75,12 +87,45 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
             <ArrowLeft className="h-4 w-4" />
             {viewingOther ? "Admin interviews" : "All interviews"}
           </Link>
-          <div className="text-xs text-text-dim">
-            {interview.completedAt
-              ? `Completed ${new Date(interview.completedAt).toLocaleString()}`
-              : "In progress"}
+          <div
+            className="text-xs"
+            style={{
+              color: isAbandoned ? "rgb(var(--text-muted))" : "rgb(var(--text-tertiary))",
+            }}
+          >
+            {statusLabel}
           </div>
         </div>
+
+        {isAbandoned && (
+          <div
+            className="mb-6 panel px-4 py-3 flex items-start gap-3"
+            style={{
+              borderColor: "rgb(var(--border-strong))",
+              background: "rgb(var(--bg-inset) / 0.6)",
+            }}
+          >
+            <AlertTriangle
+              className="h-4 w-4 mt-0.5 text-text-muted shrink-0"
+              aria-hidden
+            />
+            <div className="text-sm">
+              <p className="text-text font-medium">Session ended without a debrief.</p>
+              <p className="text-text-muted mt-0.5 text-xs leading-relaxed">
+                You ended this session before submitting your solution, so there&apos;s
+                no scorecard. The transcript and any code you wrote are below — pick the
+                problem again from{" "}
+                <Link
+                  href="/problems"
+                  className="underline underline-offset-2 hover:text-text"
+                >
+                  Problems
+                </Link>{" "}
+                to start a fresh attempt.
+              </p>
+            </div>
+          </div>
+        )}
 
         <header className="panel p-5 mb-6">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -128,13 +173,13 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
 
           <div className="panel p-5">
             <h2 className="text-lg font-semibold mb-3">
-              Submitted code
+              {isAbandoned ? "Code at end" : "Submitted code"}
               <span className="ml-2 text-xs text-text-dim font-normal">
                 ({interview.language || "python"})
               </span>
             </h2>
             <pre className="rounded-md bg-bg-surface border border-border p-3 overflow-auto text-xs leading-relaxed font-mono whitespace-pre">
-              {interview.code || "(none)"}
+              {interview.code?.trim() ? interview.code : "(none)"}
             </pre>
           </div>
         </section>

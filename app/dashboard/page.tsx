@@ -46,7 +46,11 @@ export default async function DashboardPage() {
         <div className="space-y-6">
           <StatGrid stats={data.stats} />
           <PlanUsage plan={plan} interviewsThisMonth={interviewsThisMonth} />
-          <ResumeRow inProgress={data.inProgress} lastCompleted={data.recent[0]} />
+          <ResumeRow
+            inProgress={data.inProgress}
+            lastCompleted={data.recent[0]}
+            suggestion={data.suggestion}
+          />
           <PracticeModes />
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">

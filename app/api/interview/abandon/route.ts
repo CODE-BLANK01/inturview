@@ -1,0 +1,46 @@
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const Body = z.object({ interview_id: z.string().min(1) });
+
+/**
+ * End an in-progress interview without going through debrief. Status flips
+ * to ABANDONED and the row can't be resumed (the start route only reuses
+ * IN_PROGRESS rows). The interview still counts toward the monthly cap.
+ *
+ * No-op if the interview is already completed or abandoned — returns ok so
+ * the client navigation isn't blocked by a stale race.
+ */
+export async function POST(req: NextRequest) {
+  const user = await requireUser();
+  if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
+
+  let parsed: z.infer<typeof Body>;
+  try {
+    parsed = Body.parse(await req.json());
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : "Invalid input" },
+      { status: 400 }
+    );
+  }
+
+  const result = await prisma.interview.updateMany({
+    where: {
+      id: parsed.interview_id,
+      userId: user.id,
+      status: "IN_PROGRESS",
+    },
+    data: {
+      status: "ABANDONED",
+      completedAt: new Date(),
+    },
+  });
+
+  return Response.json({ ok: true, updated: result.count });
+}

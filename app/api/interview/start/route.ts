@@ -50,6 +50,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Resume vs. start fresh. If the user has an existing IN_PROGRESS interview
+  // for this problem, hand them that one — clicking "Continue" or re-opening
+  // the problem should pick up where they left off, not orphan the old row.
+  // Resumes bypass the monthly cap (they don't count as a new attempt).
+  const existing = await prisma.interview.findFirst({
+    where: {
+      userId: user.id,
+      problemId: parsed.problem_id,
+      status: "IN_PROGRESS",
+    },
+    orderBy: { startedAt: "desc" },
+    select: { id: true, startedAt: true },
+  });
+  if (existing) {
+    return Response.json({ ...existing, resumed: true }, { status: 200 });
+  }
+
+  // Fresh interview — enforce monthly plan cap.
   const plan = getPlan(profile.plan);
   if (plan.interviewsPerMonth !== null) {
     const monthStart = startOfMonthUTC();
@@ -93,13 +111,10 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const interview = await prisma.interview.create({
-    data: {
-      userId: user.id,
-      problemId: parsed.problem_id,
-    },
+  const created = await prisma.interview.create({
+    data: { userId: user.id, problemId: parsed.problem_id },
     select: { id: true, startedAt: true },
   });
 
-  return Response.json(interview, { status: 201 });
+  return Response.json({ ...created, resumed: false }, { status: 201 });
 }

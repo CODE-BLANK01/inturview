@@ -22,6 +22,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       status: true,
       startedAt: true,
       completedAt: true,
+      approachAcceptedAt: true,
+      movedToCodeEarly: true,
       problem: {
         select: { title: true, difficulty: true, topic: true, leetcodeUrl: true },
       },

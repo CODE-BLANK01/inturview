@@ -74,7 +74,7 @@ In this phase the candidate may ask brief clarifying questions while coding. Rul
 }
 
 export const DEBRIEF_SCHEMA = `{
-  "overall_recommendation": "Strong Hire | Hire | No Hire",
+  "overall_recommendation": "Strong Hire | Hire | Lean Hire | No Hire | Strong No Hire",
   "scores": {
     "problem_understanding": { "score": <1-5>, "max": 5, "evidence": "<one sentence>" },
     "approach_quality":      { "score": <1-5>, "max": 5, "evidence": "<one sentence>" },
@@ -145,10 +145,18 @@ Scoring rubric (1-5 each):
 
 Be honest. A score of 3 means "meets bar", 4 means "above bar", 5 means "exceptional". Do not give everyone 5s. If no approach was discussed or no code was written, score those dimensions accordingly (1 or 2).
 
-Overall recommendation thresholds (guideline):
-- Strong Hire: total >= 22
-- Hire: total 17–21
-- No Hire: total < 17`;
+Overall recommendation — 5 bands (use the total score AS A GUIDELINE, then adjust
+up or down by one band based on qualitative signal: behavioral red flags, code
+that's correct-but-untested, communication that fell apart at the end, etc.):
+- Strong Hire:     total 22–25  (top-tier, you'd actively push to hire them)
+- Hire:            total 18–21  (solid yes, comfortable advancing)
+- Lean Hire:       total 13–17  (borderline — could go either way; the qualitative call matters)
+- No Hire:         total  8–12  (not ready, multiple gaps)
+- Strong No Hire:  total  0–7   (significant correctness, communication, or behavior problems)
+
+Lean Hire is the genuine middle. Don't use it as a hedge — if signal is clear,
+pick the band that matches. Save Lean Hire for the cases where reasonable
+interviewers would actually disagree.`;
 }
 
 export function followUpSystemPrompt(problem: Problem): string {

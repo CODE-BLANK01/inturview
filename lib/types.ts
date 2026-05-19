@@ -29,8 +29,19 @@ export interface DimensionScore {
   evidence: string;
 }
 
+/** 5-band Google-style recommendation. Visual emphasis lives at the extremes
+ *  (strong) and tapers toward "Lean Hire" in the middle, which is the genuinely
+ *  borderline call. Legacy debriefs written before this expansion still use
+ *  the 3-value set ("Strong Hire" / "Hire" / "No Hire") and render correctly. */
+export type Recommendation =
+  | "Strong Hire"
+  | "Hire"
+  | "Lean Hire"
+  | "No Hire"
+  | "Strong No Hire";
+
 export interface Debrief {
-  overall_recommendation: "Strong Hire" | "Hire" | "No Hire";
+  overall_recommendation: Recommendation;
   scores: {
     problem_understanding: DimensionScore;
     approach_quality: DimensionScore;

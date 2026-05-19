@@ -24,7 +24,13 @@ const DimensionSchema = z.object({
 });
 
 const DebriefSchema = z.object({
-  overall_recommendation: z.enum(["Strong Hire", "Hire", "No Hire"]),
+  overall_recommendation: z.enum([
+    "Strong Hire",
+    "Hire",
+    "Lean Hire",
+    "No Hire",
+    "Strong No Hire",
+  ]),
   scores: z.object({
     problem_understanding: DimensionSchema,
     approach_quality: DimensionSchema,
@@ -164,7 +170,10 @@ export async function POST(req: NextRequest) {
         s.communication.score;
       debrief.total_score = total;
 
-      // Persist debrief + flip interview to COMPLETED.
+      // Persist debrief, flip THIS interview to COMPLETED, AND mark any
+      // sibling IN_PROGRESS interviews for the same problem as ABANDONED.
+      // The sibling cleanup hardens the dashboard against legacy orphans
+      // accumulated before the start-route reuse logic existed.
       await prisma.$transaction([
         prisma.debrief.create({
           data: {
@@ -179,6 +188,18 @@ export async function POST(req: NextRequest) {
             status: "COMPLETED",
             totalScore: total,
             recommendation: debrief.overall_recommendation,
+            completedAt: new Date(),
+          },
+        }),
+        prisma.interview.updateMany({
+          where: {
+            userId: user.id,
+            problemId: interview.problemId,
+            status: "IN_PROGRESS",
+            id: { not: interview.id },
+          },
+          data: {
+            status: "ABANDONED",
             completedAt: new Date(),
           },
         }),

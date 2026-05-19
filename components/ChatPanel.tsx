@@ -15,6 +15,10 @@ interface ChatPanelProps {
   compact?: boolean;
   /** Optional ref the parent can use to focus the input (e.g. from a "Discuss more" prompt). */
   inputRef?: React.RefObject<HTMLTextAreaElement>;
+  /** Copy shown when there are no messages yet. Defaults to nothing — the
+   *  approach phase passes "The interviewer will start…", code/debrief phases
+   *  set their own (the interviewer doesn't open those). */
+  emptyState?: React.ReactNode;
 }
 
 export function ChatPanel({
@@ -25,6 +29,7 @@ export function ChatPanel({
   placeholder,
   compact,
   inputRef,
+  emptyState,
 }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -48,10 +53,8 @@ export function ChatPanel({
         ref={scrollRef}
         className={`flex-1 space-y-3 overflow-y-auto p-4 ${compact ? "text-sm" : ""}`}
       >
-        {messages.length === 0 && !streamingText && (
-          <div className="text-text-dim text-sm">
-            The interviewer will start the conversation shortly.
-          </div>
+        {messages.length === 0 && !streamingText && emptyState && (
+          <div className="text-text-dim text-sm">{emptyState}</div>
         )}
         {messages.map((m, i) => (
           <Bubble key={i} role={m.role} text={m.content} />
