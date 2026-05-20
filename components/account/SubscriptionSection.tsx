@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Lock, ArrowUpRight } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
 import { priceLabel, renderFeature, PLANS } from "@/lib/plans";
@@ -10,7 +11,7 @@ interface SubscriptionSectionProps {
   interviewsThisMonth: number;
 }
 
-function daysUntilReset(): number {
+function computeDaysUntilReset(): number {
   const now = new Date();
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   return Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 86_400_000));
@@ -22,6 +23,16 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
   const pct = unlimited ? 0 : Math.min(100, Math.round((interviewsThisMonth / (limit || 1)) * 100));
   const atOrNearLimit = !unlimited && interviewsThisMonth >= (limit ?? 0);
   const warning = !unlimited && limit !== null && limit > 0 && interviewsThisMonth / limit >= 0.8;
+
+  // Compute days-until-reset only after mount. Calling new Date() during
+  // render would put a stamp in SSR HTML that could diff against the client's
+  // first render (server runs in UTC; if it ticks over midnight between SSR
+  // and hydration, the day count drifts). Null until ready, then the line
+  // re-renders with the real value.
+  const [daysUntilReset, setDaysUntilReset] = useState<number | null>(null);
+  useEffect(() => {
+    setDaysUntilReset(computeDaysUntilReset());
+  }, []);
 
   const upgradeCandidates = PLANS.filter((p) => p.tier !== plan.tier && p.audience === "individual");
 
@@ -92,7 +103,9 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
                     interviews —{" "}
                     {atOrNearLimit
                       ? "you've hit the cap."
-                      : `${(limit ?? 0) - interviewsThisMonth} left, resets in ${daysUntilReset()}d.`}
+                      : `${(limit ?? 0) - interviewsThisMonth} left${
+                          daysUntilReset !== null ? `, resets in ${daysUntilReset}d` : ""
+                        }.`}
                   </span>
                 </>
               )}

@@ -59,6 +59,8 @@ export function ResumeRow({ inProgress, lastCompleted, suggestion }: ResumeRowPr
 
   // 2. They've finished at least one — recommend a specific next problem.
   if (suggestion) {
+    // Single outer <Link> wraps the whole card. No nested <a> — the
+    // "Browse all" affordance lives in the TopNav (Practice tab).
     return (
       <Link
         href={`/interview/${suggestion.problemId}`}
@@ -79,18 +81,10 @@ export function ResumeRow({ inProgress, lastCompleted, suggestion }: ResumeRowPr
             </div>
             <div className="mt-1 text-xs text-text-dim">{suggestion.reason}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/problems"
-              className="text-xs text-text-muted hover:text-text"
-            >
-              Browse all
-            </Link>
-            <span className="btn btn-primary self-start sm:self-auto">
-              Start
-              <ArrowRight className="h-4 w-4" />
-            </span>
-          </div>
+          <span className="btn btn-primary self-start sm:self-auto">
+            Start
+            <ArrowRight className="h-4 w-4" />
+          </span>
         </div>
       </Link>
     );

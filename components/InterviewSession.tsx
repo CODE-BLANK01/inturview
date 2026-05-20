@@ -52,11 +52,12 @@ export function InterviewSession({ problem }: { problem: Problem }) {
   const [followUpStreaming, setFollowUpStreaming] = useState(false);
   const followUpWriter = useTypewriter(45);
 
-  // Authoritative "interview started at" timestamp. Initialized to now() as a
-  // visual placeholder; replaced with the row's actual startedAt as soon as
-  // /api/interview/start resolves — so resumed sessions show real elapsed time
-  // instead of restarting the clock.
-  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
+  // Authoritative "interview started at" timestamp. Initialized to 0 so SSR
+  // and first client render agree (hydration-safe); replaced with the row's
+  // actual startedAt as soon as /api/interview/start resolves. The timer
+  // isn't visible until interviewId is set anyway — see the `!interviewId`
+  // loader branch below.
+  const [startedAt, setStartedAt] = useState<number>(0);
 
   // Session controls (client-only — pause is a UI freeze, not a persisted state).
   // When paused, we shift `startedAt` forward by the paused duration on resume
