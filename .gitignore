@@ -8,3 +8,8 @@ out
 *.log
 .vscode
 .idea
+
+# Internal-only working docs (security notes, technical debt log, etc).
+# These contain sensitive context and explicit references to past security
+# issues — never commit, never share publicly.
+INTERNAL-NOTES.md

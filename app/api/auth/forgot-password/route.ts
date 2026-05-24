@@ -42,6 +42,23 @@ export async function POST(req: NextRequest) {
   }
 
   const email = parsed.email.toLowerCase().trim();
+
+  // Per-destination-email cap, independent of IP. The per-IP limit above only
+  // protects against ONE host bombing many inboxes; the real attack is a
+  // proxy pool ALL targeting one inbox to drown the user in reset emails.
+  // This bucket is shared across every source IP for the same target — so the
+  // victim's address can receive at most N reset emails an hour total, no
+  // matter how many hosts the attacker controls.
+  const targetRl = checkRateLimit({
+    key: `forgot-target:${email}`,
+    limit: Number(process.env.RL_FORGOT_TARGET_PER_HOUR ?? 3),
+    windowMs: 60 * 60_000,
+  });
+  if (!targetRl.ok) {
+    // Same generic 200 — the rate limit must not double as an enumeration oracle.
+    return Response.json({ ok: true });
+  }
+
   const user = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true, name: true, disabledAt: true },

@@ -44,6 +44,23 @@ export async function POST(req: NextRequest) {
   }
 
   const email = parsed.email.toLowerCase().trim();
+
+  // Per-destination-email cap, independent of IP. Without this, a small proxy
+  // pool can bypass the per-IP limit by spreading attempts across hosts while
+  // still targeting the same victim address. Same message as the per-IP path
+  // so an attacker can't tell which bucket fired.
+  const targetRl = checkRateLimit({
+    key: `signup-target:${email}`,
+    limit: Number(process.env.RL_SIGNUP_TARGET_PER_HOUR ?? 3),
+    windowMs: 60 * 60_000,
+  });
+  if (!targetRl.ok) {
+    return Response.json(
+      { error: "Too many signup attempts. Try again later." },
+      { status: 429 }
+    );
+  }
+
   const passwordHash = await bcrypt.hash(parsed.password, 12);
 
   try {
