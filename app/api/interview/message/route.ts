@@ -178,8 +178,14 @@ export async function POST(req: NextRequest) {
   try {
     anthropic = getAnthropic();
   } catch (err) {
+    // Log the underlying config error server-side; client gets a generic
+    // message so we don't leak env-var names or upstream service details.
+    console.error(
+      "[interview/message] config error:",
+      err instanceof Error ? err.message : err
+    );
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Server misconfigured" }),
+      JSON.stringify({ error: "The interviewer is unavailable. Try again shortly." }),
       { status: 500, headers: { "content-type": "application/json" } }
     );
   }
@@ -265,11 +271,37 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Stream error";
-        try {
-          controller.enqueue(sseEncode("error", JSON.stringify({ message })));
-        } catch {
-          /* already closed */
+        // Two paths to handle:
+        //   1. Client disconnected — abortController.signal.aborted is true.
+        //      The client is gone; no point emitting anything, and the error
+        //      would be a noise log entry.
+        //   2. Real upstream error (auth, 429, 529, network, etc.) — log the
+        //      detailed reason server-side for debugging, but emit a generic
+        //      message to the client. The previous behavior forwarded the raw
+        //      Anthropic SDK message which leaked model name, error class,
+        //      and request IDs.
+        const isAbort =
+          (err as { name?: string })?.name === "AbortError" ||
+          abortController.signal.aborted;
+        if (!isAbort) {
+          console.error("[interview/message] upstream stream error:", {
+            userId: user.id,
+            interviewId: interview.id,
+            phase: parsed.phase,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          try {
+            controller.enqueue(
+              sseEncode(
+                "error",
+                JSON.stringify({
+                  message: "Couldn't reach the interviewer. Refresh to retry.",
+                })
+              )
+            );
+          } catch {
+            /* already closed */
+          }
         }
       } finally {
         // Persist the assistant turn (even partial) so context is durable.
