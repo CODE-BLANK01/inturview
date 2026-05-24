@@ -51,6 +51,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
         callbackUrl,
       });
       if (result?.error) {
+        // NextAuth surfaces the message thrown from authorize() as
+        // result.error. We use a sentinel prefix to distinguish rate-limit
+        // errors (which deserve a specific user-facing message) from every
+        // other failure (which intentionally collapses to the generic
+        // "invalid credentials" line to avoid enumeration).
+        const RATE_LIMIT_PREFIX = "RATE_LIMITED:";
+        if (result.error.startsWith(RATE_LIMIT_PREFIX)) {
+          throw new Error(result.error.slice(RATE_LIMIT_PREFIX.length).trim());
+        }
         throw new Error("Invalid email or password.");
       }
       router.push(callbackUrl);

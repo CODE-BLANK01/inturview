@@ -5,6 +5,39 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Role } from "@prisma/client";
 import { prisma } from "./db";
+import { checkRateLimit, pruneExpired } from "./rateLimit";
+
+/**
+ * Extracts the client IP from whatever shape NextAuth hands us in
+ * `authorize(credentials, req)`. In Node runtime `req.headers` is a plain
+ * object; in Edge runtime it can be a Headers instance.
+ */
+function extractIp(req: unknown): string {
+  const r = req as { headers?: unknown } | undefined;
+  const h = r?.headers;
+  if (!h) return "anon";
+
+  let fwd: string | undefined;
+  if (typeof (h as { get?: unknown }).get === "function") {
+    const headers = h as { get: (k: string) => string | null };
+    fwd = headers.get("x-forwarded-for") ?? headers.get("x-real-ip") ?? undefined;
+  } else {
+    const map = h as Record<string, string | string[] | undefined>;
+    const raw = map["x-forwarded-for"] ?? map["x-real-ip"];
+    fwd = Array.isArray(raw) ? raw[0] : raw;
+  }
+  if (!fwd) return "anon";
+  return fwd.split(",")[0]!.trim() || "anon";
+}
+
+/**
+ * Prefix the AuthForm client looks for to surface a specific rate-limit
+ * message instead of the generic "Invalid email or password." Any error
+ * thrown from `authorize()` ends up in `result.error` when the form calls
+ * `signIn({ redirect: false })` — we use this prefix to pick rate-limit
+ * errors out of the noise.
+ */
+export const SIGNIN_RATE_LIMIT_PREFIX = "RATE_LIMITED:";
 
 const CredentialsSchema = z.object({
   email: z.string().email(),
@@ -32,10 +65,42 @@ export const authOptions: AuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const parsed = CredentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
         const email = parsed.data.email.toLowerCase();
+
+        // Two-layered rate limit, both decrement on EVERY attempt (success or
+        // failure). 10 attempts / 15 min per (IP, email) — stops password-
+        // guessing one account. 50 attempts / hour per IP — stops a single
+        // host from spreading guesses across many emails.
+        //
+        // checkRateLimit decrements on call, so an attacker can't sniff which
+        // limit fired by observing different error messages — we throw the
+        // same one for both.
+        pruneExpired();
+        const ip = extractIp(req);
+        const perPair = checkRateLimit({
+          key: `signin:${ip}:${email}`,
+          limit: Number(process.env.RL_SIGNIN_PER_15MIN ?? 10),
+          windowMs: 15 * 60_000,
+        });
+        const perIp = checkRateLimit({
+          key: `signin-ip:${ip}`,
+          limit: Number(process.env.RL_SIGNIN_IP_PER_HOUR ?? 50),
+          windowMs: 60 * 60_000,
+        });
+        if (!perPair.ok || !perIp.ok) {
+          const cooldown = Math.ceil(
+            Math.max(perPair.resetMs, perIp.resetMs) / 60_000
+          );
+          throw new Error(
+            `${SIGNIN_RATE_LIMIT_PREFIX} Too many sign-in attempts. Try again in ${cooldown} minute${
+              cooldown === 1 ? "" : "s"
+            }.`
+          );
+        }
+
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
         if (user.disabledAt) return null;
