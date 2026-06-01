@@ -24,8 +24,8 @@ export function ResetPasswordForm() {
       setError("Passwords don't match.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (password.length < 10) {
+      setError("Password must be at least 10 characters.");
       return;
     }
     if (!token) {
@@ -91,7 +91,7 @@ export function ResetPasswordForm() {
       <div className="panel p-7">
         <h1 className="t-section-headline text-2xl mb-1">Set a new password</h1>
         <p className="t-body-light text-sm text-text-muted mb-6">
-          Choose something you don&apos;t use elsewhere. At least 8 characters.
+          Choose something you don&apos;t use elsewhere. At least 10 characters.
         </p>
 
         <form onSubmit={submit} className="space-y-3">
@@ -101,11 +101,11 @@ export function ResetPasswordForm() {
               className="input mt-1"
               type="password"
               required
-              minLength={8}
+              minLength={10}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
-              placeholder="Min. 8 characters"
+              placeholder="Min. 10 characters"
             />
           </label>
           <label className="block">
@@ -114,7 +114,7 @@ export function ResetPasswordForm() {
               className="input mt-1"
               type="password"
               required
-              minLength={8}
+              minLength={10}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               autoComplete="new-password"

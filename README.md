@@ -88,6 +88,7 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | Variable              | Default                | Purpose                                                            |
 | --------------------- | ---------------------- | ------------------------------------------------------------------ |
 | `ANTHROPIC_MODEL`     | `claude-sonnet-4-5`    | Override the Claude model. Swap to `claude-opus-4-7` for higher fidelity. |
+| `APP_ENCRYPTION_KEY`  | `NEXTAUTH_SECRET`      | Optional separate encryption root for TOTP secrets. Generate with `openssl rand -base64 32`. |
 | `ADMIN_EMAILS`        | _(empty)_              | Comma-separated emails auto-promoted to `ADMIN` on signup/signin.  |
 | `DIRECT_URL`          | _(unused)_             | If you set `DATABASE_URL` to a pooler (e.g. Supabase port 6543), set this to the direct connection (5432) and uncomment `directUrl` in `prisma/schema.prisma`. |
 | `RL_MESSAGE_PER_MIN`  | `20`                   | Per-IP+user rate limit on the streaming message endpoint.          |

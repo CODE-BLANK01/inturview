@@ -5,6 +5,7 @@ import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { adminEmails } from "@/lib/auth";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
+import { MIN_PASSWORD_LENGTH, validatePasswordStrength } from "@/lib/passwordCheck";
 import {
   createVerificationToken,
   sendVerificationEmail,
@@ -17,7 +18,7 @@ const Body = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
     .max(128, "Password is too long"),
 });
 
@@ -44,6 +45,11 @@ export async function POST(req: NextRequest) {
   }
 
   const email = parsed.email.toLowerCase().trim();
+
+  const strength = await validatePasswordStrength(parsed.password);
+  if (!strength.ok) {
+    return Response.json({ error: strength.error }, { status: 400 });
+  }
 
   // Per-destination-email cap, independent of IP. Without this, a small proxy
   // pool can bypass the per-IP limit by spreading attempts across hosts while

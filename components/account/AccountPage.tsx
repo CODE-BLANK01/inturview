@@ -13,6 +13,7 @@ export interface AccountProfile {
   role: Role;
   plan: PlanTier;
   goal: OnboardingGoal | null;
+  twoFactorEnabled: boolean;
   createdAt: string;
 }
 
@@ -29,7 +30,7 @@ export function AccountPage({ profile, planInfo, interviewsThisMonth }: AccountP
       <SectionDivider />
       <SubscriptionSection plan={planInfo} interviewsThisMonth={interviewsThisMonth} />
       <SectionDivider />
-      <SecuritySection email={profile.email} />
+      <SecuritySection email={profile.email} twoFactorEnabled={profile.twoFactorEnabled} />
       <SectionDivider tone="danger" />
       <DangerZone email={profile.email} isAdmin={profile.role === "ADMIN"} />
     </div>

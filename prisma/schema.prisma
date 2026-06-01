@@ -53,6 +53,12 @@ model User {
   /// The signed JWT carries the value at issue time; requireUser() compares
   /// it to the current DB value on every protected request.
   tokenVersion Int @default(0)
+  /// Non-null when TOTP MFA is enabled for the user.
+  totpEnabledAt DateTime?
+  /// AES-GCM encrypted TOTP secret. Null until the user completes setup.
+  totpSecret String?
+  /// Bcrypt hashes of one-time recovery codes. Stored as JSON string array.
+  totpRecoveryCodes Json?
   flagged      Boolean     @default(false)
   flagReason   String?
   // Non-null = the user is disabled and can't sign in. Existing data is retained.

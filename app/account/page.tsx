@@ -23,6 +23,7 @@ export default async function AccountSettingsPage() {
         goal: true,
         emailVerifiedAt: true,
         onboardingCompletedAt: true,
+        totpEnabledAt: true,
         createdAt: true,
       },
     }),
@@ -58,6 +59,7 @@ export default async function AccountSettingsPage() {
             role: profile.role,
             plan: profile.plan,
             goal: profile.goal,
+            twoFactorEnabled: !!profile.totpEnabledAt,
             createdAt: profile.createdAt.toISOString(),
           }}
           planInfo={plan}

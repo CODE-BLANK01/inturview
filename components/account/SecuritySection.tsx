@@ -5,8 +5,15 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { Check, Loader2, LogOut } from "lucide-react";
 import { SectionHeader } from "./ProfileSection";
+import { TwoFactorSection } from "./TwoFactorSection";
 
-export function SecuritySection({ email }: { email: string }) {
+export function SecuritySection({
+  email,
+  twoFactorEnabled,
+}: {
+  email: string;
+  twoFactorEnabled: boolean;
+}) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -25,8 +32,8 @@ export function SecuritySection({ email }: { email: string }) {
       setError("New passwords don't match.");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters.");
+    if (newPassword.length < 10) {
+      setError("New password must be at least 10 characters.");
       return;
     }
     if (newPassword === currentPassword) {
@@ -117,10 +124,10 @@ export function SecuritySection({ email }: { email: string }) {
               className="input mt-2"
               type="password"
               required
-              minLength={8}
+              minLength={10}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Min. 8 characters"
+              placeholder="Min. 10 characters"
               autoComplete="new-password"
             />
           </label>
@@ -131,7 +138,7 @@ export function SecuritySection({ email }: { email: string }) {
               className="input mt-2"
               type="password"
               required
-              minLength={8}
+              minLength={10}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               autoComplete="new-password"
@@ -214,6 +221,10 @@ export function SecuritySection({ email }: { email: string }) {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <TwoFactorSection enabled={twoFactorEnabled} />
       </div>
     </section>
   );

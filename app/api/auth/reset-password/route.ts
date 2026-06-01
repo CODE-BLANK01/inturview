@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { validateResetToken, markTokenUsed } from "@/lib/passwordReset";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
+import { MIN_PASSWORD_LENGTH, validatePasswordStrength } from "@/lib/passwordCheck";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ const Body = z.object({
   token: z.string().min(20).max(200),
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
     .max(128, "Password is too long"),
 });
 
@@ -43,6 +44,11 @@ export async function POST(req: NextRequest) {
       { error: err instanceof Error ? err.message : "Invalid input" },
       { status: 400 }
     );
+  }
+
+  const strength = await validatePasswordStrength(parsed.password);
+  if (!strength.ok) {
+    return Response.json({ error: strength.error }, { status: 400 });
   }
 
   const result = await validateResetToken(parsed.token);

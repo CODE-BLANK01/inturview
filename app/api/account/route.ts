@@ -24,6 +24,7 @@ export async function GET() {
         goal: true,
         emailVerifiedAt: true,
         onboardingCompletedAt: true,
+        totpEnabledAt: true,
         createdAt: true,
       },
     }),
@@ -38,6 +39,7 @@ export async function GET() {
       ...profile,
       emailVerifiedAt: profile.emailVerifiedAt?.toISOString() ?? null,
       onboardingCompletedAt: profile.onboardingCompletedAt?.toISOString() ?? null,
+      twoFactorEnabled: !!profile.totpEnabledAt,
       createdAt: profile.createdAt.toISOString(),
     },
     usage: {

@@ -6,6 +6,12 @@ import { z } from "zod";
 import { Role } from "@prisma/client";
 import { prisma } from "./db";
 import { checkRateLimit, pruneExpired } from "./rateLimit";
+import {
+  recoveryHashesFromJson,
+  TWO_FACTOR_INVALID_PREFIX,
+  TWO_FACTOR_REQUIRED_PREFIX,
+  verifySecondFactorForUser,
+} from "./twoFactor";
 
 /**
  * Extracts the client IP from whatever shape NextAuth hands us in
@@ -42,6 +48,15 @@ export const SIGNIN_RATE_LIMIT_PREFIX = "RATE_LIMITED:";
 const CredentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
+  totpCode: z
+    .string()
+    .max(64)
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      if (!trimmed || trimmed === "undefined" || trimmed === "null") return undefined;
+      return trimmed;
+    }),
 });
 
 /** Comma-separated list of emails that are auto-promoted to ADMIN on signin/signup. */
@@ -64,6 +79,7 @@ export const authOptions: AuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totpCode: { label: "Two-factor code", type: "text" },
       },
       async authorize(credentials, req) {
         const parsed = CredentialsSchema.safeParse(credentials);
@@ -106,6 +122,26 @@ export const authOptions: AuthOptions = {
         if (user.disabledAt) return null;
         const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!ok) return null;
+
+        if (user.totpEnabledAt) {
+          const code = parsed.data.totpCode;
+          if (!code) {
+            throw new Error(
+              `${TWO_FACTOR_REQUIRED_PREFIX} Enter your authenticator code.`
+            );
+          }
+          const secondFactorOk = await verifySecondFactorForUser({
+            userId: user.id,
+            encryptedSecret: user.totpSecret,
+            recoveryHashes: recoveryHashesFromJson(user.totpRecoveryCodes),
+            code,
+          });
+          if (!secondFactorOk) {
+            throw new Error(
+              `${TWO_FACTOR_INVALID_PREFIX} Invalid two-factor code.`
+            );
+          }
+        }
 
         if (user.role !== Role.ADMIN && adminEmails().has(email)) {
           await prisma.user.update({

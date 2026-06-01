@@ -20,6 +20,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
     (mode === "signup" ? "/verify-email" : "/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [needsSecondFactor, setNeedsSecondFactor] = useState(false);
+  const [secondFactorReady, setSecondFactorReady] = useState(false);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,12 +47,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
           throw new Error(j.error || `Signup failed (${res.status})`);
         }
       }
-      const result = await signIn("credentials", {
+      const credentials: Record<string, string | boolean> = {
         email: email.trim(),
         password,
         redirect: false,
         callbackUrl,
-      });
+      };
+      if (needsSecondFactor) credentials.totpCode = totpCode.trim();
+
+      const result = await signIn("credentials", credentials);
       if (result?.error) {
         // NextAuth surfaces the message thrown from authorize() as
         // result.error. We use a sentinel prefix to distinguish rate-limit
@@ -59,6 +65,19 @@ export function AuthForm({ mode }: { mode: Mode }) {
         const RATE_LIMIT_PREFIX = "RATE_LIMITED:";
         if (result.error.startsWith(RATE_LIMIT_PREFIX)) {
           throw new Error(result.error.slice(RATE_LIMIT_PREFIX.length).trim());
+        }
+        const TOTP_REQUIRED_PREFIX = "TOTP_REQUIRED:";
+        if (result.error.startsWith(TOTP_REQUIRED_PREFIX)) {
+          setNeedsSecondFactor(true);
+          setSecondFactorReady(true);
+          setTotpCode("");
+          return;
+        }
+        const TOTP_INVALID_PREFIX = "TOTP_INVALID:";
+        if (result.error.startsWith(TOTP_INVALID_PREFIX)) {
+          setNeedsSecondFactor(true);
+          setSecondFactorReady(false);
+          throw new Error(result.error.slice(TOTP_INVALID_PREFIX.length).trim());
         }
         throw new Error("Invalid email or password.");
       }
@@ -120,9 +139,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setNeedsSecondFactor(false);
+                setSecondFactorReady(false);
+              }}
               placeholder="you@example.com"
               autoComplete="email"
+              disabled={needsSecondFactor}
             />
           </label>
           <label className="block">
@@ -141,13 +165,43 @@ export function AuthForm({ mode }: { mode: Mode }) {
               className="input mt-1"
               type="password"
               required
-              minLength={8}
+              minLength={mode === "signin" ? undefined : 10}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === "signin" ? "Your password" : "Min. 8 characters"}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setNeedsSecondFactor(false);
+                setSecondFactorReady(false);
+              }}
+              placeholder={mode === "signin" ? "Your password" : "Min. 10 characters"}
               autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              disabled={needsSecondFactor}
             />
           </label>
+
+          {needsSecondFactor && (
+            <label className="block">
+              <span className="text-xs text-text-muted">
+                Authenticator or recovery code
+              </span>
+              <input
+                className="input mt-1"
+                type="text"
+                required
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                placeholder="123456"
+                autoFocus
+              />
+            </label>
+          )}
+
+          {secondFactorReady && !error && (
+            <div className="rounded-md border border-border bg-bg-inset/40 text-text-muted text-sm px-3 py-2">
+              Password verified. Enter your authenticator or recovery code.
+            </div>
+          )}
 
           {error && (
             <div className="rounded-md border border-hard/40 bg-hard/10 text-hard text-sm px-3 py-2">
@@ -161,7 +215,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
             disabled={loading}
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {mode === "signin" ? "Sign in" : "Create account"}
+            {needsSecondFactor
+              ? "Verify code"
+              : mode === "signin"
+              ? "Sign in"
+              : "Create account"}
           </button>
         </form>
 

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
+import { MIN_PASSWORD_LENGTH, validatePasswordStrength } from "@/lib/passwordCheck";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ const Body = z.object({
   currentPassword: z.string().min(1).max(128),
   newPassword: z
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
     .max(128, "Password is too long"),
 });
 
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
       { error: "New password must be different from the current one." },
       { status: 400 }
     );
+  }
+
+  const strength = await validatePasswordStrength(parsed.newPassword);
+  if (!strength.ok) {
+    return Response.json({ error: strength.error }, { status: 400 });
   }
 
   const row = await prisma.user.findUnique({
