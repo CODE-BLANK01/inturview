@@ -31,9 +31,14 @@ export default async function DashboardPage() {
 
   const plan = getPlan(profile.plan);
   const monthStart = startOfMonthUTC();
-  const interviewsThisMonth = await prisma.interview.count({
-    where: { userId: user.id, startedAt: { gte: monthStart } },
-  });
+  const [interviewsThisMonth, designSessionsThisMonth] = await Promise.all([
+    prisma.interview.count({
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.designSession.count({
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+  ]);
 
   const data = await loadDashboardData(user.id);
 
@@ -45,7 +50,11 @@ export default async function DashboardPage() {
 
         <div className="space-y-6">
           <StatGrid stats={data.stats} />
-          <PlanUsage plan={plan} interviewsThisMonth={interviewsThisMonth} />
+          <PlanUsage
+            plan={plan}
+            interviewsThisMonth={interviewsThisMonth}
+            designSessionsThisMonth={designSessionsThisMonth}
+          />
           <ResumeRow
             inProgress={data.inProgress}
             lastCompleted={data.recent[0]}

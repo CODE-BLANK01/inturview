@@ -30,9 +30,10 @@ const MODES: Mode[] = [
   {
     key: "system-design",
     title: "System design",
-    blurb: "Whiteboard-style sessions with capacity math and trade-off probing.",
+    blurb: "Free-draw whiteboard, three phases, scorecard at the end.",
     icon: Network,
-    status: "soon",
+    href: "/design-problems",
+    status: "live",
   },
   {
     key: "behavioral",

@@ -14,22 +14,77 @@ export default async function HistoryPage() {
 
   // Both COMPLETED (finished + scored) and ABANDONED (ended early, no debrief)
   // are part of the user's history. IN_PROGRESS rows live on the dashboard.
-  const interviews = await prisma.interview.findMany({
-    where: {
-      userId: user.id,
-      status: { in: ["COMPLETED", "ABANDONED"] },
-    },
-    orderBy: { completedAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      problemId: true,
-      status: true,
-      totalScore: true,
-      recommendation: true,
-      completedAt: true,
-      problem: { select: { title: true, difficulty: true, topic: true } },
-    },
+  const [interviewRows, designRows] = await Promise.all([
+    prisma.interview.findMany({
+      where: { userId: user.id, status: { in: ["COMPLETED", "ABANDONED"] } },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        totalScore: true,
+        recommendation: true,
+        completedAt: true,
+        problem: { select: { title: true, difficulty: true, topic: true } },
+      },
+    }),
+    prisma.designSession.findMany({
+      where: { userId: user.id, status: { in: ["COMPLETED", "ABANDONED"] } },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        totalScore: true,
+        recommendation: true,
+        completedAt: true,
+        problem: { select: { title: true, difficulty: true, topic: true } },
+      },
+    }),
+  ]);
+
+  type HistoryItem = {
+    id: string;
+    kind: "coding" | "design";
+    href: string;
+    status: "COMPLETED" | "ABANDONED";
+    totalScore: number | null;
+    recommendation: string | null;
+    completedAt: Date | null;
+    title: string;
+    difficulty: string;
+    topic: string;
+  };
+
+  const interviews: HistoryItem[] = [
+    ...interviewRows.map((iv) => ({
+      id: iv.id,
+      kind: "coding" as const,
+      href: `/history/${iv.id}`,
+      status: iv.status as "COMPLETED" | "ABANDONED",
+      totalScore: iv.totalScore,
+      recommendation: iv.recommendation,
+      completedAt: iv.completedAt,
+      title: iv.problem.title,
+      difficulty: iv.problem.difficulty,
+      topic: iv.problem.topic,
+    })),
+    ...designRows.map((ds) => ({
+      id: ds.id,
+      kind: "design" as const,
+      href: `/history/design/${ds.id}`,
+      status: ds.status as "COMPLETED" | "ABANDONED",
+      totalScore: ds.totalScore,
+      recommendation: ds.recommendation,
+      completedAt: ds.completedAt,
+      title: ds.problem.title,
+      difficulty: ds.problem.difficulty,
+      topic: ds.problem.topic,
+    })),
+  ].sort((a, b) => {
+    const at = a.completedAt?.getTime() ?? 0;
+    const bt = b.completedAt?.getTime() ?? 0;
+    return bt - at;
   });
 
   return (
@@ -58,15 +113,25 @@ export default async function HistoryPage() {
               const isAbandoned = iv.status === "ABANDONED";
               return (
                 <Link
-                  key={iv.id}
-                  href={`/history/${iv.id}`}
+                  key={`${iv.kind}-${iv.id}`}
+                  href={iv.href}
                   className="flex items-center gap-3 p-4 hover:bg-bg-surface transition-colors"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{iv.problem.title}</span>
-                      <DifficultyBadge value={iv.problem.difficulty as Difficulty} />
-                      <TopicBadge value={iv.problem.topic} />
+                      <span className="font-medium truncate">{iv.title}</span>
+                      <DifficultyBadge value={iv.difficulty as Difficulty} />
+                      <TopicBadge value={iv.topic} />
+                      <span
+                        className="badge"
+                        style={{
+                          background: "rgb(var(--bg-inset))",
+                          color: "rgb(var(--text-muted))",
+                          borderColor: "rgb(var(--border-base))",
+                        }}
+                      >
+                        {iv.kind === "design" ? "System design" : "Coding"}
+                      </span>
                       {isAbandoned && (
                         <span
                           className="badge"

@@ -5,6 +5,7 @@ import { priceLabel } from "@/lib/plans";
 interface PlanUsageProps {
   plan: PlanDefinition;
   interviewsThisMonth: number;
+  designSessionsThisMonth: number;
 }
 
 function daysUntilReset(): number {
@@ -15,7 +16,11 @@ function daysUntilReset(): number {
   return Math.max(1, Math.ceil((nextMonth.getTime() - now.getTime()) / 86_400_000));
 }
 
-export function PlanUsage({ plan, interviewsThisMonth }: PlanUsageProps) {
+export function PlanUsage({
+  plan,
+  interviewsThisMonth,
+  designSessionsThisMonth,
+}: PlanUsageProps) {
   const limit = plan.interviewsPerMonth;
   const used = interviewsThisMonth;
   const unlimited = limit === null;
@@ -23,6 +28,14 @@ export function PlanUsage({ plan, interviewsThisMonth }: PlanUsageProps) {
   const remaining = unlimited ? null : Math.max(0, limit! - used);
   const atOrNearLimit = !unlimited && used >= (limit ?? 0);
   const warningThreshold = !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
+
+  const dLimit = plan.designSessionsPerMonth;
+  const dUsed = designSessionsThisMonth;
+  const dUnlimited = dLimit === null;
+  const dPct = dUnlimited ? 0 : Math.min(100, Math.round((dUsed / (dLimit || 1)) * 100));
+  const dRemaining = dUnlimited ? null : Math.max(0, dLimit! - dUsed);
+  const dAtLimit = !dUnlimited && dUsed >= (dLimit ?? 0);
+  const dWarning = !dUnlimited && dLimit !== null && dLimit > 0 && dUsed / dLimit >= 0.8;
 
   const resetDays = daysUntilReset();
 
@@ -74,6 +87,33 @@ export function PlanUsage({ plan, interviewsThisMonth }: PlanUsageProps) {
                 }`}
                 style={{ width: `${pct}%` }}
                 aria-label={`${pct}% used`}
+              />
+            </div>
+          )}
+
+          <p className="mt-4 text-sm text-text-muted leading-snug">
+            {dUnlimited ? (
+              "Unlimited system-design sessions on your plan."
+            ) : (
+              <>
+                <span className="t-data text-[15px] text-text">
+                  {dUsed} / {dLimit}
+                </span>{" "}
+                <span className="text-text-muted">
+                  design sessions this month —{" "}
+                  {dAtLimit ? "limit reached." : `${dRemaining} left.`}
+                </span>
+              </>
+            )}
+          </p>
+          {!dUnlimited && (
+            <div className="mt-2 h-[6px] w-full max-w-md overflow-hidden rounded-full bg-bg-inset">
+              <div
+                className={`h-full transition-[width] duration-300 ${
+                  dAtLimit ? "bg-hard" : dWarning ? "bg-medium" : "bg-text"
+                }`}
+                style={{ width: `${dPct}%` }}
+                aria-label={`${dPct}% design used`}
               />
             </div>
           )}
