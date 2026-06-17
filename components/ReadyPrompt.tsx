@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 interface ReadyPromptProps {
-  /** True once the interviewer has emitted [READY]. */
+  /** True once the interviewer has emitted [READY] / [SCOPED]. */
   ready: boolean;
   /** Locks the buttons while a stream is in flight. */
   disabled?: boolean;
@@ -19,6 +19,17 @@ interface ReadyPromptProps {
   /** Called when the user chooses to advance BEFORE the interviewer green-lit them. */
   onSkipAhead: () => void;
   onKeepDiscussing: () => void;
+  /** Reusable across modes. Defaults match the coding (approach → code) flow. */
+  labels?: {
+    /** Heading shown on green-lit state. */
+    greenLitTitle?: string;
+    /** Body shown on green-lit state. */
+    greenLitBody?: ReactNode;
+    /** Primary button label on green-lit state. */
+    advanceLabel?: string;
+    /** Body explaining why skipping early hurts the score. */
+    skipPenaltyBody?: ReactNode;
+  };
 }
 
 export function ReadyPrompt({
@@ -28,8 +39,16 @@ export function ReadyPrompt({
   onStartCoding,
   onSkipAhead,
   onKeepDiscussing,
+  labels,
 }: ReadyPromptProps) {
   const [confirmingSkip, setConfirmingSkip] = useState(false);
+  const greenLitTitle =
+    labels?.greenLitTitle ?? "The interviewer green-lit your approach.";
+  const greenLitBody =
+    labels?.greenLitBody ??
+    "Looks like they've heard enough — you can move to the editor whenever you're ready, or keep discussing if you want to refine further.";
+  const advanceLabel = labels?.advanceLabel ?? "Start coding";
+  const skipPenaltyBody = labels?.skipPenaltyBody;
 
   if (ready) {
     return (
@@ -38,13 +57,8 @@ export function ReadyPrompt({
           <div className="flex items-start gap-3 flex-1">
             <CheckCircle2 className="h-5 w-5 text-easy mt-0.5 shrink-0" />
             <div>
-              <h3 className="font-semibold leading-tight">
-                The interviewer green-lit your approach.
-              </h3>
-              <p className="text-sm text-text-muted mt-1">
-                Looks like they've heard enough — you can move to the editor whenever
-                you're ready, or keep discussing if you want to refine further.
-              </p>
+              <h3 className="font-semibold leading-tight">{greenLitTitle}</h3>
+              <p className="text-sm text-text-muted mt-1">{greenLitBody}</p>
             </div>
           </div>
           <div className="flex flex-row gap-2 sm:flex-col lg:flex-row shrink-0">
@@ -63,7 +77,7 @@ export function ReadyPrompt({
               disabled={disabled}
               className="btn btn-primary flex-1 sm:flex-none"
             >
-              Start coding
+              {advanceLabel}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -106,9 +120,13 @@ export function ReadyPrompt({
         <div className="mt-3 rounded-md border border-medium/40 bg-medium/10 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
           <AlertTriangle className="h-4 w-4 text-medium shrink-0" />
           <p className="text-xs text-text flex-1">
-            Moving to code without the interviewer's go-ahead will count against your
-            <span className="font-medium"> communication</span> and
-            <span className="font-medium"> approach quality</span> scores in the debrief.
+            {skipPenaltyBody ?? (
+              <>
+                Moving to code without the interviewer&apos;s go-ahead will count against your
+                <span className="font-medium"> communication</span> and
+                <span className="font-medium"> approach quality</span> scores in the debrief.
+              </>
+            )}
           </p>
           <div className="flex gap-2 shrink-0">
             <button
