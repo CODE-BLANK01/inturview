@@ -2,6 +2,15 @@
 
 import type { Phase } from "./types";
 
+export type DesignPhase = "scope" | "design" | "debrief";
+
+export interface DesignStreamRequest {
+  session_id: string;
+  problem_id: string;
+  phase: DesignPhase;
+  user_turn: string | null;
+}
+
 export interface StreamRequest {
   interview_id: string;
   problem_id: string;
@@ -18,18 +27,33 @@ export interface StreamCallbacks {
   onDone: () => void;
   onError: (message: string) => void;
   /** Fires once per stream when the server emits a structured signal
-   *  (e.g. approach-phase readiness). */
-  onMeta?: (meta: { ready?: boolean }) => void;
+   *  (e.g. approach-phase readiness, scope-phase acceptance). */
+  onMeta?: (meta: { ready?: boolean; scoped?: boolean }) => void;
   signal?: AbortSignal;
+}
+
+export async function streamDesignMessage(
+  body: DesignStreamRequest,
+  cb: StreamCallbacks
+): Promise<void> {
+  return streamFromEndpoint("/api/design/message", body, cb);
 }
 
 export async function streamInterviewMessage(
   body: StreamRequest,
   cb: StreamCallbacks
 ): Promise<void> {
+  return streamFromEndpoint("/api/interview/message", body, cb);
+}
+
+async function streamFromEndpoint(
+  url: string,
+  body: unknown,
+  cb: StreamCallbacks
+): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/interview/message", {
+    res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -84,7 +108,7 @@ export async function streamInterviewMessage(
           }
         } else if (event === "meta") {
           try {
-            const parsed = JSON.parse(data) as { ready?: boolean };
+            const parsed = JSON.parse(data) as { ready?: boolean; scoped?: boolean };
             cb.onMeta?.(parsed);
           } catch {
             /* ignore malformed meta */

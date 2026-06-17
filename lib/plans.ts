@@ -12,9 +12,12 @@ export interface PlanDefinition {
   audience: "individual" | "team" | "enterprise";
   /** Bullet features shown on the card. Keep tight — 3–5 lines max. */
   features: string[];
-  /** Hard cap on completed-or-in-progress interviews per calendar month.
-   *  null = unlimited. */
+  /** Hard cap on coding-interview starts per calendar month. null = unlimited. */
   interviewsPerMonth: number | null;
+  /** Hard cap on system-design-session starts per calendar month. null = unlimited.
+   *  Separate counter from coding interviews — design sessions are ~2-3x more
+   *  expensive per AI call (bigger context, longer duration). */
+  designSessionsPerMonth: number | null;
   /** Whether a user can select this plan from the onboarding wizard today. */
   selectable: boolean;
   /** When selectable=false, this is the "Coming Q2" style note. */
@@ -28,6 +31,11 @@ function freeInterviewsPerMonth(): number {
   return Number.isFinite(v) && v >= 0 ? v : 5;
 }
 
+function freeDesignSessionsPerMonth(): number {
+  const v = Number(process.env.FREE_DESIGN_SESSIONS_PER_MONTH ?? "2");
+  return Number.isFinite(v) && v >= 0 ? v : 2;
+}
+
 export const PLANS: PlanDefinition[] = [
   {
     tier: PlanTier.FREE,
@@ -36,12 +44,14 @@ export const PLANS: PlanDefinition[] = [
     priceMonthlyCents: 0,
     audience: "individual",
     features: [
-      "Up to {{interviews}} mock interviews per month",
+      "Up to {{interviews}} mock coding interviews per month",
+      "Up to {{designSessions}} system-design sessions per month",
       "Full three-phase loop — approach, code, debrief",
       "Five-dimension rubric scorecard",
       "All NeetCode 150 problems unlocked",
     ],
     interviewsPerMonth: freeInterviewsPerMonth(),
+    designSessionsPerMonth: freeDesignSessionsPerMonth(),
     selectable: true,
   },
   {
@@ -51,12 +61,13 @@ export const PLANS: PlanDefinition[] = [
     priceMonthlyCents: 1900,
     audience: "individual",
     features: [
-      "Unlimited mock interviews",
+      "Unlimited mock interviews (coding + system design)",
       "Company-specific interview modes",
       "Advanced AI feedback + benchmarking",
       "Priority response speed",
     ],
     interviewsPerMonth: null,
+    designSessionsPerMonth: null,
     selectable: false,
     availabilityNote: "Coming soon",
   },
@@ -68,11 +79,13 @@ export const PLANS: PlanDefinition[] = [
     audience: "team",
     features: [
       "~20 candidate interview sessions / month",
+      "~8 system-design sessions / month",
       "Recruiter dashboard + scorecards",
       "Custom rubric configuration",
       "Up to 3 seats",
     ],
     interviewsPerMonth: 20,
+    designSessionsPerMonth: 8,
     selectable: false,
     availabilityNote: "Coming soon",
   },
@@ -84,11 +97,13 @@ export const PLANS: PlanDefinition[] = [
     audience: "team",
     features: [
       "~100 candidate interview sessions / month",
+      "~40 system-design sessions / month",
       "Candidate comparison + analytics",
       "Calibrated scoring & benchmarking",
       "Up to 10 seats, shared workspaces",
     ],
     interviewsPerMonth: 100,
+    designSessionsPerMonth: 40,
     selectable: false,
     availabilityNote: "Coming soon",
   },
@@ -105,6 +120,7 @@ export const PLANS: PlanDefinition[] = [
       "SSO, audit log export, SLA",
     ],
     interviewsPerMonth: null,
+    designSessionsPerMonth: null,
     selectable: false,
     availabilityNote: "Talk to us",
   },

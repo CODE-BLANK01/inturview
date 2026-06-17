@@ -15,3 +15,8 @@ export function getAnthropic(): Anthropic {
 }
 
 export const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+// System-design interviews use a separate model knob — the surface is bigger
+// (whiteboard context, multi-component trade-offs) so we may want a stronger
+// model here independently from the coding loop.
+export const DESIGN_MODEL =
+  process.env.ANTHROPIC_DESIGN_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
