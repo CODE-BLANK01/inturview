@@ -66,6 +66,7 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   interviews   Interview[]
+  designSessions DesignSession[]
   auditEntries AuditLog[]  @relation("AdminAudit")
   resetTokens  PasswordResetToken[]
   verificationTokens EmailVerificationToken[]
@@ -196,4 +197,94 @@ model Debrief {
   createdAt   DateTime @default(now())
 
   interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// System-design interviews — parallel surface to coding (Problem/Interview).
+// Separate models because the field shapes are mostly disjoint (no LeetCode
+// URL, no optimal_time/space; instead: open prompt, reference architecture,
+// canvas JSON snapshot).
+// ---------------------------------------------------------------------------
+
+model SystemDesignProblem {
+  // Slug ("design-twitter"), mirrors Problem.id convention.
+  id                       String   @id
+  title                    String
+  difficulty               String   // Easy / Medium / Hard
+  topic                    String   // Feeds, Messaging, Storage, Geospatial, ...
+  /// The open prompt the AI delivers at session start.
+  prompt                   String
+  /// JSON: { functional: string[], nonFunctional: string[] } — used as
+  /// reference during debrief grading, not shown to the candidate live.
+  expectedRequirements     Json
+  /// Plain-text canonical architecture summary (multi-paragraph) used in
+  /// the debrief's "optimal solution notes" and as grading reference.
+  referenceArchitecture    String
+  /// JSON string[] — suggested deep-dive topics the AI can probe.
+  deepDiveTopics           Json
+  estimatedDurationMinutes Int      @default(45)
+
+  sessions DesignSession[]
+
+  @@index([topic])
+  @@index([difficulty])
+}
+
+enum DesignSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+model DesignSession {
+  id              String              @id @default(cuid())
+  userId          String
+  problemId       String
+  status          DesignSessionStatus @default(IN_PROGRESS)
+  /// Excalidraw scene JSON (the elements + appState subset we care about).
+  /// Debounced auto-save from the client. Null at session start.
+  canvasJson      Json?
+  totalScore      Int?
+  recommendation  String?
+  startedAt       DateTime            @default(now())
+  completedAt     DateTime?
+  /// First time the interviewer emitted [SCOPED] for this session's requirements.
+  /// Null when the candidate moved to design without scope acceptance —
+  /// caps the Requirements/Architecture scores in debrief.
+  scopeAcceptedAt DateTime?
+  /// Whether the candidate clicked "Start designing" while the latest signal
+  /// was still [CONTINUE]. Behavioral signal feeding the rubric.
+  movedToDesignEarly Boolean          @default(false)
+
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem  SystemDesignProblem @relation(fields: [problemId], references: [id])
+  messages DesignMessage[]
+  debrief  DesignDebrief?
+
+  @@index([userId, problemId, completedAt])
+  @@index([userId, startedAt])
+}
+
+model DesignMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  /// "scope" | "design" | "debrief" (debrief = post-debrief follow-up chat)
+  phase     String
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+
+  session DesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model DesignDebrief {
+  id         String   @id @default(cuid())
+  sessionId  String   @unique
+  payload    Json
+  totalScore Int
+  createdAt  DateTime @default(now())
+
+  session DesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
