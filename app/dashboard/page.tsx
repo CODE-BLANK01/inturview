@@ -31,12 +31,27 @@ export default async function DashboardPage() {
 
   const plan = getPlan(profile.plan);
   const monthStart = startOfMonthUTC();
-  const [interviewsThisMonth, designSessionsThisMonth] = await Promise.all([
+  const [
+    interviewsThisMonth,
+    designSessionsThisMonth,
+    behavioralSessionsThisMonth,
+    recruiterSessionsThisMonth,
+  ] = await Promise.all([
     prisma.interview.count({
       where: { userId: user.id, startedAt: { gte: monthStart } },
     }),
     prisma.designSession.count({
       where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.conversationSession.count({
+      where: { userId: user.id, kind: "BEHAVIORAL", startedAt: { gte: monthStart } },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "RECRUITER_SCREEN",
+        startedAt: { gte: monthStart },
+      },
     }),
   ]);
 
@@ -54,6 +69,8 @@ export default async function DashboardPage() {
             plan={plan}
             interviewsThisMonth={interviewsThisMonth}
             designSessionsThisMonth={designSessionsThisMonth}
+            behavioralSessionsThisMonth={behavioralSessionsThisMonth}
+            recruiterSessionsThisMonth={recruiterSessionsThisMonth}
           />
           <ResumeRow
             inProgress={data.inProgress}

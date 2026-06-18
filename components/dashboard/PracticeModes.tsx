@@ -38,16 +38,18 @@ const MODES: Mode[] = [
   {
     key: "behavioral",
     title: "Behavioral",
-    blurb: "STAR-method drills, ambiguity scenarios, leadership stories.",
+    blurb: "STAR-method drills against the questions interviewers actually ask.",
     icon: Users,
-    status: "soon",
+    href: "/behavioral",
+    status: "live",
   },
   {
     key: "screen",
     title: "Recruiter screen",
-    blurb: "Resume walkthrough, motivation, and compensation framing.",
+    blurb: "25-min phone screen — story, motivation, comp expectations.",
     icon: ClipboardList,
-    status: "planned",
+    href: "/recruiter-screen",
+    status: "live",
   },
 ];
 

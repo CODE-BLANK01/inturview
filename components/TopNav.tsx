@@ -5,13 +5,64 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { ChevronDown, LogOut, Settings } from "lucide-react";
+import {
+  ChevronDown,
+  ClipboardList,
+  Code2,
+  LogOut,
+  Network,
+  Settings,
+  Users,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+
+const PRACTICE_MODES: {
+  href: string;
+  label: string;
+  blurb: string;
+  icon: LucideIcon;
+  pathPrefixes: string[];
+}[] = [
+  {
+    href: "/problems",
+    label: "Coding",
+    blurb: "Approach, code, debrief — NeetCode 150",
+    icon: Code2,
+    pathPrefixes: ["/problems", "/interview"],
+  },
+  {
+    href: "/design-problems",
+    label: "System design",
+    blurb: "Free-draw whiteboard, scope → design → debrief",
+    icon: Network,
+    pathPrefixes: ["/design-problems", "/design"],
+  },
+  {
+    href: "/behavioral",
+    label: "Behavioral",
+    blurb: "STAR drills against real interviewer questions",
+    icon: Users,
+    pathPrefixes: ["/behavioral"],
+  },
+  {
+    href: "/recruiter-screen",
+    label: "Recruiter screen",
+    blurb: "25-min phone screen — story, motivation, comp",
+    icon: ClipboardList,
+    pathPrefixes: ["/recruiter-screen"],
+  },
+];
 
 export function TopNav() {
   const { data, status } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [practiceOpen, setPracticeOpen] = useState(false);
+
+  const practiceActive = PRACTICE_MODES.some((m) =>
+    m.pathPrefixes.some((p) => pathname === p || pathname?.startsWith(p + "/"))
+  );
 
   const isAuthed = status === "authenticated";
   const isAdmin =
@@ -41,9 +92,46 @@ export function TopNav() {
             <NavLink href="/dashboard" active={pathname === "/dashboard"}>
               Dashboard
             </NavLink>
-            <NavLink href="/problems" active={pathname?.startsWith("/problems") ?? false}>
-              Practice
-            </NavLink>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setPracticeOpen((v) => !v)}
+                onBlur={() => setTimeout(() => setPracticeOpen(false), 150)}
+                className={`px-3 py-1.5 rounded-md inline-flex items-center gap-1 transition-colors duration-150 ${
+                  practiceActive
+                    ? "text-text bg-bg-inset"
+                    : "text-text-muted hover:text-text hover:bg-bg-inset/60"
+                }`}
+              >
+                Practice
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {practiceOpen && (
+                <div className="absolute left-0 top-full mt-1 w-72 panel py-1 shadow-lg">
+                  {PRACTICE_MODES.map((m) => {
+                    const Icon = m.icon;
+                    const active = m.pathPrefixes.some(
+                      (p) => pathname === p || pathname?.startsWith(p + "/")
+                    );
+                    return (
+                      <Link
+                        key={m.href}
+                        href={m.href}
+                        className={`flex items-start gap-3 px-3 py-2 hover:bg-bg-inset ${
+                          active ? "bg-bg-inset/60" : ""
+                        }`}
+                      >
+                        <Icon className="h-4 w-4 mt-0.5 text-accent shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium">{m.label}</div>
+                          <div className="text-xs text-text-dim truncate">{m.blurb}</div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <NavLink href="/history" active={pathname?.startsWith("/history") ?? false}>
               History
             </NavLink>
@@ -80,7 +168,10 @@ export function TopNav() {
                   </div>
                   <div className="md:hidden">
                     <DropdownLink href="/dashboard">Dashboard</DropdownLink>
-                    <DropdownLink href="/problems">Practice</DropdownLink>
+                    <DropdownLink href="/problems">Coding</DropdownLink>
+                    <DropdownLink href="/design-problems">System design</DropdownLink>
+                    <DropdownLink href="/behavioral">Behavioral</DropdownLink>
+                    <DropdownLink href="/recruiter-screen">Recruiter screen</DropdownLink>
                     <DropdownLink href="/history">History</DropdownLink>
                     {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
                     <div className="my-1 border-t border-border" />

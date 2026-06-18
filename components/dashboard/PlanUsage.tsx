@@ -6,6 +6,8 @@ interface PlanUsageProps {
   plan: PlanDefinition;
   interviewsThisMonth: number;
   designSessionsThisMonth: number;
+  behavioralSessionsThisMonth: number;
+  recruiterSessionsThisMonth: number;
 }
 
 function daysUntilReset(): number {
@@ -20,116 +22,113 @@ export function PlanUsage({
   plan,
   interviewsThisMonth,
   designSessionsThisMonth,
+  behavioralSessionsThisMonth,
+  recruiterSessionsThisMonth,
 }: PlanUsageProps) {
-  const limit = plan.interviewsPerMonth;
-  const used = interviewsThisMonth;
-  const unlimited = limit === null;
-  const pct = unlimited ? 0 : Math.min(100, Math.round((used / (limit || 1)) * 100));
-  const remaining = unlimited ? null : Math.max(0, limit! - used);
-  const atOrNearLimit = !unlimited && used >= (limit ?? 0);
-  const warningThreshold = !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
-
-  const dLimit = plan.designSessionsPerMonth;
-  const dUsed = designSessionsThisMonth;
-  const dUnlimited = dLimit === null;
-  const dPct = dUnlimited ? 0 : Math.min(100, Math.round((dUsed / (dLimit || 1)) * 100));
-  const dRemaining = dUnlimited ? null : Math.max(0, dLimit! - dUsed);
-  const dAtLimit = !dUnlimited && dUsed >= (dLimit ?? 0);
-  const dWarning = !dUnlimited && dLimit !== null && dLimit > 0 && dUsed / dLimit >= 0.8;
-
   const resetDays = daysUntilReset();
+  const meters = [
+    {
+      label: "Coding",
+      used: interviewsThisMonth,
+      limit: plan.interviewsPerMonth,
+    },
+    {
+      label: "System design",
+      used: designSessionsThisMonth,
+      limit: plan.designSessionsPerMonth,
+    },
+    {
+      label: "Behavioral",
+      used: behavioralSessionsThisMonth,
+      limit: plan.behavioralSessionsPerMonth,
+    },
+    {
+      label: "Recruiter screen",
+      used: recruiterSessionsThisMonth,
+      limit: plan.recruiterSessionsPerMonth,
+    },
+  ];
 
   return (
     <section className="panel p-5">
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-start">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="t-eyebrow">Plan</span>
-            <span
-              className="badge"
-              style={{
-                background: "rgb(var(--bg-inverse))",
-                color: "rgb(var(--text-inverse))",
-                borderColor: "rgb(var(--bg-inverse))",
-                fontWeight: 700,
-              }}
-            >
-              {plan.name}
-            </span>
-            <span className="text-xs text-text-dim tabular-nums">
-              {priceLabel(plan)}
-              {plan.priceMonthlyCents && plan.priceMonthlyCents > 0 ? " / mo" : ""}
-            </span>
-          </div>
-          <p className="text-sm text-text-muted leading-snug">
-            {unlimited ? (
-              "Unlimited interviews on your plan."
-            ) : (
-              <>
-                <span className="t-data text-[15px] text-text">
-                  {used} / {limit}
-                </span>{" "}
-                <span className="text-text-muted">
-                  interviews this month —{" "}
-                  {atOrNearLimit
-                    ? "limit reached."
-                    : `${remaining} left, resets in ${resetDays}d.`}
-                </span>
-              </>
-            )}
-          </p>
-
-          {!unlimited && (
-            <div className="mt-3 h-[6px] w-full max-w-md overflow-hidden rounded-full bg-bg-inset">
-              <div
-                className={`h-full transition-[width] duration-300 ${
-                  atOrNearLimit ? "bg-hard" : warningThreshold ? "bg-medium" : "bg-text"
-                }`}
-                style={{ width: `${pct}%` }}
-                aria-label={`${pct}% used`}
-              />
-            </div>
-          )}
-
-          <p className="mt-4 text-sm text-text-muted leading-snug">
-            {dUnlimited ? (
-              "Unlimited system-design sessions on your plan."
-            ) : (
-              <>
-                <span className="t-data text-[15px] text-text">
-                  {dUsed} / {dLimit}
-                </span>{" "}
-                <span className="text-text-muted">
-                  design sessions this month —{" "}
-                  {dAtLimit ? "limit reached." : `${dRemaining} left.`}
-                </span>
-              </>
-            )}
-          </p>
-          {!dUnlimited && (
-            <div className="mt-2 h-[6px] w-full max-w-md overflow-hidden rounded-full bg-bg-inset">
-              <div
-                className={`h-full transition-[width] duration-300 ${
-                  dAtLimit ? "bg-hard" : dWarning ? "bg-medium" : "bg-text"
-                }`}
-                style={{ width: `${dPct}%` }}
-                aria-label={`${dPct}% design used`}
-              />
-            </div>
-          )}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <span className="t-eyebrow">Plan</span>
+          <span
+            className="badge"
+            style={{
+              background: "rgb(var(--bg-inverse))",
+              color: "rgb(var(--text-inverse))",
+              borderColor: "rgb(var(--bg-inverse))",
+              fontWeight: 700,
+            }}
+          >
+            {plan.name}
+          </span>
+          <span className="text-xs text-text-dim tabular-nums">
+            {priceLabel(plan)}
+            {plan.priceMonthlyCents && plan.priceMonthlyCents > 0 ? " / mo" : ""}
+          </span>
+          <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
         </div>
+        <UpgradeCta />
+      </div>
 
-        <div className="flex sm:flex-col items-start sm:items-end gap-2">
-          <UpgradeCta />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+        {meters.map((m) => (
+          <Meter key={m.label} label={m.label} used={m.used} limit={m.limit} />
+        ))}
       </div>
     </section>
   );
 }
 
+function Meter({
+  label,
+  used,
+  limit,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+}) {
+  const unlimited = limit === null;
+  const pct = unlimited ? 0 : Math.min(100, Math.round((used / (limit || 1)) * 100));
+  const atLimit = !unlimited && used >= (limit ?? 0);
+  const warning = !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
+  const bar = atLimit ? "bg-hard" : warning ? "bg-medium" : "bg-text";
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-sm mb-1.5">
+        <span className="text-text-muted">{label}</span>
+        <span className="t-data tabular-nums">
+          {used}
+          {unlimited ? (
+            <span className="text-text-dim text-xs"> · unlimited</span>
+          ) : (
+            <>
+              <span className="text-text-dim"> / {limit}</span>
+            </>
+          )}
+        </span>
+      </div>
+      <div className="h-[6px] w-full overflow-hidden rounded-full bg-bg-inset">
+        {unlimited ? (
+          <div className="h-full bg-easy/40" style={{ width: "100%" }} />
+        ) : (
+          <div
+            className={`h-full transition-[width] duration-300 ${bar}`}
+            style={{ width: `${pct}%` }}
+            aria-label={`${label} ${pct}% used`}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function UpgradeCta() {
-  // Payments aren't wired up yet — clicking does nothing but signal intent.
-  // Replace with a Link to /billing or /upgrade when billing ships.
   return (
     <button
       type="button"

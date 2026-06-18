@@ -14,7 +14,7 @@ export default async function HistoryPage() {
 
   // Both COMPLETED (finished + scored) and ABANDONED (ended early, no debrief)
   // are part of the user's history. IN_PROGRESS rows live on the dashboard.
-  const [interviewRows, designRows] = await Promise.all([
+  const [interviewRows, designRows, conversationRows] = await Promise.all([
     prisma.interview.findMany({
       where: { userId: user.id, status: { in: ["COMPLETED", "ABANDONED"] } },
       orderBy: { completedAt: "desc" },
@@ -41,18 +41,32 @@ export default async function HistoryPage() {
         problem: { select: { title: true, difficulty: true, topic: true } },
       },
     }),
+    prisma.conversationSession.findMany({
+      where: { userId: user.id, status: { in: ["COMPLETED", "ABANDONED"] } },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        totalScore: true,
+        recommendation: true,
+        completedAt: true,
+        scenario: { select: { title: true, category: true } },
+      },
+    }),
   ]);
 
   type HistoryItem = {
     id: string;
-    kind: "coding" | "design";
+    kind: "coding" | "design" | "behavioral" | "recruiter";
     href: string;
     status: "COMPLETED" | "ABANDONED";
     totalScore: number | null;
     recommendation: string | null;
     completedAt: Date | null;
     title: string;
-    difficulty: string;
+    difficulty: string | null;
     topic: string;
   };
 
@@ -81,11 +95,38 @@ export default async function HistoryPage() {
       difficulty: ds.problem.difficulty,
       topic: ds.problem.topic,
     })),
+    ...conversationRows.map((cs) => ({
+      id: cs.id,
+      kind: (cs.kind === "BEHAVIORAL" ? "behavioral" : "recruiter") as
+        | "behavioral"
+        | "recruiter",
+      href: `/history/conversation/${cs.id}`,
+      status: cs.status as "COMPLETED" | "ABANDONED",
+      totalScore: cs.totalScore,
+      recommendation: cs.recommendation,
+      completedAt: cs.completedAt,
+      title:
+        cs.kind === "BEHAVIORAL"
+          ? cs.scenario?.title ?? "Behavioral"
+          : "Recruiter screen",
+      difficulty: null,
+      topic:
+        cs.kind === "BEHAVIORAL"
+          ? cs.scenario?.category ?? "Behavioral"
+          : "Phone screen",
+    })),
   ].sort((a, b) => {
     const at = a.completedAt?.getTime() ?? 0;
     const bt = b.completedAt?.getTime() ?? 0;
     return bt - at;
   });
+
+  const KIND_LABEL: Record<HistoryItem["kind"], string> = {
+    coding: "Coding",
+    design: "System design",
+    behavioral: "Behavioral",
+    recruiter: "Recruiter screen",
+  };
 
   return (
     <>
@@ -120,7 +161,9 @@ export default async function HistoryPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{iv.title}</span>
-                      <DifficultyBadge value={iv.difficulty as Difficulty} />
+                      {iv.difficulty && (
+                        <DifficultyBadge value={iv.difficulty as Difficulty} />
+                      )}
                       <TopicBadge value={iv.topic} />
                       <span
                         className="badge"
@@ -130,7 +173,7 @@ export default async function HistoryPage() {
                           borderColor: "rgb(var(--border-base))",
                         }}
                       >
-                        {iv.kind === "design" ? "System design" : "Coding"}
+                        {KIND_LABEL[iv.kind]}
                       </span>
                       {isAbandoned && (
                         <span
