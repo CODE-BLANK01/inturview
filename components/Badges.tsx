@@ -67,6 +67,26 @@ const BAND_STYLES: Record<Recommendation, BandStyle> = {
       fontWeight: 700,
     },
   },
+  // Recruiter-screen variant — same color logic, "Advance" terminology.
+  "Strong Advance": {
+    style: {
+      background: "rgb(var(--score-hire))",
+      color: "rgb(var(--text-inverse))",
+      borderColor: "rgb(var(--score-hire))",
+      fontWeight: 700,
+    },
+  },
+  Advance: { className: "border-easy/45 bg-easy-bg/70 text-easy font-semibold" },
+  "Lean Advance": { className: "border-medium/45 bg-medium-bg/70 text-medium font-semibold" },
+  "No Advance": { className: "border-hard/45 bg-hard-bg/70 text-hard font-semibold" },
+  "Strong No Advance": {
+    style: {
+      background: "rgb(var(--score-no))",
+      color: "rgb(var(--text-inverse))",
+      borderColor: "rgb(var(--score-no))",
+      fontWeight: 700,
+    },
+  },
 };
 
 export function RecommendationBadge({ value }: { value: Recommendation }) {
