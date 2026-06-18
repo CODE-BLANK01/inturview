@@ -67,6 +67,7 @@ model User {
   updatedAt    DateTime    @updatedAt
   interviews   Interview[]
   designSessions DesignSession[]
+  conversations  ConversationSession[]
   auditEntries AuditLog[]  @relation("AdminAudit")
   resetTokens  PasswordResetToken[]
   verificationTokens EmailVerificationToken[]
@@ -287,4 +288,83 @@ model DesignDebrief {
   createdAt  DateTime @default(now())
 
   session DesignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Conversation-only interviews (behavioral + recruiter screen).
+// One model parameterized by `kind` — both surfaces are pure-chat with a
+// scorecard at the end. No editor, no canvas.
+// ---------------------------------------------------------------------------
+
+enum ConversationKind {
+  BEHAVIORAL
+  RECRUITER_SCREEN
+}
+
+enum ConversationStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+model BehavioralScenario {
+  // Slug ("conflict-with-teammate"), mirrors Problem.id convention.
+  id          String   @id
+  title       String
+  /// "Conflict" / "Leadership" / "Failure" / "Ambiguity" / "Growth" / ...
+  category    String
+  /// The opening question the interviewer asks. Free-form prose; the LLM
+  /// will probe with STAR follow-ups.
+  prompt      String
+  /// JSON string[] — the specific behaviors / signals the debrief should
+  /// look for. Used as grading reference, not shown to the candidate live.
+  expectedSignals Json
+
+  sessions ConversationSession[]
+
+  @@index([category])
+}
+
+model ConversationSession {
+  id             String              @id @default(cuid())
+  userId         String
+  kind           ConversationKind
+  /// Set when kind=BEHAVIORAL; null for RECRUITER_SCREEN (single canonical flow).
+  scenarioId     String?
+  status         ConversationStatus  @default(IN_PROGRESS)
+  totalScore     Int?
+  recommendation String?
+  startedAt      DateTime            @default(now())
+  completedAt    DateTime?
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenario BehavioralScenario?   @relation(fields: [scenarioId], references: [id])
+  messages ConversationMessage[]
+  debrief  ConversationDebrief?
+
+  @@index([userId, kind, completedAt])
+  @@index([userId, startedAt])
+  @@index([userId, kind, status])
+}
+
+model ConversationMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+
+  session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model ConversationDebrief {
+  id         String   @id @default(cuid())
+  sessionId  String   @unique
+  payload    Json
+  totalScore Int
+  createdAt  DateTime @default(now())
+
+  session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

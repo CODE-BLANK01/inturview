@@ -13,6 +13,7 @@
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:seed": "dotenv -e .env.local -- tsx prisma/seed.ts",
     "db:seed-design": "dotenv -e .env.local -- tsx prisma/seedDesign.ts",
+    "db:seed-behavioral": "dotenv -e .env.local -- tsx prisma/seedBehavioral.ts",
     "db:backfill-free": "dotenv -e .env.local -- tsx prisma/backfillFreeTier.ts",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "postinstall": "prisma generate"
