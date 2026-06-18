@@ -38,7 +38,12 @@ export type Recommendation =
   | "Hire"
   | "Lean Hire"
   | "No Hire"
-  | "Strong No Hire";
+  | "Strong No Hire"
+  | "Strong Advance"
+  | "Advance"
+  | "Lean Advance"
+  | "No Advance"
+  | "Strong No Advance";
 
 export interface Debrief {
   overall_recommendation: Recommendation;

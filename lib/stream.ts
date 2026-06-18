@@ -39,6 +39,19 @@ export async function streamDesignMessage(
   return streamFromEndpoint("/api/design/message", body, cb);
 }
 
+export interface ConversationStreamRequest {
+  session_id: string;
+  mode: "live" | "followup";
+  user_turn: string | null;
+}
+
+export async function streamConversationMessage(
+  body: ConversationStreamRequest,
+  cb: StreamCallbacks
+): Promise<void> {
+  return streamFromEndpoint("/api/conversation/message", body, cb);
+}
+
 export async function streamInterviewMessage(
   body: StreamRequest,
   cb: StreamCallbacks
