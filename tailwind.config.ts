@@ -22,6 +22,7 @@ const config: Config = {
         text: {
           DEFAULT: "rgb(var(--text-primary) / <alpha-value>)",
           muted: "rgb(var(--text-secondary) / <alpha-value>)",
+          "muted-inverse": "rgb(var(--text-secondary-inverse) / <alpha-value>)",
           dim: "rgb(var(--text-tertiary) / <alpha-value>)",
           ember: "rgb(var(--text-ember) / <alpha-value>)",
           inverse: "rgb(var(--text-inverse) / <alpha-value>)",

@@ -131,30 +131,16 @@ const CONFESSIONS = [
 
 function Confession() {
   return (
-    <section
-      className="border-b border-border"
-      style={{
-        background: "rgb(var(--bg-inverse))",
-        color: "rgb(var(--text-inverse))",
-      }}
-    >
+    <section className="surface-inverse border-b border-border">
       <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-        <p className="t-eyebrow mb-6" style={{ color: "rgb(var(--text-tertiary))" }}>
-          02 — The Confession
-        </p>
-        <h2
-          className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl"
-          style={{ color: "rgb(var(--text-inverse))" }}
-        >
+        <p className="t-eyebrow mb-6">02 — The Confession</p>
+        <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text-inverse">
           We both know
           <br />
           what <span className="t-italic">actually</span> happened.
         </h2>
 
-        <ul
-          className="mt-14 border-t"
-          style={{ borderColor: "rgb(var(--text-tertiary) / 0.18)" }}
-        >
+        <ul className="mt-14 border-t border-text-dim/18">
           {CONFESSIONS.map((c) => (
             <ConfessionRow key={c.num} {...c} />
           ))}
@@ -174,23 +160,18 @@ function ConfessionRow({
   evidence: string;
 }) {
   return (
-    <li
-      className="group grid grid-cols-[40px_1fr] sm:grid-cols-[80px_1fr] gap-4 sm:gap-8 py-7 border-b transition-colors duration-150"
-      style={{ borderColor: "rgb(var(--text-tertiary) / 0.18)" }}
-    >
-      <span className="t-eyebrow self-start" style={{ color: "rgb(var(--text-tertiary))" }}>
-        {num}
-      </span>
+    <li className="group grid grid-cols-[40px_1fr] sm:grid-cols-[80px_1fr] gap-4 sm:gap-8 py-7 border-b border-text-dim/18 transition-colors duration-150">
+      <span className="t-eyebrow self-start">{num}</span>
       <div className="border-l-2 border-transparent group-hover:border-text-ember pl-4 sm:pl-6 -ml-4 sm:-ml-6 transition-colors duration-150">
         <p
-          className="t-body text-[15px] sm:text-[17px] group-hover:text-text-ember transition-colors duration-150"
-          style={{ color: "rgb(var(--text-inverse))", fontWeight: 500 }}
+          className="t-body text-[15px] sm:text-[17px] text-text-inverse group-hover:text-text-ember transition-colors duration-150"
+          style={{ fontWeight: 500 }}
         >
           {statement}
         </p>
         <p
-          className="t-body-light text-[13px] mt-3 max-w-2xl"
-          style={{ color: "rgb(var(--text-secondary))", lineHeight: 1.65 }}
+          className="t-body-light text-[15px] mt-3 max-w-2xl text-text-muted"
+          style={{ lineHeight: 1.65 }}
         >
           {evidence}
         </p>
@@ -237,13 +218,7 @@ function Reframe() {
         </p>
 
         {/* Rubric inset — appears without a header. Trust the reader. */}
-        <div
-          className="mt-14 p-6 sm:p-8 rounded-xl"
-          style={{
-            background: "rgb(var(--bg-inverse))",
-            color: "rgb(var(--text-inverse))",
-          }}
-        >
+        <div className="surface-inverse mt-14 p-6 sm:p-8 rounded-xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {RUBRIC.map((r) => (
               <div
@@ -251,15 +226,8 @@ function Reframe() {
                 className="rounded-lg p-4"
                 style={{ border: "1px solid rgb(var(--border-strong))" }}
               >
-                <p className="t-eyebrow" style={{ color: "rgb(var(--text-ember))" }}>
-                  {r.label}
-                </p>
-                <p
-                  className="t-body-light text-[12px] mt-2"
-                  style={{ color: "rgb(var(--text-secondary))" }}
-                >
-                  {r.q}
-                </p>
+                <p className="t-eyebrow text-text-ember">{r.label}</p>
+                <p className="t-body-light text-[15px] mt-2 text-text-muted">{r.q}</p>
               </div>
             ))}
           </div>
@@ -302,41 +270,38 @@ const PHASES = [
 
 function HowItWorks() {
   return (
-    <section className="border-b border-border">
+    <section className="surface-inverse border-b border-border">
       <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
         <p className="t-eyebrow mb-6">04 — How It Works</p>
-        <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text">
+        <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text-inverse">
           Three phases.
           <br />
           One <span className="t-italic">honest</span> scorecard.
         </h2>
 
-        <div className="mt-14 border-t border-border">
+        <div className="mt-14 border-t border-text-dim/18">
           {PHASES.map((p) => (
             <article
               key={p.num}
-              className={`py-10 border-b border-border ${
+              className={`py-10 border-b border-text-dim/18 ${
                 p.emberBorder
                   ? "border-l-2 border-l-text-ember pl-6 sm:pl-8 -ml-px"
                   : ""
               }`}
             >
               <div className="flex items-baseline justify-between gap-4 mb-4">
-                <span
-                  className="t-eyebrow"
-                  style={{ color: "rgb(var(--text-ember))" }}
-                >
+                <span className="t-eyebrow text-text-ember">
                   Phase {p.num} — {p.label}
                 </span>
                 <span className="t-eyebrow">{p.eta}</span>
               </div>
               <h3
-                className="t-body text-[17px] text-text"
+                className="t-body text-[17px] text-text-inverse"
                 style={{ fontWeight: 500 }}
               >
                 {p.title}
               </h3>
-              <p className="t-body-light text-[13px] mt-3 max-w-3xl text-text-muted">
+              <p className="t-body-light text-[15px] mt-3 max-w-3xl text-text-muted">
                 {p.body}
               </p>
             </article>
@@ -428,7 +393,7 @@ function ScorecardPreview() {
             style={{ borderColor: "rgb(var(--text-ember))" }}
           >
             <p
-              className="t-body-light italic text-[13px]"
+              className="t-body-light italic text-[15px]"
               style={{ color: "rgb(var(--text-secondary))" }}
             >
               &ldquo;Candidate demonstrated strong problem decomposition but rushed to

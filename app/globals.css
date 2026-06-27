@@ -21,7 +21,9 @@
 
   --text-primary: 26 20 16; /* Inkwell */
   --text-secondary: 107 94 84; /* Clay */
-  --text-tertiary: 184 169 154; /* Whisper */
+  --text-tertiary: 138 125 112; /* Whisper — darkened for parchment readability */
+  --text-secondary-inverse: 196 184 173; /* Muted text on inverse bands */
+  --text-tertiary-inverse: 184 169 154; /* Eyebrows / dim text on inverse bands */
   --text-ember: 196 84 26; /* Ember — Instrument Serif italic only on landing */
   --text-inverse: 250 247 242;
 
@@ -45,8 +47,10 @@
   --bg-inverse: 240 235 227;
 
   --text-primary: 240 235 227; /* Bone */
-  --text-secondary: 107 94 84; /* Clay — same in both modes, intentional */
-  --text-tertiary: 74 64 53; /* Ash */
+  --text-secondary: 154 139 126; /* Clay — lighter for dark mode readability */
+  --text-tertiary: 154 139 126; /* Ash */
+  --text-secondary-inverse: 90 77 67; /* Muted text on inverse bands */
+  --text-tertiary-inverse: 96 84 74; /* Eyebrows / dim text on inverse bands */
   --text-ember: 232 132 90; /* Ember warm — brighter for dark bg */
   --text-inverse: 14 12 10;
 
@@ -165,6 +169,24 @@ body {
   font-family: "Cabinet Grotesk", system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+/* Inverse surface — dark/light bands on the landing page */
+.surface-inverse {
+  background: rgb(var(--bg-inverse));
+  color: rgb(var(--text-inverse));
+}
+.surface-inverse .text-text-muted {
+  color: rgb(var(--text-secondary-inverse));
+}
+.surface-inverse .text-text-dim {
+  color: rgb(var(--text-tertiary-inverse));
+}
+.surface-inverse .t-eyebrow {
+  color: rgb(var(--text-tertiary-inverse));
+}
+.surface-inverse .text-text-ember {
+  color: rgb(var(--text-ember));
 }
 
 /* ---------------------------------------------------------------------------
