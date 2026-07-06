@@ -476,6 +476,20 @@ function Footer() {
   return (
     <footer>
       <div className="mx-auto max-w-6xl px-6 sm:px-12 py-10 text-center">
+        <nav className="mb-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+          <Link
+            href="/about"
+            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
+          >
+            About
+          </Link>
+          <Link
+            href="/contact"
+            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
+          >
+            Contact
+          </Link>
+        </nav>
         <p className="t-eyebrow">
           Inturview · NeetCode 150 · Made for candidates who are serious
         </p>
