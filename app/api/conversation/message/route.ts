@@ -8,6 +8,8 @@ import {
   recruiterFollowUpSystemPrompt,
 } from "@/lib/conversationPrompts";
 import { getBehavioralScenario } from "@/lib/behavioralScenarios";
+import { faceToFaceFollowUpSystemPrompt } from "@/lib/faceToFacePrompts";
+import type { FaceToFacePlan } from "@/lib/faceToFaceQuestions";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -65,13 +67,25 @@ export async function POST(req: NextRequest) {
 
   const session = await prisma.conversationSession.findFirst({
     where: { id: parsed.session_id, userId: user.id },
-    select: { id: true, kind: true, scenarioId: true, status: true },
+    select: { id: true, kind: true, scenarioId: true, status: true, plan: true },
   });
   if (!session) {
     return new Response(JSON.stringify({ error: "Session not found" }), {
       status: 404,
       headers: { "content-type": "application/json" },
     });
+  }
+  if (session.kind === "FACE_TO_FACE" && parsed.mode === "live") {
+    return new Response(
+      JSON.stringify({ error: "Face-to-face live turns run through the realtime service." }),
+      { status: 400, headers: { "content-type": "application/json" } }
+    );
+  }
+  if (session.kind === "FACE_TO_FACE" && session.status !== "COMPLETED") {
+    return new Response(
+      JSON.stringify({ error: "Follow-up opens after the debrief." }),
+      { status: 403, headers: { "content-type": "application/json" } }
+    );
   }
   if (session.status === "COMPLETED" && parsed.mode === "live") {
     return new Response(
@@ -123,6 +137,14 @@ export async function POST(req: NextRequest) {
       parsed.mode === "live"
         ? behavioralSystemPrompt(scenario)
         : behavioralFollowUpSystemPrompt(scenario);
+  } else if (session.kind === "FACE_TO_FACE") {
+    if (!session.plan) {
+      return new Response(JSON.stringify({ error: "Plan missing" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    system = faceToFaceFollowUpSystemPrompt(session.plan as unknown as FaceToFacePlan);
   } else {
     system =
       parsed.mode === "live"

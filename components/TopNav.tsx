@@ -13,6 +13,7 @@ import {
   Network,
   Settings,
   Users,
+  Video,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
@@ -51,6 +52,13 @@ const PRACTICE_MODES: {
     blurb: "25-min phone screen — story, motivation, comp",
     icon: ClipboardList,
     pathPrefixes: ["/recruiter-screen"],
+  },
+  {
+    href: "/face-to-face",
+    label: "Face-to-face",
+    blurb: "Live video technical round — voice, camera, delivery scoring",
+    icon: Video,
+    pathPrefixes: ["/face-to-face"],
   },
 ];
 
@@ -172,6 +180,7 @@ export function TopNav() {
                     <DropdownLink href="/design-problems">System design</DropdownLink>
                     <DropdownLink href="/behavioral">Behavioral</DropdownLink>
                     <DropdownLink href="/recruiter-screen">Recruiter screen</DropdownLink>
+                    <DropdownLink href="/face-to-face">Face-to-face</DropdownLink>
                     <DropdownLink href="/history">History</DropdownLink>
                     {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
                     <div className="my-1 border-t border-border" />

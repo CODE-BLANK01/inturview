@@ -10,11 +10,11 @@
 
 # inturview
 
-inturview is a full-stack web app that simulates real technical interviews. It runs **four interview modes** — coding, system design, behavioral, and recruiter screen — each with a live AI interviewer and a rubric-based scorecard at the end.
+inturview is a full-stack web app that simulates real technical interviews. It runs **five interview modes** — coding, system design, behavioral, recruiter screen, and a live face-to-face voice round — each with a live AI interviewer and a rubric-based scorecard at the end.
 
 The interviewer is powered by Claude (Anthropic) and behaves like a real one: it probes your reasoning, won't green-light you to the next phase until you've earned it, and penalizes you in the debrief if you skip ahead anyway. Behavior matters, not just correctness.
 
-### The four modes
+### The five modes
 
 | Mode | Route | Shape | Phases |
 | ---- | ----- | ----- | ------ |
@@ -22,6 +22,9 @@ The interviewer is powered by Claude (Anthropic) and behaves like a real one: it
 | **System design** | `/design-problems` → `/design/[id]` | Excalidraw whiteboard + chat | scope → design → debrief |
 | **Behavioral** | `/behavioral` → `/behavioral/[id]` | Pure chat (STAR drills) | conversation → debrief |
 | **Recruiter screen** | `/recruiter-screen` | Pure chat (single canonical flow) | conversation → debrief |
+| **Face-to-face** | `/face-to-face` | Live voice + camera (OpenAI Realtime) | setup → live → debrief |
+
+The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup, architecture, and troubleshooting.
 
 Every mode green-lights with a gating signal where it makes sense (`[READY]` for coding approach, `[SCOPED]` for design scope), persists every turn, and ends with a 5-dimension scorecard + follow-up Q&A.
 
@@ -39,6 +42,7 @@ Every mode green-lights with a gating signal where it makes sense (`[READY]` for
   - **Debrief** — 5-dimension rubric (requirements / architecture / scalability / trade-offs / communication) + reference architecture
 - **Behavioral interview** — `/behavioral/[id]`: STAR-method drills against 8 seeded scenarios (Conflict / Failure / Leadership / Ambiguity / Growth / Communication). Scored on STAR structure / depth / self-awareness / impact / communication.
 - **Recruiter screen** — `/recruiter-screen`: a 25-minute initial phone screen — resume walkthrough, motivation, compensation framing, logistics. Scored on story clarity / motivation fit / comp savvy / role alignment / communication, with an `Advance / No Advance` recommendation.
+- **Face-to-face** — `/face-to-face`: a live, spoken technical round over video. Pick a track (backend / frontend / full-stack / data & ML / mobile / DevOps / AI & LLM engineering) and level; the interviewer (OpenAI Realtime, speech-to-speech) climbs a depth ladder on each question. Scored by Claude on technical depth / problem solving / clarity / delivery / body language, with measured pace, filler-word and pause metrics from the audio and eye-contact, posture and restlessness metrics from on-device MediaPipe tracking (no video leaves the browser). Runs through a small FastAPI service in `services/realtime` — see [FACE_TO_FACE.md](FACE_TO_FACE.md).
 - **Smooth streaming** — Anthropic SSE → server-side prefix parser (`[READY]/[CONTINUE]`, `[SCOPED]/[CONTINUE]`) → typewriter buffer (~45 cps) on the client. Backpressure-safe, abort-propagating.
 - **Auth + persistence** — NextAuth v4 credentials (email + bcrypt), session JWTs, Postgres via Prisma. Every message, code snapshot, canvas, and debrief is persisted scoped to the user.
 - **User dashboard** — `/dashboard`: greeting, 4-stat strip, resume-in-progress card, all four practice modes live, a per-mode plan-usage grid, topic mastery bars, recent interviews, roadmap sidebar.
@@ -60,6 +64,7 @@ Every mode green-lights with a gating signal where it makes sense (`[READY]` for
 | AI          | Anthropic Claude (`claude-sonnet-4-5` default)        |
 | Editor      | Monaco (`@monaco-editor/react`)                       |
 | Whiteboard  | Excalidraw (`@excalidraw/excalidraw`, dynamic import) |
+| Voice round | OpenAI Realtime over WebRTC + FastAPI sidecar (`services/realtime`); MediaPipe `@mediapipe/tasks-vision` in-browser for body language |
 | Streaming   | Server-Sent Events (custom protocol with `meta` + `delta` + `done` + `error` events) |
 | Icons       | lucide-react                                          |
 | Validation  | zod                                                   |
@@ -120,6 +125,10 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `FREE_DESIGN_SESSIONS_PER_MONTH` | `2`         | Free-tier system-design cap per calendar month.                    |
 | `FREE_BEHAVIORAL_SESSIONS_PER_MONTH` | `3`     | Free-tier behavioral cap per calendar month.                       |
 | `FREE_RECRUITER_SESSIONS_PER_MONTH` | `2`      | Free-tier recruiter-screen cap per calendar month.                 |
+| `FREE_FACE_TO_FACE_SESSIONS_PER_MONTH` | `2`   | Free-tier face-to-face cap per calendar month (realtime audio is the most expensive mode). |
+| `FACE_TO_FACE_MAX_MINUTES` | `20`               | Hard cap on a single face-to-face session.                          |
+| `REALTIME_SERVICE_SECRET` | _(required for face-to-face)_ | Shared secret with the FastAPI realtime service. 32+ chars, same value on both sides. |
+| `NEXT_PUBLIC_REALTIME_SERVICE_URL` | `http://localhost:8000` | Where the browser reaches the realtime service.            |
 
 ---
 
@@ -136,10 +145,11 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 - `/design-problems` — system-design browser → `/design/[id]` (scope → design → debrief)
 - `/behavioral` — behavioral scenario browser → `/behavioral/[id]` (conversation → debrief)
 - `/recruiter-screen` — recruiter phone-screen sim (single canonical flow)
-- `/history` — all four modes merged with kind badges
+- `/face-to-face` — live voice + camera technical round (setup → live → debrief)
+- `/history` — all five modes merged with kind badges
 - `/history/[id]` — coding transcript + code + debrief
 - `/history/design/[id]` — design transcript + canvas spec + debrief
-- `/history/conversation/[id]` — behavioral / recruiter transcript + debrief (admins can view any user's session)
+- `/history/conversation/[id]` — behavioral / recruiter / face-to-face transcript + debrief (admins can view any user's session)
 
 ### Admin (role-gated by middleware)
 - `/admin` — overview tiles + recent activity
@@ -153,7 +163,8 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 - `POST /api/auth/signup`, `[…nextauth]` routes
 - **Coding** — `POST /api/interview/{start,message,code,skip-approach,debrief,abandon}`, `GET /api/interviews`, `/api/interviews/[id]`, `/api/interviews/stats`
 - **System design** — `POST /api/design/{start,message,canvas,skip-scope,debrief,abandon}`, `GET /api/design-sessions/[id]`
-- **Conversation** (behavioral + recruiter) — `POST /api/conversation/{start,message,abandon,debrief}`, `GET /api/conversation-sessions/[id]`
+- **Conversation** (behavioral + recruiter + face-to-face debrief/follow-up) — `POST /api/conversation/{start,message,abandon,debrief}`, `GET /api/conversation-sessions/[id]`
+- **Face-to-face** — `POST /api/face-to-face/start`; server-to-server only: `GET /api/internal/face-to-face/[id]`, `POST /api/internal/face-to-face/[id]/turns` (guarded by `x-service-secret`). Live audio goes browser ↔ OpenAI over WebRTC; the FastAPI service in `services/realtime` mints the session and ingests transcript turns.
 - Admin: `/api/admin/problems`, `/api/admin/problems/[id]`, `/api/admin/users`, `/api/admin/users/[id]`, `/api/admin/interviews`, `/api/admin/interviews/[id]`
 
 All `message` endpoints are SSE-streamed, auth + ownership-checked, and rate-limited.
@@ -197,7 +208,7 @@ These bands are **guidelines for Claude**, not enforced math — the recommendat
 
 ## Roadmap (visible on the dashboard / landing)
 
-Shipped: ✅ coding · ✅ system design (Excalidraw whiteboard) · ✅ behavioral · ✅ recruiter screen.
+Shipped: ✅ coding · ✅ system design (Excalidraw whiteboard) · ✅ behavioral · ✅ recruiter screen · ✅ face-to-face (live voice + on-device body-language scoring).
 
 Still ahead:
 

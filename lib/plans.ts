@@ -22,6 +22,10 @@ export interface PlanDefinition {
   behavioralSessionsPerMonth: number | null;
   /** Hard cap on recruiter-screen starts per calendar month. null = unlimited. */
   recruiterSessionsPerMonth: number | null;
+  /** Hard cap on face-to-face (live voice) starts per calendar month. null = unlimited.
+   *  Realtime audio tokens cost an order of magnitude more than text, so this
+   *  is the tightest cap. */
+  faceToFaceSessionsPerMonth: number | null;
   /** Whether a user can select this plan from the onboarding wizard today. */
   selectable: boolean;
   /** When selectable=false, this is the "Coming Q2" style note. */
@@ -50,6 +54,11 @@ function freeRecruiterSessionsPerMonth(): number {
   return Number.isFinite(v) && v >= 0 ? v : 2;
 }
 
+function freeFaceToFaceSessionsPerMonth(): number {
+  const v = Number(process.env.FREE_FACE_TO_FACE_SESSIONS_PER_MONTH ?? "2");
+  return Number.isFinite(v) && v >= 0 ? v : 2;
+}
+
 export const PLANS: PlanDefinition[] = [
   {
     tier: PlanTier.FREE,
@@ -68,6 +77,7 @@ export const PLANS: PlanDefinition[] = [
     designSessionsPerMonth: freeDesignSessionsPerMonth(),
     behavioralSessionsPerMonth: freeBehavioralSessionsPerMonth(),
     recruiterSessionsPerMonth: freeRecruiterSessionsPerMonth(),
+    faceToFaceSessionsPerMonth: freeFaceToFaceSessionsPerMonth(),
     selectable: true,
   },
   {
@@ -86,6 +96,7 @@ export const PLANS: PlanDefinition[] = [
     designSessionsPerMonth: null,
     behavioralSessionsPerMonth: null,
     recruiterSessionsPerMonth: null,
+    faceToFaceSessionsPerMonth: 30,
     selectable: false,
     availabilityNote: "Coming soon",
   },
@@ -106,6 +117,7 @@ export const PLANS: PlanDefinition[] = [
     designSessionsPerMonth: 8,
     behavioralSessionsPerMonth: 20,
     recruiterSessionsPerMonth: 10,
+    faceToFaceSessionsPerMonth: 10,
     selectable: false,
     availabilityNote: "Coming soon",
   },
@@ -126,6 +138,7 @@ export const PLANS: PlanDefinition[] = [
     designSessionsPerMonth: 40,
     behavioralSessionsPerMonth: 100,
     recruiterSessionsPerMonth: 50,
+    faceToFaceSessionsPerMonth: 50,
     selectable: false,
     availabilityNote: "Coming soon",
   },
@@ -145,6 +158,7 @@ export const PLANS: PlanDefinition[] = [
     designSessionsPerMonth: null,
     behavioralSessionsPerMonth: null,
     recruiterSessionsPerMonth: null,
+    faceToFaceSessionsPerMonth: null,
     selectable: false,
     availabilityNote: "Talk to us",
   },

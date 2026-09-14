@@ -7,10 +7,13 @@ import {
 } from "@/lib/conversationPrompts";
 import {
   BehavioralDebriefSchema,
+  FaceToFaceDebriefSchema,
   RecruiterDebriefSchema,
   type ConversationDebrief,
 } from "@/lib/conversationTypes";
 import { getBehavioralScenario } from "@/lib/behavioralScenarios";
+import { faceToFaceDebriefSystemPrompt, type TurnMetrics } from "@/lib/faceToFacePrompts";
+import type { FaceToFacePlan } from "@/lib/faceToFaceQuestions";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   const session = await prisma.conversationSession.findFirst({
     where: { id: parsed.session_id, userId: user.id },
-    select: { id: true, kind: true, scenarioId: true, status: true },
+    select: { id: true, kind: true, scenarioId: true, status: true, plan: true },
   });
   if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
 
@@ -83,11 +86,12 @@ export async function POST(req: NextRequest) {
   const transcriptRows = await prisma.conversationMessage.findMany({
     where: { sessionId: session.id },
     orderBy: { createdAt: "asc" },
-    select: { role: true, content: true },
+    select: { role: true, content: true, metrics: true },
   });
   const transcript = transcriptRows.map((m) => ({
     role: m.role as "user" | "assistant",
     content: m.content,
+    metrics: m.metrics as TurnMetrics | null,
   }));
 
   let system: string;
@@ -98,6 +102,20 @@ export async function POST(req: NextRequest) {
     const scenario = getBehavioralScenario(session.scenarioId);
     if (!scenario) return Response.json({ error: "Unknown scenario" }, { status: 404 });
     system = behavioralDebriefSystemPrompt(scenario, transcript);
+  } else if (session.kind === "FACE_TO_FACE") {
+    if (!session.plan) return Response.json({ error: "Plan missing" }, { status: 500 });
+    if (session.status !== "IN_PROGRESS") {
+      return Response.json({ error: "Session is not in progress" }, { status: 409 });
+    }
+    // Turns are persisted asynchronously by the realtime service; never score
+    // an empty transcript and burn the session.
+    if (!transcript.some((t) => t.role === "user")) {
+      return Response.json(
+        { error: "None of your answers were saved, so there's nothing to score yet. Try again in a moment." },
+        { status: 409 }
+      );
+    }
+    system = faceToFaceDebriefSystemPrompt(session.plan as unknown as FaceToFacePlan, transcript);
   } else {
     system = recruiterDebriefSystemPrompt(transcript);
   }
@@ -133,7 +151,11 @@ export async function POST(req: NextRequest) {
       const raw = extractJson(text);
 
       const schema =
-        session.kind === "BEHAVIORAL" ? BehavioralDebriefSchema : RecruiterDebriefSchema;
+        session.kind === "BEHAVIORAL"
+          ? BehavioralDebriefSchema
+          : session.kind === "FACE_TO_FACE"
+            ? FaceToFaceDebriefSchema
+            : RecruiterDebriefSchema;
       const debrief = schema.parse(raw) as ConversationDebrief;
       const total = sumScores(debrief.scores as unknown as Record<string, { score: number }>);
       debrief.total_score = total;

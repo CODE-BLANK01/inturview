@@ -59,7 +59,7 @@ export default async function HistoryPage() {
 
   type HistoryItem = {
     id: string;
-    kind: "coding" | "design" | "behavioral" | "recruiter";
+    kind: "coding" | "design" | "behavioral" | "recruiter" | "face-to-face";
     href: string;
     status: "COMPLETED" | "ABANDONED";
     totalScore: number | null;
@@ -97,9 +97,11 @@ export default async function HistoryPage() {
     })),
     ...conversationRows.map((cs) => ({
       id: cs.id,
-      kind: (cs.kind === "BEHAVIORAL" ? "behavioral" : "recruiter") as
-        | "behavioral"
-        | "recruiter",
+      kind: (cs.kind === "BEHAVIORAL"
+        ? "behavioral"
+        : cs.kind === "FACE_TO_FACE"
+          ? "face-to-face"
+          : "recruiter") as "behavioral" | "recruiter" | "face-to-face",
       href: `/history/conversation/${cs.id}`,
       status: cs.status as "COMPLETED" | "ABANDONED",
       totalScore: cs.totalScore,
@@ -108,12 +110,16 @@ export default async function HistoryPage() {
       title:
         cs.kind === "BEHAVIORAL"
           ? cs.scenario?.title ?? "Behavioral"
-          : "Recruiter screen",
+          : cs.kind === "FACE_TO_FACE"
+            ? "Face-to-face technical round"
+            : "Recruiter screen",
       difficulty: null,
       topic:
         cs.kind === "BEHAVIORAL"
           ? cs.scenario?.category ?? "Behavioral"
-          : "Phone screen",
+          : cs.kind === "FACE_TO_FACE"
+            ? "Live video"
+            : "Phone screen",
     })),
   ].sort((a, b) => {
     const at = a.completedAt?.getTime() ?? 0;
@@ -126,6 +132,7 @@ export default async function HistoryPage() {
     design: "System design",
     behavioral: "Behavioral",
     recruiter: "Recruiter screen",
+    "face-to-face": "Face-to-face",
   };
 
   return (

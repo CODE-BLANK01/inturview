@@ -299,6 +299,7 @@ model DesignDebrief {
 enum ConversationKind {
   BEHAVIORAL
   RECRUITER_SCREEN
+  FACE_TO_FACE
 }
 
 enum ConversationStatus {
@@ -331,6 +332,10 @@ model ConversationSession {
   kind           ConversationKind
   /// Set when kind=BEHAVIORAL; null for RECRUITER_SCREEN (single canonical flow).
   scenarioId     String?
+  /// FACE_TO_FACE only: the question plan chosen at start
+  /// ({ track, level, questionIds, maxDurationSec }). Rebuilt into the
+  /// realtime interviewer instructions on demand.
+  plan           Json?
   status         ConversationStatus  @default(IN_PROGRESS)
   totalScore     Int?
   recommendation String?
@@ -352,6 +357,9 @@ model ConversationMessage {
   sessionId String
   role      String   // "user" | "assistant"
   content   String
+  /// FACE_TO_FACE user turns: delivery metrics computed by the realtime
+  /// service (wpm, filler_count, duration_ms, longest_pause_ms, ...).
+  metrics   Json?
   createdAt DateTime @default(now())
 
   session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)

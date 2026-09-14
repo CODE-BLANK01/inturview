@@ -20,14 +20,28 @@ const RECRUITER_LABELS: Record<string, string> = {
   communication: "Communication",
 };
 
+const FACE_TO_FACE_LABELS: Record<string, string> = {
+  technical_depth: "Technical Depth",
+  problem_solving: "Problem Solving",
+  clarity: "Clarity",
+  delivery: "Delivery",
+  body_language: "Body Language",
+};
+
+const LABELS = {
+  BEHAVIORAL: BEHAVIORAL_LABELS,
+  RECRUITER_SCREEN: RECRUITER_LABELS,
+  FACE_TO_FACE: FACE_TO_FACE_LABELS,
+} as const;
+
 export function ConversationDebriefView({
   debrief,
   kind,
 }: {
   debrief: ConversationDebrief;
-  kind: "BEHAVIORAL" | "RECRUITER_SCREEN";
+  kind: keyof typeof LABELS;
 }) {
-  const labels = kind === "BEHAVIORAL" ? BEHAVIORAL_LABELS : RECRUITER_LABELS;
+  const labels = LABELS[kind];
   const dims = Object.entries(debrief.scores) as [string, { score: number; max: number; evidence: string }][];
 
   return (
@@ -65,9 +79,9 @@ export function ConversationDebriefView({
 
         <div>
           <h3 className="text-sm font-medium text-text-muted mb-2">
-            {kind === "BEHAVIORAL"
-              ? "What a strong answer looks like"
-              : "How strong candidates handle this"}
+            {kind === "RECRUITER_SCREEN"
+              ? "How strong candidates handle this"
+              : "What a strong answer looks like"}
           </h3>
           <p className="text-sm text-text whitespace-pre-wrap">
             {debrief.optimal_solution_notes}

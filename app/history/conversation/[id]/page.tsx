@@ -7,6 +7,7 @@ import { TopicBadge } from "@/components/Badges";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { ConversationDebrief } from "@/lib/conversationTypes";
+import { LEVEL_LABELS, TRACK_LABELS, type FaceToFacePlan } from "@/lib/faceToFaceQuestions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function ConversationHistoryPage({
       status: true,
       startedAt: true,
       completedAt: true,
+      plan: true,
       user: { select: { email: true, name: true } },
       scenario: { select: { title: true, category: true, prompt: true } },
       messages: {
@@ -41,18 +43,33 @@ export default async function ConversationHistoryPage({
   if (!session) notFound();
 
   const debrief = session.debrief?.payload as unknown as ConversationDebrief | null;
+  const plan = session.plan as unknown as FaceToFacePlan | null;
+  const kindLabel =
+    session.kind === "BEHAVIORAL"
+      ? "Behavioral"
+      : session.kind === "FACE_TO_FACE"
+        ? "Face-to-face"
+        : "Recruiter screen";
   const title =
     session.kind === "BEHAVIORAL"
       ? session.scenario?.title ?? "Behavioral"
-      : "Recruiter screen";
+      : session.kind === "FACE_TO_FACE"
+        ? "Face-to-face technical round"
+        : "Recruiter screen";
   const subtitle =
     session.kind === "BEHAVIORAL"
       ? session.scenario?.category ?? "Behavioral"
-      : "25-min initial phone screen";
+      : session.kind === "FACE_TO_FACE"
+        ? plan
+          ? `${TRACK_LABELS[plan.track]} · ${LEVEL_LABELS[plan.level]}`
+          : "Live technical round"
+        : "25-min initial phone screen";
   const prompt =
     session.kind === "BEHAVIORAL"
       ? session.scenario?.prompt ?? ""
-      : "A recruiter is calling for an initial phone screen.";
+      : session.kind === "FACE_TO_FACE"
+        ? "A live, spoken technical interview over video."
+        : "A recruiter is calling for an initial phone screen.";
 
   return (
     <>
@@ -85,17 +102,14 @@ export default async function ConversationHistoryPage({
                 borderColor: "rgb(var(--border-base))",
               }}
             >
-              {session.kind === "BEHAVIORAL" ? "Behavioral" : "Recruiter screen"}
+              {kindLabel}
             </span>
           </div>
           <p className="text-sm text-text-muted whitespace-pre-wrap">{prompt}</p>
         </header>
 
         {debrief && (
-          <ConversationDebriefView
-            debrief={debrief}
-            kind={session.kind as "BEHAVIORAL" | "RECRUITER_SCREEN"}
-          />
+          <ConversationDebriefView debrief={debrief} kind={session.kind} />
         )}
 
         <section className="panel p-5">

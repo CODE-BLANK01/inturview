@@ -4,6 +4,7 @@ import {
   Network,
   Users,
   ClipboardList,
+  Video,
   ArrowRight,
   Lock,
 } from "lucide-react";
@@ -51,6 +52,14 @@ const MODES: Mode[] = [
     href: "/recruiter-screen",
     status: "live",
   },
+  {
+    key: "face-to-face",
+    title: "Face-to-face",
+    blurb: "Live video technical round — answer out loud, scored on depth and delivery.",
+    icon: Video,
+    href: "/face-to-face",
+    status: "live",
+  },
 ];
 
 export function PracticeModes() {
@@ -62,7 +71,7 @@ export function PracticeModes() {
         </h2>
         <span className="text-xs text-text-dim">More arriving — see roadmap</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {MODES.map((m) => (
           <ModeCard key={m.key} mode={m} />
         ))}
