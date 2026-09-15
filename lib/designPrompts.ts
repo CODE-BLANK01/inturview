@@ -53,35 +53,27 @@ Be honest. Don't [SCOPED] just to move things along.`;
 
 export function designSystemPrompt(
   problem: SystemDesignProblemDef,
-  scopeTranscript: DesignChatMessage[],
-  canvasSpec: string
 ): string {
-  const transcript = scopeTranscript
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
-
   return `You are conducting a system-design interview. The candidate is now in the DESIGN phase for: ${problem.title}.
 
 Problem: ${problem.prompt}
-
-Scope discussion captured:
-${transcript || "(none — they skipped scoping)"}
-
-Current whiteboard (auto-extracted from their Excalidraw canvas — may be incomplete or messy):
-\`\`\`
-${canvasSpec || "(empty canvas)"}
-\`\`\`
 
 Suggested deep-dive topics for this problem (use as probes — don't read them off):
 ${(problem.deepDiveTopics ?? []).map((t) => `- ${t}`).join("\n") || "- general architecture"}
 
 Rules:
-- You can see their canvas above. Reference specific components ("the cache between the API gateway and the user service") rather than pretending it's invisible.
+- You can see their canvas in the latest context block. Reference specific components ("the cache between the API gateway and the user service") rather than pretending it's invisible.
 - Probe trade-offs: "Why this DB choice?" "What's the consistency model here?" "What breaks at 10x scale?"
 - Answer briefly (2-4 sentences). Do NOT solve the design for them. Do NOT name specific technologies they haven't introduced unless asking about trade-offs.
 - If the canvas is empty, encourage them to start with a rough box-and-arrow sketch — the API surface, the data flow, then storage.
 - Stay in staff-interviewer character. No "as an AI", no markdown headers, no code blocks.
 - If they ask you to grade their design, tell them to click "Submit Design" to finish.`;
+}
+
+/** Per-turn context follows the cached transcript so canvas edits do not bust it. */
+export function designLiveContext(scopeTranscript: DesignChatMessage[], canvasSpec: string): string {
+  const transcript = scopeTranscript.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
+  return `Scope discussion captured:\n${transcript || "(none — they skipped scoping)"}\n\nCurrent whiteboard (auto-extracted from their Excalidraw canvas — may be incomplete or messy):\n\`\`\`\n${canvasSpec || "(empty canvas)"}\n\`\`\``;
 }
 
 export const DESIGN_DEBRIEF_SCHEMA = `{
@@ -190,15 +182,13 @@ export type DesignPhase = "scope" | "design" | "debrief";
 
 export function designPhasePromptFor(
   phase: DesignPhase,
-  problem: SystemDesignProblemDef,
-  scopeTranscript: DesignChatMessage[],
-  canvasSpec: string
+  problem: SystemDesignProblemDef
 ): string {
   switch (phase) {
     case "scope":
       return scopeSystemPrompt(problem);
     case "design":
-      return designSystemPrompt(problem, scopeTranscript, canvasSpec);
+      return designSystemPrompt(problem);
     case "debrief":
       return designFollowUpSystemPrompt(problem);
   }

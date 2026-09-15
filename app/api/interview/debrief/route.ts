@@ -7,6 +7,7 @@ import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import type { Debrief } from "@/lib/types";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -204,6 +205,16 @@ export async function POST(req: NextRequest) {
           },
         }),
       ]);
+
+      await captureProductEvent(user.id, {
+        event: "phase_advanced",
+        properties: { mode: "coding", session_id: interview.id, from: "code", to: "debrief" },
+      });
+
+      await captureProductEvent(user.id, {
+        event: "debrief_completed",
+        properties: { mode: "coding", session_id: interview.id, score: total },
+      });
 
       return Response.json(debrief);
     } catch (err) {

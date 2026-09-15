@@ -3,7 +3,7 @@ import { TopNav } from "@/components/TopNav";
 import { AccountPage } from "@/components/account/AccountPage";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Account — inturview" };
@@ -35,7 +35,7 @@ export default async function AccountSettingsPage() {
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
 
-  const plan = getPlan(profile.plan);
+  const plan = getEffectivePlan(profile.plan, profile.email);
 
   return (
     <>

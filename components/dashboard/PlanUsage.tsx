@@ -28,6 +28,16 @@ export function PlanUsage({
   const resetDays = daysUntilReset();
   const meters = [
     {
+      label: "Recruiter screen",
+      used: recruiterSessionsThisMonth,
+      limit: plan.recruiterSessionsPerMonth,
+    },
+    {
+      label: "Behavioral",
+      used: behavioralSessionsThisMonth,
+      limit: plan.behavioralSessionsPerMonth,
+    },
+    {
       label: "Coding",
       used: interviewsThisMonth,
       limit: plan.interviewsPerMonth,
@@ -36,16 +46,6 @@ export function PlanUsage({
       label: "System design",
       used: designSessionsThisMonth,
       limit: plan.designSessionsPerMonth,
-    },
-    {
-      label: "Behavioral",
-      used: behavioralSessionsThisMonth,
-      limit: plan.behavioralSessionsPerMonth,
-    },
-    {
-      label: "Recruiter screen",
-      used: recruiterSessionsThisMonth,
-      limit: plan.recruiterSessionsPerMonth,
     },
   ];
 

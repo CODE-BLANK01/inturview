@@ -46,18 +46,18 @@ function Hero() {
   return (
     <section className="border-b border-border">
       <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-        <p className="t-eyebrow mb-6">NeetCode 150 · Interview Simulator</p>
+        <p className="t-eyebrow mb-6">Recruiter screens · Behavioral interviews · Technical rounds</p>
 
         <h1 className="t-display text-text text-[44px] sm:text-[64px] md:text-[72px] max-w-4xl">
-          You&apos;ve solved 500 problems.
+          You know your experience.
           <br />
-          Still <span className="t-italic">failed</span> the interview.
+          Can you <span className="t-italic">tell</span> the story?
         </h1>
 
         <p className="t-body mt-8 max-w-[460px] text-text-muted">
-          LeetCode didn&apos;t lie to you. It just prepared you for the wrong thing.
-          Solving problems alone is not the same as performing under pressure, in front
-          of someone, in real time.
+          The first screen can turn on a simple question: “Tell me about yourself.”
+          Practice your story, motivation, and behavioral examples with an AI
+          interviewer that asks follow-ups and gives you a structured debrief.
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -73,11 +73,11 @@ function Hero() {
         <div className="mt-12 h-px w-full bg-border" aria-hidden />
 
         <ul className="mt-8 flex flex-wrap gap-8 sm:gap-12">
-          <StatTick value="150" label="Problems" />
+          <StatTick value="01" label="Recruiter screen" />
           <Divider />
-          <StatTick value="+31%" label="Avg score gain" />
+          <StatTick value="02" label="Behavioral" />
           <Divider />
-          <StatTick value="1.2k" label="Sessions today" />
+          <StatTick value="03–04" label="Coding + design" />
         </ul>
       </div>
     </section>
@@ -105,27 +105,27 @@ const CONFESSIONS = [
   {
     num: "01",
     statement:
-      "You blanked. Not because you didn't know — because no one was watching you before.",
+      "Tell me about yourself. Suddenly your clear career path sounds like a list of job titles.",
     evidence:
-      "Solving at your desk at midnight is nothing like explaining your thinking out loud to a senior engineer judging every word. That gap is real. Nobody warns you about it.",
+      "A recruiter needs to understand what you did, why you moved, and what you want next. It is hard to find that story for the first time in a live screen.",
   },
   {
     num: "02",
-    statement: "You got the optimal solution. They still said no hire.",
+    statement: "Your behavioral example had a result. The interviewer still asked what you actually did.",
     evidence:
-      "Because you couldn't explain your complexity. Because you jumped to code without walking through your approach. Because you went silent for 4 minutes. All of that is scored. None of it is on LeetCode.",
+      "“We shipped it” hides your contribution. Strong examples make the situation, your actions, the outcome, and what you learned clear.",
   },
   {
     num: "03",
-    statement: "Mock interviews with friends don't count. They're too nice.",
+    statement: "A friend may nod along where an interviewer would probe.",
     evidence:
-      "Your friend won't probe a weak approach. Won't ask \"what's the time complexity of that?\" three times. Won't write in a debrief that your communication was unclear. A real interviewer will — and does.",
+      "A useful practice round asks what changed, how you measured impact, and why this role makes sense for you. The follow-up is often where the real answer appears.",
   },
   {
     num: "04",
-    statement: "You have no idea what you actually look like in an interview.",
+    statement: "You finish a practice answer without knowing what landed.",
     evidence:
-      "You've never seen your own scorecard. Never had a senior engineer break down exactly what you said, what it signaled, and where you lost the hire. You're flying blind and calling it preparation.",
+      "A debrief can show whether your story was clear, your motivation was specific, and your answer had enough evidence to carry into the next round.",
   },
 ] as const;
 
@@ -185,11 +185,11 @@ function ConfessionRow({
  * ------------------------------------------------------------------------ */
 
 const RUBRIC = [
-  { label: "Problem understanding", q: "Did you clarify constraints before diving in?" },
-  { label: "Approach quality", q: "Did you walk through trade-offs before committing?" },
-  { label: "Code correctness", q: "Does it actually work — for the edge cases too?" },
-  { label: "Complexity awareness", q: "Can you defend the time and space, out loud?" },
-  { label: "Communication", q: "Did your thinking land — or did the room go quiet?" },
+  { label: "Story clarity", q: "Can someone follow your career path and transitions?" },
+  { label: "Motivation", q: "Is your reason for this move specific and credible?" },
+  { label: "Role alignment", q: "Can you connect your experience to this role?" },
+  { label: "Compensation", q: "Can you discuss expectations clearly?" },
+  { label: "Communication", q: "Did your answers feel concise and two-way?" },
 ];
 
 function Reframe() {
@@ -200,21 +200,21 @@ function Reframe() {
         <span className="block h-[2px] w-8 bg-text-ember mb-6" aria-hidden />
 
         <h2 className="t-section-headline text-[32px] sm:text-[44px] max-w-3xl text-text">
-          The problem was never
+          The first round is
           <br />
-          the <span className="t-italic">problems</span>.
+          more than a <span className="t-italic">formality</span>.
         </h2>
 
         <p className="t-body mt-8 max-w-[500px] text-text-muted">
-          Every candidate who walks into a Google loop has solved the same 150 problems
-          you have. The ones who get offers practiced the thing that actually separates
-          them: performing under structured evaluation. Getting scored. Doing it again.
+          A recruiter screen asks for your story, your motivation, and your expectations.
+          A behavioral round asks you to prove the claims in that story with specific
+          examples. Both are skills you can practice before the real conversation.
         </p>
         <p
           className="t-body mt-6 max-w-[500px] text-text"
           style={{ fontWeight: 500, lineHeight: 1.5 }}
         >
-          Explaining. Adapting. Communicating under pressure.
+          Try an answer. Hear the follow-up. See what to sharpen.
         </p>
 
         {/* Rubric inset — appears without a header. Trust the reader. */}
@@ -244,18 +244,18 @@ function Reframe() {
 const PHASES = [
   {
     num: "01",
-    label: "Approach",
-    eta: "~5 min",
-    title: "Talk before you type.",
-    body: "The AI interviewer asks you to walk through your approach out loud. It probes. It pushes back. It asks what happens when the input is empty, when n is 10⁶, when there are duplicates. You don't get to hide behind your editor yet.",
+    label: "Choose",
+    eta: "your round",
+    title: "Start with the conversation you need most.",
+    body: "Try a recruiter screen for your career story and role fit, or pick a behavioral question to work on a specific example. Coding and system design are there when you need them.",
     emberBorder: false,
   },
   {
     num: "02",
-    label: "Code",
-    eta: "~20 min",
-    title: "Now write it.",
-    body: "Monaco editor, your language. No autocomplete hints, no solution tab. Mid-session you can ask the interviewer a clarifying question — it answers the way a real interviewer would: carefully, without giving anything away.",
+    label: "Practice",
+    eta: "at your pace",
+    title: "Answer, then handle the follow-up.",
+    body: "The text-based AI interviewer asks for specifics and keeps the conversation moving. Practice explaining decisions and results without a script in front of you.",
     emberBorder: false,
   },
   {
@@ -263,7 +263,7 @@ const PHASES = [
     label: "Debrief",
     eta: "immediate",
     title: "Here's what you actually looked like.",
-    body: "A structured scorecard — five dimensions, 1–5 each, evidence pulled from your exact words and code. Strengths. Gaps. The two sentences a hiring manager would have written about you. Then the optimal approach, fully explained.",
+    body: "Get a structured scorecard for that round: what came through, what stayed vague, and what to improve before the next attempt.",
     emberBorder: true,
   },
 ];
@@ -274,9 +274,9 @@ function HowItWorks() {
       <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
         <p className="t-eyebrow mb-6">04 — How It Works</p>
         <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text-inverse">
-          Three phases.
+          Pick a round.
           <br />
-          One <span className="t-italic">honest</span> scorecard.
+          Get an <span className="t-italic">honest</span> debrief.
         </h2>
 
         <div className="mt-14 border-t border-text-dim/18">
@@ -291,7 +291,7 @@ function HowItWorks() {
             >
               <div className="flex items-baseline justify-between gap-4 mb-4">
                 <span className="t-eyebrow text-text-ember">
-                  Phase {p.num} — {p.label}
+                  Step {p.num} — {p.label}
                 </span>
                 <span className="t-eyebrow">{p.eta}</span>
               </div>
@@ -317,10 +317,10 @@ function HowItWorks() {
  * ------------------------------------------------------------------------ */
 
 const SCORE_ROWS = [
-  { label: "Problem understanding", score: 4, max: 5 },
-  { label: "Approach quality", score: 3, max: 5 },
-  { label: "Code correctness", score: 5, max: 5 },
-  { label: "Complexity awareness", score: 3, max: 5 },
+  { label: "Story clarity", score: 4, max: 5 },
+  { label: "Motivation fit", score: 3, max: 5 },
+  { label: "Compensation", score: 3, max: 5 },
+  { label: "Role alignment", score: 4, max: 5 },
   { label: "Communication", score: 4, max: 5 },
 ];
 
@@ -343,7 +343,7 @@ function ScorecardPreview() {
         <div className="mt-14 max-w-2xl panel p-6 sm:p-8">
           <div className="flex items-center justify-between gap-4">
             <h3 className="t-body text-[15px] text-text" style={{ fontWeight: 500 }}>
-              Two Sum · 24 min
+              Recruiter screen · example debrief
             </h3>
             <span
               className="badge"
@@ -354,7 +354,7 @@ function ScorecardPreview() {
                 fontWeight: 700,
               }}
             >
-              HIRE
+              ADVANCE
             </span>
             <span className="t-data text-[22px] text-text whitespace-nowrap">
               {total} / {max}
@@ -396,10 +396,9 @@ function ScorecardPreview() {
               className="t-body-light italic text-[15px]"
               style={{ color: "rgb(var(--text-secondary))" }}
             >
-              &ldquo;Candidate demonstrated strong problem decomposition but rushed to
-              code without fully articulating the O(n) vs O(n log n) tradeoff.
-              Communication deteriorated under follow-up pressure. Lean hire — recommend
-              a second round focused on complexity articulation.&rdquo;
+              &ldquo;The candidate gave a clear career timeline and specific examples of
+              impact. Their reason for this role needs more detail, and their compensation
+              range could be stated more directly.&rdquo;
             </p>
           </blockquote>
         </div>
@@ -413,9 +412,9 @@ function ScorecardPreview() {
  * ------------------------------------------------------------------------ */
 
 const OUTCOMES = [
-  { n: "31%", label: "Average score increase", body: "Across candidates after 10+ sessions" },
-  { n: "6.2x", label: "More likely to advance", body: "Candidates who debrief vs those who don't" },
-  { n: "150", label: "Problems covered", body: "Every NeetCode 150 problem. No gaps." },
+  { n: "01", label: "Recruiter screen", body: "Practice your story, motivation, and expectations." },
+  { n: "02", label: "Behavioral", body: "Build stronger examples with real follow-ups." },
+  { n: "03–04", label: "Technical rounds", body: "Keep coding and system design in the same practice loop." },
 ];
 
 function Outcome() {
@@ -456,7 +455,7 @@ function Outcome() {
             className="t-body-light text-[16px] mb-6"
             style={{ color: "rgb(var(--text-secondary))" }}
           >
-            No account needed. Pick a problem. Start talking.
+            Create a free account, choose a round, and start practicing.
           </p>
           <Link href="/signup" className="btn btn-primary text-[15px] px-8 py-4">
             Start your first session
@@ -491,7 +490,7 @@ function Footer() {
           </Link>
         </nav>
         <p className="t-eyebrow">
-          Inturview · NeetCode 150 · Made for candidates who are serious
+          Inturview · Practice the conversations that decide the next round
         </p>
       </div>
     </footer>

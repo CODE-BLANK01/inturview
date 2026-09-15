@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDesignProblem } from "@/lib/designProblems";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Fresh session — enforce monthly cap on the SEPARATE design counter.
-  const plan = getPlan(profile.plan);
+  const plan = getEffectivePlan(profile.plan, user.email);
   if (plan.designSessionsPerMonth !== null) {
     const monthStart = startOfMonthUTC();
     const used = await prisma.designSession.count({
@@ -96,6 +97,11 @@ export async function POST(req: NextRequest) {
   const created = await prisma.designSession.create({
     data: { userId: user.id, problemId: parsed.problem_id },
     select: { id: true, startedAt: true },
+  });
+
+  await captureProductEvent(user.id, {
+    event: "interview_started",
+    properties: { mode: "system_design", session_id: created.id },
   });
 
   return Response.json({ ...created, resumed: false }, { status: 201 });

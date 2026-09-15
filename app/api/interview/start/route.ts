@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getProblem } from "@/lib/problems";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Fresh interview — enforce monthly plan cap.
-  const plan = getPlan(profile.plan);
+  const plan = getEffectivePlan(profile.plan, user.email);
   if (plan.interviewsPerMonth !== null) {
     const monthStart = startOfMonthUTC();
     const used = await prisma.interview.count({
@@ -114,6 +115,11 @@ export async function POST(req: NextRequest) {
   const created = await prisma.interview.create({
     data: { userId: user.id, problemId: parsed.problem_id },
     select: { id: true, startedAt: true },
+  });
+
+  await captureProductEvent(user.id, {
+    event: "interview_started",
+    properties: { mode: "coding", session_id: created.id },
   });
 
   return Response.json({ ...created, resumed: false }, { status: 201 });

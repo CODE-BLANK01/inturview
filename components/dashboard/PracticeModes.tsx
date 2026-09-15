@@ -21,9 +21,25 @@ interface Mode {
 
 const MODES: Mode[] = [
   {
+    key: "screen",
+    title: "Recruiter screen",
+    blurb: "Practice your story, motivation, role fit, and compensation in a text-based screen.",
+    icon: ClipboardList,
+    href: "/recruiter-screen",
+    status: "live",
+  },
+  {
+    key: "behavioral",
+    title: "Behavioral",
+    blurb: "Practice specific STAR stories with follow-up questions and a scorecard.",
+    icon: Users,
+    href: "/behavioral",
+    status: "live",
+  },
+  {
     key: "coding",
     title: "Coding interview",
-    blurb: "Three-phase mock: approach, code, debrief. NeetCode 150.",
+    blurb: "Work through approach, code, and debrief with an AI interviewer.",
     icon: Code2,
     href: "/problems",
     status: "live",
@@ -31,25 +47,9 @@ const MODES: Mode[] = [
   {
     key: "system-design",
     title: "System design",
-    blurb: "Free-draw whiteboard, three phases, scorecard at the end.",
+    blurb: "Clarify scope, sketch on a whiteboard, and get a debrief.",
     icon: Network,
     href: "/design-problems",
-    status: "live",
-  },
-  {
-    key: "behavioral",
-    title: "Behavioral",
-    blurb: "STAR-method drills against the questions interviewers actually ask.",
-    icon: Users,
-    href: "/behavioral",
-    status: "live",
-  },
-  {
-    key: "screen",
-    title: "Recruiter screen",
-    blurb: "25-min phone screen — story, motivation, comp expectations.",
-    icon: ClipboardList,
-    href: "/recruiter-screen",
     status: "live",
   },
   {
@@ -69,7 +69,7 @@ export function PracticeModes() {
         <h2 className="text-sm uppercase tracking-[0.08em] text-text-dim">
           Practice modes
         </h2>
-        <span className="text-xs text-text-dim">More arriving — see roadmap</span>
+        <span className="text-xs text-text-dim">Choose the round you want to practice</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {MODES.map((m) => (

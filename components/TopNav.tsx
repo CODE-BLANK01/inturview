@@ -26,32 +26,32 @@ const PRACTICE_MODES: {
   pathPrefixes: string[];
 }[] = [
   {
+    href: "/recruiter-screen",
+    label: "Recruiter screen",
+    blurb: "Your story, motivation, role fit, compensation",
+    icon: ClipboardList,
+    pathPrefixes: ["/recruiter-screen"],
+  },
+  {
+    href: "/behavioral",
+    label: "Behavioral",
+    blurb: "Practice stories with follow-up questions",
+    icon: Users,
+    pathPrefixes: ["/behavioral"],
+  },
+  {
     href: "/problems",
     label: "Coding",
-    blurb: "Approach, code, debrief — NeetCode 150",
+    blurb: "Approach, code, debrief",
     icon: Code2,
     pathPrefixes: ["/problems", "/interview"],
   },
   {
     href: "/design-problems",
     label: "System design",
-    blurb: "Free-draw whiteboard, scope → design → debrief",
+    blurb: "Whiteboard, scope, design, debrief",
     icon: Network,
     pathPrefixes: ["/design-problems", "/design"],
-  },
-  {
-    href: "/behavioral",
-    label: "Behavioral",
-    blurb: "STAR drills against real interviewer questions",
-    icon: Users,
-    pathPrefixes: ["/behavioral"],
-  },
-  {
-    href: "/recruiter-screen",
-    label: "Recruiter screen",
-    blurb: "25-min phone screen — story, motivation, comp",
-    icon: ClipboardList,
-    pathPrefixes: ["/recruiter-screen"],
   },
   {
     href: "/face-to-face",
@@ -176,10 +176,10 @@ export function TopNav() {
                   </div>
                   <div className="md:hidden">
                     <DropdownLink href="/dashboard">Dashboard</DropdownLink>
+                    <DropdownLink href="/recruiter-screen">Recruiter screen</DropdownLink>
+                    <DropdownLink href="/behavioral">Behavioral</DropdownLink>
                     <DropdownLink href="/problems">Coding</DropdownLink>
                     <DropdownLink href="/design-problems">System design</DropdownLink>
-                    <DropdownLink href="/behavioral">Behavioral</DropdownLink>
-                    <DropdownLink href="/recruiter-screen">Recruiter screen</DropdownLink>
                     <DropdownLink href="/face-to-face">Face-to-face</DropdownLink>
                     <DropdownLink href="/history">History</DropdownLink>
                     {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
@@ -265,4 +265,3 @@ function Avatar({ email, name }: { email: string; name: string | null }) {
     </span>
   );
 }
-

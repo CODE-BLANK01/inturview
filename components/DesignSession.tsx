@@ -15,6 +15,7 @@ import { EndDesignDialog } from "./design/EndDesignDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useTypewriter } from "@/lib/useTypewriter";
+import { trackPhaseAdvance } from "@/lib/trackPhaseAdvance";
 import { streamDesignMessage, type DesignPhase } from "@/lib/stream";
 import type { SystemDesignProblemDef } from "@/lib/designProblems";
 import type { ChatMessage } from "@/lib/types";
@@ -479,7 +480,10 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
                 ready={scopeAccepted}
                 disabled={scopeStreaming}
                 followups={aiTurnsInScope}
-                onStartCoding={() => setPhase("design")}
+                onStartCoding={() => {
+                  if (sessionId) trackPhaseAdvance("system_design", sessionId);
+                  setPhase("design");
+                }}
                 onSkipAhead={() => {
                   if (sessionId) {
                     fetch("/api/design/skip-scope", {
@@ -489,6 +493,7 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
                       keepalive: true,
                     }).catch(() => {});
                   }
+                  if (sessionId) trackPhaseAdvance("system_design", sessionId);
                   setPhase("design");
                 }}
                 onKeepDiscussing={() => scopeInputRef.current?.focus()}

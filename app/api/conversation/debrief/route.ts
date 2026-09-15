@@ -17,6 +17,7 @@ import type { FaceToFacePlan } from "@/lib/faceToFaceQuestions";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -188,6 +189,25 @@ export async function POST(req: NextRequest) {
           data: { status: "ABANDONED", completedAt: new Date() },
         }),
       ]);
+
+      await captureProductEvent(user.id, {
+        event: "phase_advanced",
+        properties: {
+          mode: session.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
+          session_id: session.id,
+          from: "conversation",
+          to: "debrief",
+        },
+      });
+
+      await captureProductEvent(user.id, {
+        event: "debrief_completed",
+        properties: {
+          mode: session.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
+          session_id: session.id,
+          score: total,
+        },
+      });
 
       return Response.json(debrief);
     } catch (err) {

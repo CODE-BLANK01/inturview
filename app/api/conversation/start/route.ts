@@ -2,9 +2,10 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 import { getBehavioralScenario } from "@/lib/behavioralScenarios";
 import { ConversationKind } from "@prisma/client";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Fresh — enforce the right monthly cap.
-  const plan = getPlan(profile.plan);
+  const plan = getEffectivePlan(profile.plan, user.email);
   const cap =
     parsed.kind === "BEHAVIORAL"
       ? plan.behavioralSessionsPerMonth
@@ -130,6 +131,14 @@ export async function POST(req: NextRequest) {
       scenarioId: parsed.scenario_id ?? null,
     },
     select: { id: true, startedAt: true },
+  });
+
+  await captureProductEvent(user.id, {
+    event: "interview_started",
+    properties: {
+      mode: parsed.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
+      session_id: created.id,
+    },
   });
 
   return Response.json({ ...created, resumed: false }, { status: 201 });

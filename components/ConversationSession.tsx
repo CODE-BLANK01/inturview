@@ -362,7 +362,7 @@ export function ConversationSession({
                 streamingText={liveStreaming ? liveWriter.visible : null}
                 disabled={liveStreaming}
                 onSend={onLiveSend}
-                placeholder="Your turn — speak as if you're in the room."
+                placeholder="Your turn — type your answer as you would say it."
                 inputRef={liveInputRef}
                 emptyState="The interviewer will start the conversation shortly."
               />

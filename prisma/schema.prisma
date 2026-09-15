@@ -65,6 +65,8 @@ model User {
   disabledAt   DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+  /// First authenticated dashboard visit 24h–7d after signup; prevents duplicate retention events.
+  returnedWithin7dAt DateTime?
   interviews   Interview[]
   designSessions DesignSession[]
   conversations  ConversationSession[]
@@ -164,6 +166,8 @@ model Interview {
   // null when the candidate jumped to code without the interviewer signaling acceptance —
   // weighted negatively in the debrief's communication / approach_quality scores.
   approachAcceptedAt DateTime?
+  // First explicit transition from approach to code; analytics dedupe marker.
+  codePhaseEnteredAt DateTime?
   // Whether the candidate clicked "Start coding" while the latest interviewer
   // signal was still [CONTINUE]. Persisted for the debrief.
   movedToCodeEarly   Boolean   @default(false)
@@ -253,6 +257,8 @@ model DesignSession {
   /// Null when the candidate moved to design without scope acceptance —
   /// caps the Requirements/Architecture scores in debrief.
   scopeAcceptedAt DateTime?
+  // First explicit transition from scope to design; analytics dedupe marker.
+  designPhaseEnteredAt DateTime?
   /// Whether the candidate clicked "Start designing" while the latest signal
   /// was still [CONTINUE]. Behavioral signal feeding the rubric.
   movedToDesignEarly Boolean          @default(false)

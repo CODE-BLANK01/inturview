@@ -7,6 +7,7 @@ import { describeCanvas } from "@/lib/designCanvas";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
 import { DesignDebriefSchema, type DesignDebrief } from "@/lib/designTypes";
 
 export const runtime = "nodejs";
@@ -176,6 +177,16 @@ export async function POST(req: NextRequest) {
           data: { status: "ABANDONED", completedAt: new Date() },
         }),
       ]);
+
+      await captureProductEvent(user.id, {
+        event: "phase_advanced",
+        properties: { mode: "system_design", session_id: session.id, from: "design", to: "debrief" },
+      });
+
+      await captureProductEvent(user.id, {
+        event: "debrief_completed",
+        properties: { mode: "system_design", session_id: session.id, score: total },
+      });
 
       return Response.json(debrief);
     } catch (err) {

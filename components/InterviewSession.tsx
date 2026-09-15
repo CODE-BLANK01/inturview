@@ -18,6 +18,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useTypewriter } from "@/lib/useTypewriter";
 import { streamInterviewMessage } from "@/lib/stream";
 import type { ChatMessage, Debrief, Phase, Problem } from "@/lib/types";
+import { trackPhaseAdvance } from "@/lib/trackPhaseAdvance";
 
 type DebriefState =
   | { status: "idle" }
@@ -505,7 +506,10 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                 ready={approachReady}
                 disabled={approachStreaming}
                 followups={aiTurnsInApproach}
-                onStartCoding={() => setPhase("code")}
+                onStartCoding={() => {
+                  if (interviewId) trackPhaseAdvance("coding", interviewId);
+                  setPhase("code");
+                }}
                 onSkipAhead={() => {
                   // Persist behavioral flag, then advance.
                   if (interviewId) {
@@ -518,6 +522,7 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                       /* non-fatal — the debrief route will still see approachAcceptedAt is null */
                     });
                   }
+                  if (interviewId) trackPhaseAdvance("coding", interviewId);
                   setPhase("code");
                 }}
                 onKeepDiscussing={() => approachInputRef.current?.focus()}

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { getAnthropic, MODEL } from "@/lib/anthropic";
+import { cachedInterviewPrompt, getAnthropic, logCacheUsage, MODEL } from "@/lib/anthropic";
 import {
   behavioralSystemPrompt,
   recruiterScreenSystemPrompt,
@@ -187,18 +187,19 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const upstream = await anthropic.messages.stream(
+        const upstream = await anthropic.beta.promptCaching.messages.stream(
           {
             model: MODEL,
             max_tokens: 500,
-            system,
-            messages: messagesForModel,
+            ...cachedInterviewPrompt(system, messagesForModel),
           },
           { signal: abortController.signal }
         );
 
         for await (const event of upstream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          if (event.type === "message_start") {
+            logCacheUsage(`${session.kind.toLowerCase()}/${parsed.mode}`, event.message.usage);
+          } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             const text = event.delta.text;
             assistantBuffer += text;
             controller.enqueue(sseEncode("delta", JSON.stringify({ text })));

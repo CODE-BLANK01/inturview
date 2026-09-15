@@ -14,7 +14,7 @@ export function Greeting({
 
   let sub: string;
   if (stats.interviewsCompleted === 0) {
-    sub = "First mock is the toughest. Pick something light to find the rhythm.";
+    sub = "Start with a recruiter screen or a behavioral story to find your rhythm.";
   } else if (stats.interviewsCompleted < 5) {
     sub = `${stats.interviewsCompleted} interviews in. Build the streak.`;
   } else if (stats.averageScore !== null) {

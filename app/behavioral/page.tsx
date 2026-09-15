@@ -4,7 +4,7 @@ import { TopNav } from "@/components/TopNav";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { BEHAVIORAL_SCENARIOS } from "@/lib/behavioralScenarios";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Behavioral — inturview" };
@@ -20,7 +20,7 @@ export default async function BehavioralIndexPage() {
   if (!profile?.emailVerifiedAt) redirect("/verify-email");
   if (!profile.onboardingCompletedAt) redirect("/onboarding");
 
-  const plan = getPlan(profile.plan);
+  const plan = getEffectivePlan(profile.plan, user.email);
   const monthStart = startOfMonthUTC();
   const used = await prisma.conversationSession.count({
     where: {
@@ -54,7 +54,11 @@ export default async function BehavioralIndexPage() {
           </div>
           <div className="text-sm text-text-muted">
             <span className="tabular-nums">{used}</span>
-            {cap !== null && <> / {cap}</>}
+            {cap === null ? (
+              <span className="text-text-dim"> · unlimited</span>
+            ) : (
+              <> / {cap}</>
+            )}
             <span className="text-text-dim"> this month</span>
           </div>
         </header>

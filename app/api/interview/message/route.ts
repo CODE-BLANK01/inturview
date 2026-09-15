@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getProblem } from "@/lib/problems";
-import { getAnthropic, MODEL } from "@/lib/anthropic";
-import { phasePromptFor } from "@/lib/prompts";
+import { cachedInterviewPrompt, getAnthropic, logCacheUsage, MODEL } from "@/lib/anthropic";
+import { codeLiveContext, phasePromptFor } from "@/lib/prompts";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -172,7 +172,12 @@ export async function POST(req: NextRequest) {
     messagesForModel = [{ role: "user", content: "..." }];
   }
 
-  const system = phasePromptFor(parsed.phase, problem, phase1Transcript, userCode);
+  const system = phasePromptFor(parsed.phase, problem);
+  const cachedPrompt = cachedInterviewPrompt(
+    system,
+    messagesForModel,
+    parsed.phase === "code" ? codeLiveContext(phase1Transcript, userCode) : undefined
+  );
 
   let anthropic;
   try {
@@ -235,18 +240,19 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        const upstream = await anthropic.messages.stream(
+        const upstream = await anthropic.beta.promptCaching.messages.stream(
           {
             model: MODEL,
             max_tokens: parsed.phase === "approach" ? 400 : 700,
-            system,
-            messages: messagesForModel,
+            ...cachedPrompt,
           },
           { signal: abortController.signal }
         );
 
         for await (const event of upstream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          if (event.type === "message_start") {
+            logCacheUsage(`coding/${parsed.phase}`, event.message.usage);
+          } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             const text = event.delta.text;
             if (!prefixDetected) {
               prefixBuffer += text;

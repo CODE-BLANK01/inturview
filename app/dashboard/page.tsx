@@ -11,7 +11,8 @@ import { PlanUsage } from "@/components/dashboard/PlanUsage";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { loadDashboardData } from "@/lib/dashboard";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — inturview" };
@@ -23,13 +24,36 @@ export default async function DashboardPage() {
   // Gate chain: verify-email → onboarding → dashboard. Each step blocks the next.
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true },
+    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true, createdAt: true, returnedWithin7dAt: true },
   });
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
   if (!profile.onboardingCompletedAt) redirect("/onboarding");
 
-  const plan = getPlan(profile.plan);
+  // First authenticated dashboard visit on a later day, within the first week.
+  // An atomic stamp prevents duplicate retention events on concurrent page loads.
+  const now = new Date();
+  const daysSinceSignup = (now.getTime() - profile.createdAt.getTime()) / 86_400_000;
+  if (process.env.POSTHOG_PROJECT_TOKEN && !profile.returnedWithin7dAt && daysSinceSignup >= 1 && daysSinceSignup <= 7) {
+    const stamped = await prisma.user.updateMany({
+      where: { id: user.id, returnedWithin7dAt: null },
+      data: { returnedWithin7dAt: now },
+    });
+    if (stamped.count === 1) {
+      const sent = await captureProductEvent(user.id, {
+        event: "returned_within_7d",
+        properties: { days_since_signup: Math.floor(daysSinceSignup) },
+      });
+      if (!sent) {
+        await prisma.user.updateMany({
+          where: { id: user.id, returnedWithin7dAt: now },
+          data: { returnedWithin7dAt: null },
+        });
+      }
+    }
+  }
+
+  const plan = getEffectivePlan(profile.plan, user.email);
   const monthStart = startOfMonthUTC();
   const [
     interviewsThisMonth,

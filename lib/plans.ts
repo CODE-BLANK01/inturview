@@ -59,19 +59,28 @@ function freeFaceToFaceSessionsPerMonth(): number {
   return Number.isFinite(v) && v >= 0 ? v : 2;
 }
 
+const UNLIMITED_PLAN_EMAILS = new Set(
+  [
+    "abdullahbasarvi@gmail.com",
+    ...(process.env.UNLIMITED_PLAN_EMAILS ?? "").split(","),
+  ]
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
+
 export const PLANS: PlanDefinition[] = [
   {
     tier: PlanTier.FREE,
     name: "Free",
-    tagline: "Run a few real mocks. See what the scorecard actually looks like.",
+    tagline: "Practice the first screen, then the rounds that follow.",
     priceMonthlyCents: 0,
     audience: "individual",
     features: [
-      "Up to {{interviews}} mock coding interviews per month",
-      "Up to {{designSessions}} system-design sessions per month",
-      "Full three-phase loop — approach, code, debrief",
-      "Five-dimension rubric scorecard",
-      "All NeetCode 150 problems unlocked",
+      "{{recruiterSessions}} recruiter screens per month",
+      "{{behavioralSessions}} behavioral sessions per month",
+      "{{interviews}} coding interviews per month",
+      "{{designSessions}} system-design sessions per month",
+      "Five-dimension debriefs across every mode",
     ],
     interviewsPerMonth: freeInterviewsPerMonth(),
     designSessionsPerMonth: freeDesignSessionsPerMonth(),
@@ -83,11 +92,11 @@ export const PLANS: PlanDefinition[] = [
   {
     tier: PlanTier.PRO,
     name: "Pro",
-    tagline: "Unlimited practice. Company modes. Coding rounds.",
+    tagline: "Unlimited practice across every interview mode.",
     priceMonthlyCents: 1900,
     audience: "individual",
     features: [
-      "Unlimited mock interviews (coding + system design)",
+      "Unlimited recruiter, behavioral, coding, and design practice",
       "Company-specific interview modes",
       "Advanced AI feedback + benchmarking",
       "Priority response speed",
@@ -170,13 +179,33 @@ export function getPlan(tier: PlanTier): PlanDefinition {
   return p;
 }
 
+export function hasUnlimitedPlanOverride(email: string | null | undefined): boolean {
+  return UNLIMITED_PLAN_EMAILS.has((email ?? "").trim().toLowerCase());
+}
+
+export function getEffectivePlan(
+  tier: PlanTier,
+  email: string | null | undefined
+): PlanDefinition {
+  const plan = getPlan(tier);
+  if (!hasUnlimitedPlanOverride(email)) return plan;
+  // An access override changes limits, not the account's paid tier or price.
+  return {
+    ...plan,
+    interviewsPerMonth: null,
+    designSessionsPerMonth: null,
+    behavioralSessionsPerMonth: null,
+    recruiterSessionsPerMonth: null,
+  };
+}
+
 /** Substitutes template tokens like {{interviews}} in feature strings. */
 export function renderFeature(text: string, plan: PlanDefinition): string {
-  const cap = plan.interviewsPerMonth;
-  return text.replace(
-    /\{\{interviews\}\}/g,
-    cap === null ? "unlimited" : cap.toString()
-  );
+  return text
+    .replace(/\{\{interviews\}\}/g, plan.interviewsPerMonth === null ? "unlimited" : String(plan.interviewsPerMonth))
+    .replace(/\{\{designSessions\}\}/g, plan.designSessionsPerMonth === null ? "unlimited" : String(plan.designSessionsPerMonth))
+    .replace(/\{\{behavioralSessions\}\}/g, plan.behavioralSessionsPerMonth === null ? "unlimited" : String(plan.behavioralSessionsPerMonth))
+    .replace(/\{\{recruiterSessions\}\}/g, plan.recruiterSessionsPerMonth === null ? "unlimited" : String(plan.recruiterSessionsPerMonth));
 }
 
 /** Format the monthly price for display. */
