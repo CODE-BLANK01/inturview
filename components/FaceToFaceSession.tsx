@@ -572,8 +572,6 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
     );
   };
 
-  const canFinish = transcript.length >= 2;
-
   return (
     <>
       <TopNav />
@@ -656,8 +654,7 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
                 type="button"
                 className="btn btn-primary"
                 onClick={finishInterview}
-                disabled={!canFinish}
-                title={canFinish ? "Finish and get your scorecard" : "Have a real exchange before finishing"}
+                title="Finish and get your scorecard"
               >
                 Finish interview
                 <ArrowRight className="h-4 w-4" />

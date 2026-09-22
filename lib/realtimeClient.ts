@@ -379,8 +379,13 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
         break;
       }
       case "error": {
-        const err = ev.error as { message?: string } | undefined;
-        cb.onError(err?.message ?? "Realtime session error");
+        const err = ev.error as
+          | { message?: string; type?: string; code?: string; event_id?: string }
+          | undefined;
+        // eslint-disable-next-line no-console
+        console.error("[realtime] server error event:", ev);
+        const label = [err?.type, err?.code].filter(Boolean).join("/");
+        cb.onError(label ? `${err?.message} (${label})` : err?.message ?? "Realtime session error");
         break;
       }
       default:
