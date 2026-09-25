@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const Body = z.object({
   name: z.string().trim().min(1).max(80).nullable(),
-  goal: z.enum(["PRACTICING", "RECRUITING", "COACHING", "EXPLORING"]),
+  goal: z.enum(["PRACTICING", "EXPLORING"]),
   // Only FREE is selectable from the UI today. Other tiers are accepted here so
   // the schema is forward-compatible, but we keep selectability gated on the
   // client until billing is wired up.

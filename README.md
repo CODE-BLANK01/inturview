@@ -48,6 +48,7 @@ Every mode green-lights with a gating signal where it makes sense (`[READY]` for
 - **User dashboard** — `/dashboard`: greeting, 4-stat strip, resume-in-progress card, all four practice modes live, a per-mode plan-usage grid, topic mastery bars, recent interviews, roadmap sidebar.
 - **Per-mode plan caps** — Free tier is capped separately per mode (coding 5 / design 2 / behavioral 3 / recruiter 2 per calendar month); paid tiers scale or go unlimited. See [`lib/plans.ts`](lib/plans.ts).
 - **Product analytics** — Five server-side PostHog events measure signup, starts, phase advancement, debrief completion, and first-week return. No emails, answers, code, or transcripts are sent.
+- **Pricing split** — `/pricing` is only for candidate practice (Free + a $19/30-day Interview Sprint); `/employers` separately presents the employer screening design-partner offer and per-completed-screen validation price.
 - **Prompt caching** — Explicit 5-minute Anthropic cache breakpoints on stable system instructions and prior transcript turns. Live code and canvas context follows the cached prefix.
 - **History** — `/history` merges all four modes with kind badges; per-mode detail routes show the read-only transcript + scorecard (+ code or canvas where relevant).
 - **Admin console** — `/admin`, gated by `Role.ADMIN`. Overview tiles, user management (flag / disable / promote / delete with self-protection), problem CRUD (block delete when interviews reference), interview monitor, and a paginated audit log of every admin mutation.

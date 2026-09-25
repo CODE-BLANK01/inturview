@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowLeft, Check, Lock, Loader2 } from "lucide-react";
-import { PLANS, priceLabel, renderFeature } from "@/lib/plans";
+import { CANDIDATE_PLANS, priceLabel, priceSuffix, renderFeature } from "@/lib/plans";
 import type { PlanDefinition } from "@/lib/plans";
 
-type Goal = "PRACTICING" | "RECRUITING" | "COACHING" | "EXPLORING";
+type Goal = "PRACTICING" | "EXPLORING";
 
 interface OnboardingWizardProps {
   /** Pre-populated from session — user can edit during onboarding. */
@@ -17,23 +17,13 @@ interface OnboardingWizardProps {
 const GOAL_OPTIONS: { id: Goal; label: string; sub: string }[] = [
   {
     id: "PRACTICING",
-    label: "Practicing for interviews",
-    sub: "You've got a loop coming up and want to stop bombing the room.",
-  },
-  {
-    id: "RECRUITING",
-    label: "Hiring & evaluating candidates",
-    sub: "You want a structured scorecard for the people you screen.",
-  },
-  {
-    id: "COACHING",
-    label: "Coaching others",
-    sub: "You teach or mentor candidates through interview prep.",
+    label: "Preparing for an upcoming interview",
+    sub: "You have a real process ahead and want focused practice before it starts.",
   },
   {
     id: "EXPLORING",
-    label: "Just exploring",
-    sub: "Kicking the tires before you commit to a workflow.",
+    label: "Learning interview skills",
+    sub: "You want to build confidence now so the next opportunity feels familiar.",
   },
 ];
 
@@ -143,33 +133,16 @@ export function OnboardingWizard({ initialName, email }: OnboardingWizardProps) 
               Pick your plan.
             </h1>
             <p className="t-body-light text-text-muted mt-2 text-[15px] max-w-xl">
-              Start free. Upgrade paths land soon — we&apos;ll be in your inbox
-              before they go live.
+              Start free. The Interview Sprint opens soon for candidates who want
+              thirty focused days of unlimited practice.
             </p>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {PLANS.filter((p) => p.audience === "individual").map((p) => (
+            {CANDIDATE_PLANS.map((p) => (
               <PlanCard key={p.tier} plan={p} />
             ))}
           </div>
-
-          <details className="panel p-5 group">
-            <summary className="cursor-pointer t-eyebrow flex items-center justify-between">
-              <span>Hiring with a team?</span>
-              <span className="text-text-muted normal-case tracking-normal text-xs group-open:hidden">
-                Show team plans
-              </span>
-              <span className="text-text-muted normal-case tracking-normal text-xs hidden group-open:inline">
-                Hide
-              </span>
-            </summary>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              {PLANS.filter((p) => p.audience !== "individual").map((p) => (
-                <PlanCard key={p.tier} plan={p} compact />
-              ))}
-            </div>
-          </details>
 
           {error && (
             <div className="panel border-hard/40 bg-hard-bg/30 px-3 py-2.5 text-sm text-hard">
@@ -298,7 +271,7 @@ function GoalCard({
   );
 }
 
-function PlanCard({ plan, compact }: { plan: PlanDefinition; compact?: boolean }) {
+function PlanCard({ plan }: { plan: PlanDefinition }) {
   const isFree = plan.tier === "FREE";
   const locked = !plan.selectable;
   return (
@@ -318,8 +291,8 @@ function PlanCard({ plan, compact }: { plan: PlanDefinition; compact?: boolean }
             <span className="t-display text-[28px] text-text leading-none">
               {priceLabel(plan)}
             </span>
-            {plan.priceMonthlyCents !== null && plan.priceMonthlyCents > 0 && (
-              <span className="text-xs text-text-dim">/ month</span>
+            {priceSuffix(plan) && (
+              <span className="text-xs text-text-dim">{priceSuffix(plan)}</span>
             )}
           </div>
         </div>
@@ -350,11 +323,9 @@ function PlanCard({ plan, compact }: { plan: PlanDefinition; compact?: boolean }
         )}
       </div>
 
-      {!compact && (
-        <p className="text-sm text-text-muted leading-relaxed mb-4">
-          {plan.tagline}
-        </p>
-      )}
+      <p className="text-sm text-text-muted leading-relaxed mb-4">
+        {plan.tagline}
+      </p>
 
       <ul className="space-y-1.5 text-sm text-text-muted">
         {plan.features.map((f) => (

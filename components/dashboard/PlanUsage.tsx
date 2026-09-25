@@ -1,6 +1,6 @@
 import { ArrowUpRight, Lock } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
-import { priceLabel } from "@/lib/plans";
+import { priceLabel, priceSuffix } from "@/lib/plans";
 
 interface PlanUsageProps {
   plan: PlanDefinition;
@@ -67,7 +67,7 @@ export function PlanUsage({
           </span>
           <span className="text-xs text-text-dim tabular-nums">
             {priceLabel(plan)}
-            {plan.priceMonthlyCents && plan.priceMonthlyCents > 0 ? " / mo" : ""}
+            {priceSuffix(plan)}
           </span>
           <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
         </div>

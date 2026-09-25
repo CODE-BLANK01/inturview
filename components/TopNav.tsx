@@ -210,6 +210,12 @@ export function TopNav() {
             </div>
           ) : status === "unauthenticated" ? (
             <Fragment>
+              <Link href="/pricing" className="hidden sm:inline-flex px-2 py-1.5 text-sm text-text-muted hover:text-text">
+                Pricing
+              </Link>
+              <Link href="/employers" className="hidden md:inline-flex px-2 py-1.5 text-sm text-text-muted hover:text-text">
+                For employers
+              </Link>
               <Link href="/signin" className="btn text-sm">
                 Sign in
               </Link>

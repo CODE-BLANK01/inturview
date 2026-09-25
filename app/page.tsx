@@ -483,6 +483,18 @@ function Footer() {
             About
           </Link>
           <Link
+            href="/pricing"
+            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
+          >
+            Pricing
+          </Link>
+          <Link
+            href="/employers"
+            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
+          >
+            For employers
+          </Link>
+          <Link
             href="/contact"
             className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
           >

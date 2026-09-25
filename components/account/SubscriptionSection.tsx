@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Lock, ArrowUpRight } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
-import { priceLabel, renderFeature, PLANS } from "@/lib/plans";
+import { CANDIDATE_PLANS, priceLabel, priceSuffix, renderFeature } from "@/lib/plans";
 import { SectionHeader } from "./ProfileSection";
 
 interface SubscriptionSectionProps {
@@ -34,7 +34,7 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
     setDaysUntilReset(computeDaysUntilReset());
   }, []);
 
-  const upgradeCandidates = PLANS.filter((p) => p.tier !== plan.tier && p.audience === "individual");
+  const upgradeCandidates = CANDIDATE_PLANS.filter((p) => p.tier !== plan.tier);
 
   return (
     <section>
@@ -66,8 +66,8 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
               <span className="t-display text-2xl text-text leading-none">
                 {priceLabel(plan)}
               </span>
-              {plan.priceMonthlyCents && plan.priceMonthlyCents > 0 && (
-                <span className="text-xs text-text-dim">/ month</span>
+              {priceSuffix(plan) && (
+                <span className="text-xs text-text-dim">{priceSuffix(plan)}</span>
               )}
             </div>
             <p className="text-sm text-text-muted mt-2 max-w-md leading-snug">
@@ -161,13 +161,13 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
                   </div>
                   <span className="t-data text-text-muted text-xs shrink-0">
                     {priceLabel(p)}
-                    {p.priceMonthlyCents && p.priceMonthlyCents > 0 ? "/mo" : ""}
+                    {priceSuffix(p)}
                   </span>
                 </li>
               ))}
             </ul>
             <p className="text-xs text-text-dim mt-3">
-              We&apos;ll email you when Pro opens up. No surprise charges.
+              We&apos;ll email you when the Interview Sprint opens. No annual contract or surprise renewal.
             </p>
           </div>
         )}

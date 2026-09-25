@@ -3,7 +3,14 @@ import test from "node:test";
 import { PlanTier } from "@prisma/client";
 import { cachedInterviewPrompt } from "../lib/anthropic";
 import { captureProductEvent } from "../lib/analytics";
-import { getEffectivePlan, priceLabel, renderFeature } from "../lib/plans";
+import {
+  CANDIDATE_PLANS,
+  PLANS,
+  getEffectivePlan,
+  priceLabel,
+  priceSuffix,
+  renderFeature,
+} from "../lib/plans";
 
 test("unlimited access preserves the stored plan and displayed price", () => {
   const plan = getEffectivePlan(PlanTier.FREE, " ABDULLAHBASARVI@GMAIL.COM ");
@@ -15,6 +22,20 @@ test("unlimited access preserves the stored plan and displayed price", () => {
   assert.equal(plan.recruiterSessionsPerMonth, null);
   assert.equal(plan.faceToFaceSessionsPerMonth, null);
   assert.equal(renderFeature("{{interviews}} coding and {{designSessions}} design", plan), "unlimited coding and unlimited design");
+});
+
+test("candidate pricing stays separate from employer screening", () => {
+  assert.deepEqual(CANDIDATE_PLANS.map((plan) => plan.tier), [PlanTier.FREE, PlanTier.PRO]);
+  assert.ok(CANDIDATE_PLANS.every((plan) => plan.audience === "candidate"));
+
+  const sprint = CANDIDATE_PLANS.find((plan) => plan.tier === PlanTier.PRO);
+  assert.equal(sprint?.name, "Interview Sprint");
+  assert.equal(priceLabel(sprint!), "$19");
+  assert.equal(priceSuffix(sprint!), " / 30 days");
+
+  const employerPlans = PLANS.filter((plan) => plan.audience === "employer");
+  assert.equal(employerPlans.length, 3);
+  assert.ok(employerPlans.every((plan) => !plan.name.toLowerCase().includes("team")));
 });
 
 test("cache markers stay on stable prompt content before changing live context", () => {

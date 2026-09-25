@@ -6,10 +6,11 @@ export interface PlanDefinition {
   name: string;
   /** One-line positioning copy used on the plan-select card. */
   tagline: string;
-  /** Cents per month, or null for custom / not-priced-yet. */
-  priceMonthlyCents: number | null;
+  /** Cents per billing period, or null for custom / not-priced-yet. */
+  priceCents: number | null;
+  billingPeriod: "month" | "30_days" | null;
   /** Audience: who is this plan for? */
-  audience: "individual" | "team" | "enterprise";
+  audience: "candidate" | "employer";
   /** Bullet features shown on the card. Keep tight — 3–5 lines max. */
   features: string[];
   /** Hard cap on coding-interview starts per calendar month. null = unlimited. */
@@ -72,15 +73,16 @@ export const PLANS: PlanDefinition[] = [
   {
     tier: PlanTier.FREE,
     name: "Free",
-    tagline: "Practice the first screen, then the rounds that follow.",
-    priceMonthlyCents: 0,
-    audience: "individual",
+    tagline: "Learn each interview format and find the gaps to work on.",
+    priceCents: 0,
+    billingPeriod: null,
+    audience: "candidate",
     features: [
       "{{recruiterSessions}} recruiter screens per month",
       "{{behavioralSessions}} behavioral sessions per month",
       "{{interviews}} coding interviews per month",
       "{{designSessions}} system-design sessions per month",
-      "Five-dimension debriefs across every mode",
+      "Full debriefs and interview history",
     ],
     interviewsPerMonth: freeInterviewsPerMonth(),
     designSessionsPerMonth: freeDesignSessionsPerMonth(),
@@ -91,15 +93,16 @@ export const PLANS: PlanDefinition[] = [
   },
   {
     tier: PlanTier.PRO,
-    name: "Pro",
-    tagline: "Unlimited practice across every interview mode.",
-    priceMonthlyCents: 1900,
-    audience: "individual",
+    name: "Interview Sprint",
+    tagline: "Thirty focused days of practice before the real interview.",
+    priceCents: 1900,
+    billingPeriod: "30_days",
+    audience: "candidate",
     features: [
       "Unlimited recruiter, behavioral, coding, and design practice",
-      "Company-specific interview modes",
-      "Advanced AI feedback + benchmarking",
-      "Priority response speed",
+      "Full debriefs and interview history",
+      "Repeat weak rounds without monthly caps",
+      "One payment with no annual commitment",
     ],
     interviewsPerMonth: null,
     designSessionsPerMonth: null,
@@ -107,71 +110,74 @@ export const PLANS: PlanDefinition[] = [
     recruiterSessionsPerMonth: null,
     faceToFaceSessionsPerMonth: 30,
     selectable: false,
-    availabilityNote: "Coming soon",
+    availabilityNote: "Opening soon",
   },
   {
     tier: PlanTier.TEAM_STARTER,
-    name: "Team — Starter",
-    tagline: "For small recruiting teams running structured screens.",
-    priceMonthlyCents: 9900,
-    audience: "team",
+    name: "Employer Pilot",
+    tagline: "Validate one role with real candidates and a calibrated shortlist.",
+    priceCents: 0,
+    billingPeriod: null,
+    audience: "employer",
     features: [
-      "~20 candidate interview sessions / month",
-      "~8 system-design sessions / month",
-      "Recruiter dashboard + scorecards",
-      "Custom rubric configuration",
-      "Up to 3 seats",
+      "First 10 completed employer-invited screens",
+      "One active role and a structured interview",
+      "Evidence-backed scorecards and ranked shortlist",
+      "Founder-led setup and calibration",
     ],
-    interviewsPerMonth: 20,
-    designSessionsPerMonth: 8,
-    behavioralSessionsPerMonth: 20,
-    recruiterSessionsPerMonth: 10,
-    faceToFaceSessionsPerMonth: 10,
+    interviewsPerMonth: 0,
+    designSessionsPerMonth: 0,
+    behavioralSessionsPerMonth: 0,
+    recruiterSessionsPerMonth: 0,
+    faceToFaceSessionsPerMonth: 0,
     selectable: false,
-    availabilityNote: "Coming soon",
+    availabilityNote: "Design partners",
   },
   {
     tier: PlanTier.TEAM_GROWTH,
-    name: "Team — Growth",
-    tagline: "When you're hiring across multiple roles and need analytics.",
-    priceMonthlyCents: 29900,
-    audience: "team",
+    name: "Employer Screening",
+    tagline: "Pay for completed AI screens, then move the strongest candidates forward.",
+    priceCents: null,
+    billingPeriod: null,
+    audience: "employer",
     features: [
-      "~100 candidate interview sessions / month",
-      "~40 system-design sessions / month",
-      "Candidate comparison + analytics",
-      "Calibrated scoring & benchmarking",
-      "Up to 10 seats, shared workspaces",
+      "$10 per completed employer-invited screen",
+      "Role-specific questions and evaluation rubric",
+      "Evidence-backed scorecards and ranked shortlist",
+      "No recruiter-seat pricing",
     ],
-    interviewsPerMonth: 100,
-    designSessionsPerMonth: 40,
-    behavioralSessionsPerMonth: 100,
-    recruiterSessionsPerMonth: 50,
-    faceToFaceSessionsPerMonth: 50,
+    interviewsPerMonth: 0,
+    designSessionsPerMonth: 0,
+    behavioralSessionsPerMonth: 0,
+    recruiterSessionsPerMonth: 0,
+    faceToFaceSessionsPerMonth: 0,
     selectable: false,
-    availabilityNote: "Coming soon",
+    availabilityNote: "After pilot",
   },
   {
     tier: PlanTier.ENTERPRISE,
-    name: "Enterprise",
-    tagline: "Custom workflows, API access, white-label.",
-    priceMonthlyCents: null,
-    audience: "enterprise",
+    name: "Employer Volume",
+    tagline: "Volume screening, integrations, controls, and procurement support.",
+    priceCents: null,
+    billingPeriod: null,
+    audience: "employer",
     features: [
       "Custom evaluation systems",
       "Workflow integrations (ATS, Slack)",
       "API access + white-label",
       "SSO, audit log export, SLA",
     ],
-    interviewsPerMonth: null,
-    designSessionsPerMonth: null,
-    behavioralSessionsPerMonth: null,
-    recruiterSessionsPerMonth: null,
-    faceToFaceSessionsPerMonth: null,
+    interviewsPerMonth: 0,
+    designSessionsPerMonth: 0,
+    behavioralSessionsPerMonth: 0,
+    recruiterSessionsPerMonth: 0,
+    faceToFaceSessionsPerMonth: 0,
     selectable: false,
     availabilityNote: "Talk to us",
   },
 ];
+
+export const CANDIDATE_PLANS = PLANS.filter((plan) => plan.audience === "candidate");
 
 export function getPlan(tier: PlanTier): PlanDefinition {
   const p = PLANS.find((x) => x.tier === tier);
@@ -209,11 +215,16 @@ export function renderFeature(text: string, plan: PlanDefinition): string {
     .replace(/\{\{recruiterSessions\}\}/g, plan.recruiterSessionsPerMonth === null ? "unlimited" : String(plan.recruiterSessionsPerMonth));
 }
 
-/** Format the monthly price for display. */
+/** Format the price for display; cadence is rendered separately. */
 export function priceLabel(plan: PlanDefinition): string {
-  if (plan.priceMonthlyCents === null) return "Custom";
-  if (plan.priceMonthlyCents === 0) return "$0";
-  return `$${(plan.priceMonthlyCents / 100).toFixed(0)}`;
+  if (plan.priceCents === null) return "Custom";
+  if (plan.priceCents === 0) return "$0";
+  return `$${(plan.priceCents / 100).toFixed(0)}`;
+}
+
+export function priceSuffix(plan: PlanDefinition): string {
+  if (plan.priceCents === null || plan.priceCents === 0) return "";
+  return plan.billingPeriod === "30_days" ? " / 30 days" : " / month";
 }
 
 /** Start of the current calendar month, UTC. Used to scope monthly caps. */
