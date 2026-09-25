@@ -13,6 +13,7 @@ test("unlimited access preserves the stored plan and displayed price", () => {
   assert.equal(plan.designSessionsPerMonth, null);
   assert.equal(plan.behavioralSessionsPerMonth, null);
   assert.equal(plan.recruiterSessionsPerMonth, null);
+  assert.equal(plan.faceToFaceSessionsPerMonth, null);
   assert.equal(renderFeature("{{interviews}} coding and {{designSessions}} design", plan), "unlimited coding and unlimited design");
 });
 

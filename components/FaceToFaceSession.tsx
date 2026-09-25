@@ -428,7 +428,7 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
         micStream: media.state.stream,
         audioEl: audioRef.current,
         openingInstruction: start.resumed
-          ? "The session is resuming after an interruption. Briefly welcome the candidate back and continue from where the transcript left off."
+          ? "Speak only in English. The session is resuming after an interruption. Briefly welcome the candidate back and continue from where the transcript left off."
           : undefined,
         callbacks: {
           onStatus: setLinkStatus,

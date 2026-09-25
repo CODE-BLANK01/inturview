@@ -443,7 +443,7 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
     response: {
       instructions:
         opts.openingInstruction ??
-        "Greet the candidate and begin the interview with the warm-up question.",
+        "Speak only in English. Greet the candidate and begin the interview with the warm-up question.",
     },
   });
 

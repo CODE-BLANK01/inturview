@@ -12,6 +12,12 @@ TRANSCRIPTION_PROMPT = (
     "Terms like API, latency, p99, React, Postgres, index, cache, queue, deploy."
 )
 
+OUTPUT_LANGUAGE_RULE = (
+    "LANGUAGE RULE: Speak only in English. Every spoken response must be in English, "
+    "regardless of the candidate's language, browser locale, accent, transcript text, "
+    "or any earlier turn. Never switch languages or translate the interview.\n\n"
+)
+
 
 def build_session_config(instructions: str) -> dict[str, Any]:
     """Session config baked into the ephemeral client secret.
@@ -31,7 +37,7 @@ def build_session_config(instructions: str) -> dict[str, Any]:
     return {
         "type": "realtime",
         "model": s.openai_realtime_model,
-        "instructions": instructions,
+        "instructions": f"{OUTPUT_LANGUAGE_RULE}{instructions}",
         "output_modalities": ["audio"],
         "audio": {
             "input": {

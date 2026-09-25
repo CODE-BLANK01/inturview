@@ -193,7 +193,12 @@ export async function POST(req: NextRequest) {
       await captureProductEvent(user.id, {
         event: "phase_advanced",
         properties: {
-          mode: session.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
+          mode:
+            session.kind === "BEHAVIORAL"
+              ? "behavioral"
+              : session.kind === "FACE_TO_FACE"
+                ? "face_to_face"
+                : "recruiter_screen",
           session_id: session.id,
           from: "conversation",
           to: "debrief",
@@ -203,7 +208,12 @@ export async function POST(req: NextRequest) {
       await captureProductEvent(user.id, {
         event: "debrief_completed",
         properties: {
-          mode: session.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
+          mode:
+            session.kind === "BEHAVIORAL"
+              ? "behavioral"
+              : session.kind === "FACE_TO_FACE"
+                ? "face_to_face"
+                : "recruiter_screen",
           session_id: session.id,
           score: total,
         },

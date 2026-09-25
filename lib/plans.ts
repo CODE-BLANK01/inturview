@@ -196,6 +196,7 @@ export function getEffectivePlan(
     designSessionsPerMonth: null,
     behavioralSessionsPerMonth: null,
     recruiterSessionsPerMonth: null,
+    faceToFaceSessionsPerMonth: null,
   };
 }
 

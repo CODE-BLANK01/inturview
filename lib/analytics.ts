@@ -1,5 +1,5 @@
 /** Small, server-only PostHog capture client. Never send interview text or email. */
-type Mode = "coding" | "system_design" | "behavioral" | "recruiter_screen";
+type Mode = "coding" | "system_design" | "behavioral" | "recruiter_screen" | "face_to_face";
 
 export type ProductEvent =
   | { event: "signup"; properties?: Record<string, never> }

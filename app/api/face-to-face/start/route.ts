@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { getPlan, startOfMonthUTC } from "@/lib/plans";
+import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 import {
   buildFaceToFacePlan,
   FACE_TO_FACE_LEVELS,
@@ -10,6 +10,7 @@ import {
   type FaceToFacePlan,
 } from "@/lib/faceToFaceQuestions";
 import { isRealtimeConfigured, signRealtimeToken } from "@/lib/faceToFaceToken";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const planDef = getPlan(profile.plan);
+  const planDef = getEffectivePlan(profile.plan, user.email);
   const cap = planDef.faceToFaceSessionsPerMonth;
   if (cap !== null) {
     const used = await prisma.conversationSession.count({
@@ -120,6 +121,11 @@ export async function POST(req: NextRequest) {
   const created = await prisma.conversationSession.create({
     data: { userId: user.id, kind: "FACE_TO_FACE", plan: plan as unknown as object },
     select: { id: true, startedAt: true },
+  });
+
+  await captureProductEvent(user.id, {
+    event: "interview_started",
+    properties: { mode: "face_to_face", session_id: created.id },
   });
 
   return Response.json(
