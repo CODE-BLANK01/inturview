@@ -62,9 +62,8 @@ export function ConversationSession({
 
   const [debriefState, setDebriefState] = useState<DebriefState>({ status: "idle" });
 
-  const [startedAt, setStartedAt] = useState<number>(0);
+  const [timerResumed, setTimerResumed] = useState(false);
   const [paused, setPaused] = useState(false);
-  const pausedAtRef = useRef<number | null>(null);
   const [endDialogOpen, setEndDialogOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -73,16 +72,10 @@ export function ConversationSession({
 
   const pauseSession = useCallback(() => {
     if (debriefState.status !== "idle") return;
-    pausedAtRef.current = Date.now();
     setPaused(true);
   }, [debriefState.status]);
 
   const resumeSession = useCallback(() => {
-    if (pausedAtRef.current !== null) {
-      const pausedDuration = Date.now() - pausedAtRef.current;
-      pausedAtRef.current = null;
-      setStartedAt((prev) => prev + pausedDuration);
-    }
     setPaused(false);
   }, []);
 
@@ -156,8 +149,7 @@ export function ConversationSession({
         };
         if (cancelled) return;
 
-        const persistedStart = new Date(data.startedAt).getTime();
-        if (Number.isFinite(persistedStart)) setStartedAt(persistedStart);
+        setTimerResumed(data.resumed);
 
         if (!data.resumed) {
           setSessionId(data.id);
@@ -172,15 +164,12 @@ export function ConversationSession({
         }
         const detailJson = (await detail.json()) as {
           session: {
-            startedAt: string;
             messages: { role: "user" | "assistant"; content: string }[];
           };
         };
         if (cancelled) return;
 
         const s = detailJson.session;
-        const sStart = new Date(s.startedAt).getTime();
-        if (Number.isFinite(sStart)) setStartedAt(sStart);
         const msgs: ChatMessage[] = s.messages.map((m) => ({
           role: m.role,
           content: m.content,
@@ -321,7 +310,11 @@ export function ConversationSession({
             <span className="text-sm text-text-muted">{title}</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <Timer startedAt={startedAt} paused={showingDebrief || paused} />
+            <Timer
+              sessionId={sessionId}
+              resumed={timerResumed}
+              paused={showingDebrief || paused}
+            />
             {!showingDebrief && (
               <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
                 <button
