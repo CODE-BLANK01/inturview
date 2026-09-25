@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { FACE_TO_FACE_ENABLED } from "@/lib/features";
 
 const PRACTICE_MODES: {
   href: string;
@@ -53,13 +54,15 @@ const PRACTICE_MODES: {
     icon: Network,
     pathPrefixes: ["/design-problems", "/design"],
   },
-  {
-    href: "/face-to-face",
-    label: "Face-to-face",
-    blurb: "Live video technical round — voice, camera, delivery scoring",
-    icon: Video,
-    pathPrefixes: ["/face-to-face"],
-  },
+  ...(FACE_TO_FACE_ENABLED
+    ? [{
+        href: "/face-to-face",
+        label: "Face-to-face",
+        blurb: "Live video technical round — voice, camera, delivery scoring",
+        icon: Video,
+        pathPrefixes: ["/face-to-face"],
+      }]
+    : []),
 ];
 
 export function TopNav() {
@@ -180,7 +183,9 @@ export function TopNav() {
                     <DropdownLink href="/behavioral">Behavioral</DropdownLink>
                     <DropdownLink href="/problems">Coding</DropdownLink>
                     <DropdownLink href="/design-problems">System design</DropdownLink>
-                    <DropdownLink href="/face-to-face">Face-to-face</DropdownLink>
+                    {FACE_TO_FACE_ENABLED && (
+                      <DropdownLink href="/face-to-face">Face-to-face</DropdownLink>
+                    )}
                     <DropdownLink href="/history">History</DropdownLink>
                     {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
                     <div className="my-1 border-t border-border" />

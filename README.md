@@ -128,6 +128,7 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `FREE_DESIGN_SESSIONS_PER_MONTH` | `2`         | Free-tier system-design cap per calendar month.                    |
 | `FREE_BEHAVIORAL_SESSIONS_PER_MONTH` | `3`     | Free-tier behavioral cap per calendar month.                       |
 | `FREE_RECRUITER_SESSIONS_PER_MONTH` | `2`      | Free-tier recruiter-screen cap per calendar month.                 |
+| `NEXT_PUBLIC_FACE_TO_FACE_ENABLED` | `false` | Exposes the face-to-face route and navigation when the realtime flow is ready. |
 | `FREE_FACE_TO_FACE_SESSIONS_PER_MONTH` | `2`   | Free-tier face-to-face cap per calendar month (realtime audio is the most expensive mode). |
 | `FACE_TO_FACE_MAX_MINUTES` | `20`               | Hard cap on a single face-to-face session.                          |
 | `REALTIME_SERVICE_SECRET` | _(required for face-to-face)_ | Shared secret with the FastAPI realtime service. 32+ chars, same value on both sides. |
@@ -222,7 +223,7 @@ These bands are **guidelines for Claude**, not enforced math — the recommendat
 
 ## Roadmap (visible on the dashboard / landing)
 
-Shipped: ✅ coding · ✅ system design (Excalidraw whiteboard) · ✅ behavioral · ✅ recruiter screen · ✅ face-to-face (live voice + on-device body-language scoring).
+Shipped: ✅ coding · ✅ system design (Excalidraw whiteboard) · ✅ behavioral · ✅ recruiter screen. Face-to-face stays behind `NEXT_PUBLIC_FACE_TO_FACE_ENABLED` until its live voice and on-device body-language flow is ready for production.
 
 Still ahead:
 

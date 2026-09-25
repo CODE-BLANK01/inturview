@@ -9,6 +9,7 @@ import {
   Lock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { FACE_TO_FACE_ENABLED } from "@/lib/features";
 
 interface Mode {
   key: string;
@@ -16,7 +17,7 @@ interface Mode {
   blurb: string;
   icon: LucideIcon;
   href?: string;
-  status: "live" | "soon" | "planned";
+  status: "live" | "waitlist" | "soon" | "planned";
 }
 
 const MODES: Mode[] = [
@@ -55,10 +56,14 @@ const MODES: Mode[] = [
   {
     key: "face-to-face",
     title: "Face-to-face",
-    blurb: "Live video technical round — answer out loud, scored on depth and delivery.",
+    blurb: FACE_TO_FACE_ENABLED
+      ? "Live video technical round — answer out loud, scored on depth and delivery."
+      : "A live AI interviewer with voice, video, and delivery feedback is on the way.",
     icon: Video,
-    href: "/face-to-face",
-    status: "live",
+    href: FACE_TO_FACE_ENABLED
+      ? "/face-to-face"
+      : "mailto:hello@inturview.com?subject=Face-to-face%20early%20access",
+    status: FACE_TO_FACE_ENABLED ? "live" : "waitlist",
   },
 ];
 
@@ -83,15 +88,26 @@ export function PracticeModes() {
 function ModeCard({ mode }: { mode: Mode }) {
   const Icon = mode.icon;
   const isLive = mode.status === "live";
+  const isWaitlist = mode.status === "waitlist";
+  const isInteractive = (isLive || isWaitlist) && Boolean(mode.href);
 
   const Wrapper = ({ children }: { children: React.ReactNode }) =>
-    isLive && mode.href ? (
-      <Link
-        href={mode.href}
-        className="group relative panel p-5 flex flex-col hover:border-accent/40 transition-colors overflow-hidden"
-      >
-        {children}
-      </Link>
+    isInteractive && mode.href ? (
+      isWaitlist ? (
+        <a
+          href={mode.href}
+          className="group relative panel p-5 flex flex-col hover:border-accent/40 transition-colors overflow-hidden"
+        >
+          {children}
+        </a>
+      ) : (
+        <Link
+          href={mode.href}
+          className="group relative panel p-5 flex flex-col hover:border-accent/40 transition-colors overflow-hidden"
+        >
+          {children}
+        </Link>
+      )
     ) : (
       <div className="relative panel p-5 flex flex-col opacity-80 cursor-not-allowed select-none">
         {children}
@@ -100,26 +116,27 @@ function ModeCard({ mode }: { mode: Mode }) {
 
   return (
     <Wrapper>
-      {isLive && (
+      {isInteractive && (
         <div className="absolute inset-0 bg-gradient-to-br from-accent/8 via-transparent to-transparent pointer-events-none" />
       )}
       <div className="relative flex items-start justify-between">
         <div
           className={`inline-flex h-9 w-9 items-center justify-center rounded-md border ${
-            isLive
+            isInteractive
               ? "bg-accent/15 border-accent/30 text-accent"
               : "bg-bg-surface border-border text-text-muted"
           }`}
         >
-          {isLive ? <Icon className="h-5 w-5" /> : <Lock className="h-4 w-4" />}
+          {isInteractive ? <Icon className="h-5 w-5" /> : <Lock className="h-4 w-4" />}
         </div>
         <StatusPill status={mode.status} />
       </div>
       <h3 className="relative mt-4 font-semibold leading-tight">{mode.title}</h3>
       <p className="relative mt-1 text-sm text-text-muted leading-relaxed">{mode.blurb}</p>
-      {isLive && (
+      {isInteractive && (
         <div className="relative mt-4 inline-flex items-center gap-1 text-sm text-accent">
-          Start <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          {isWaitlist ? "Join waitlist" : "Start"}{" "}
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </div>
       )}
     </Wrapper>
@@ -129,6 +146,7 @@ function ModeCard({ mode }: { mode: Mode }) {
 function StatusPill({ status }: { status: Mode["status"] }) {
   const map: Record<Mode["status"], { label: string; cls: string }> = {
     live: { label: "Live", cls: "border-easy/40 bg-easy/10 text-easy" },
+    waitlist: { label: "Incoming", cls: "border-medium/40 bg-medium/10 text-medium" },
     soon: { label: "This quarter", cls: "border-medium/40 bg-medium/10 text-medium" },
     planned: { label: "Planned", cls: "border-border bg-bg-surface text-text-dim" },
   };

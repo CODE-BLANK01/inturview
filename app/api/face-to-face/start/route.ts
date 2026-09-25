@@ -11,6 +11,7 @@ import {
 } from "@/lib/faceToFaceQuestions";
 import { isRealtimeConfigured, signRealtimeToken } from "@/lib/faceToFaceToken";
 import { captureProductEvent } from "@/lib/analytics";
+import { FACE_TO_FACE_ENABLED } from "@/lib/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,10 @@ function maxDurationSec(): number {
 }
 
 export async function POST(req: NextRequest) {
+  if (!FACE_TO_FACE_ENABLED) {
+    return Response.json({ error: "Face-to-face interviews are coming soon." }, { status: 404 });
+  }
+
   const user = await requireUser();
   if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
 
