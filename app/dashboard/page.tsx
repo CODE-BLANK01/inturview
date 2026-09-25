@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   // Gate chain: verify-email → onboarding → dashboard. Each step blocks the next.
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true, createdAt: true, returnedWithin7dAt: true },
+    select: { plan: true, planExpiresAt: true, emailVerifiedAt: true, onboardingCompletedAt: true, createdAt: true, returnedWithin7dAt: true },
   });
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
@@ -53,7 +53,7 @@ export default async function DashboardPage() {
     }
   }
 
-  const plan = getEffectivePlan(profile.plan, user.email);
+  const plan = getEffectivePlan(profile.plan, user.email, profile.planExpiresAt);
   const monthStart = startOfMonthUTC();
   const [
     interviewsThisMonth,

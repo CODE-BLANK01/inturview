@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true },
+    select: { plan: true, planExpiresAt: true, emailVerifiedAt: true, onboardingCompletedAt: true },
   });
   if (!profile) return Response.json({ error: "Account not found" }, { status: 404 });
   if (!profile.emailVerifiedAt) {
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const plan = getEffectivePlan(profile.plan, user.email);
+  const plan = getEffectivePlan(profile.plan, user.email, profile.planExpiresAt);
   const cap =
     parsed.kind === "BEHAVIORAL"
       ? plan.behavioralSessionsPerMonth

@@ -8,7 +8,11 @@ import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Account — inturview" };
 
-export default async function AccountSettingsPage() {
+export default async function AccountSettingsPage({
+  searchParams,
+}: {
+  searchParams?: { checkout?: string };
+}) {
   const user = await requireUser();
   if (!user) redirect("/signin?callbackUrl=/account");
 
@@ -27,6 +31,7 @@ export default async function AccountSettingsPage() {
         name: true,
         role: true,
         plan: true,
+        planExpiresAt: true,
         goal: true,
         emailVerifiedAt: true,
         onboardingCompletedAt: true,
@@ -59,7 +64,7 @@ export default async function AccountSettingsPage() {
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
 
-  const plan = getEffectivePlan(profile.plan, profile.email);
+  const plan = getEffectivePlan(profile.plan, profile.email, profile.planExpiresAt);
 
   return (
     <>
@@ -93,6 +98,12 @@ export default async function AccountSettingsPage() {
             behavioralSessionsThisMonth,
             recruiterSessionsThisMonth,
           }}
+          planExpiresAt={profile.planExpiresAt?.toISOString() ?? null}
+          checkoutStatus={
+            searchParams?.checkout === "success" || searchParams?.checkout === "canceled"
+              ? searchParams.checkout
+              : undefined
+          }
         />
       </main>
     </>

@@ -1,4 +1,5 @@
-import { ArrowUpRight, Lock } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
 import { priceLabel, priceSuffix } from "@/lib/plans";
 
@@ -133,15 +134,9 @@ function Meter({
 
 function UpgradeCta() {
   return (
-    <button
-      type="button"
-      disabled
-      title="Upgrade plans are launching soon"
-      className="btn text-xs cursor-not-allowed opacity-80"
-    >
-      <Lock className="h-3 w-3" />
-      Upgrade
+    <Link href="/account" className="btn text-xs">
+      Get 30 days
       <ArrowUpRight className="h-3 w-3" />
-    </button>
+    </Link>
   );
 }

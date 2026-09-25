@@ -26,14 +26,27 @@ interface AccountPageProps {
     behavioralSessionsThisMonth: number;
     recruiterSessionsThisMonth: number;
   };
+  planExpiresAt: string | null;
+  checkoutStatus?: "success" | "canceled";
 }
 
-export function AccountPage({ profile, planInfo, usage }: AccountPageProps) {
+export function AccountPage({
+  profile,
+  planInfo,
+  usage,
+  planExpiresAt,
+  checkoutStatus,
+}: AccountPageProps) {
   return (
     <div className="space-y-12">
       <ProfileSection profile={profile} />
       <SectionDivider />
-      <SubscriptionSection plan={planInfo} usage={usage} />
+      <SubscriptionSection
+        plan={planInfo}
+        usage={usage}
+        planExpiresAt={planExpiresAt}
+        checkoutStatus={checkoutStatus}
+      />
       <SectionDivider />
       <SecuritySection email={profile.email} twoFactorEnabled={profile.twoFactorEnabled} />
       <SectionDivider tone="danger" />

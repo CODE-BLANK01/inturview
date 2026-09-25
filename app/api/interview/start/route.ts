@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     where: { id: user.id },
     select: {
       plan: true,
+      planExpiresAt: true,
       emailVerifiedAt: true,
       onboardingCompletedAt: true,
     },
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const plan = getEffectivePlan(profile.plan, user.email);
+  const plan = getEffectivePlan(profile.plan, user.email, profile.planExpiresAt);
 
   // Make sure the problem exists in the DB (seeded). If for some reason it isn't
   // (fresh DB without seeding), fall back to inserting from the static list.

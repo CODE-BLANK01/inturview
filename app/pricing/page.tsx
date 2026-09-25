@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { TopNav } from "@/components/TopNav";
+import { CheckoutButton } from "@/components/billing/CheckoutButton";
 import {
   CANDIDATE_PLANS,
   priceLabel,
@@ -92,12 +93,15 @@ function CandidatePlanCard({ plan }: { plan: PlanDefinition }) {
           Start practicing free
         </Link>
       ) : (
-        <a
-          href="mailto:hello@inturview.com?subject=Interview%20Sprint%20launch%20list"
-          className="btn mt-7"
-        >
-          Join the launch list
-        </a>
+        <div className="mt-7">
+          <CheckoutButton
+            label="Get 30 days — $19"
+            className="btn btn-primary w-full"
+          />
+          <p className="mt-2 text-xs text-text-dim">
+            One payment. Buy another pass whenever you want more time.
+          </p>
+        </div>
       )}
     </article>
   );

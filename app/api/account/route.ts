@@ -28,6 +28,7 @@ export async function GET() {
         name: true,
         role: true,
         plan: true,
+        planExpiresAt: true,
         goal: true,
         emailVerifiedAt: true,
         onboardingCompletedAt: true,
@@ -71,7 +72,7 @@ export async function GET() {
       designSessionsThisMonth,
       behavioralSessionsThisMonth,
       recruiterSessionsThisMonth,
-      plan: getEffectivePlan(profile.plan, profile.email),
+      plan: getEffectivePlan(profile.plan, profile.email, profile.planExpiresAt),
     },
   });
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Lock, ArrowUpRight } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
 import { CANDIDATE_PLANS, priceLabel, priceSuffix, renderFeature } from "@/lib/plans";
+import { CheckoutButton } from "@/components/billing/CheckoutButton";
 import { SectionHeader } from "./ProfileSection";
 
 interface SubscriptionSectionProps {
@@ -14,6 +14,8 @@ interface SubscriptionSectionProps {
     behavioralSessionsThisMonth: number;
     recruiterSessionsThisMonth: number;
   };
+  planExpiresAt: string | null;
+  checkoutStatus?: "success" | "canceled";
 }
 
 function computeDaysUntilReset(): number {
@@ -22,7 +24,12 @@ function computeDaysUntilReset(): number {
   return Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 86_400_000));
 }
 
-export function SubscriptionSection({ plan, usage }: SubscriptionSectionProps) {
+export function SubscriptionSection({
+  plan,
+  usage,
+  planExpiresAt,
+  checkoutStatus,
+}: SubscriptionSectionProps) {
   // Compute days-until-reset only after mount. Calling new Date() during
   // render would put a stamp in SSR HTML that could diff against the client's
   // first render (server runs in UTC; if it ticks over midnight between SSR
@@ -69,12 +76,23 @@ export function SubscriptionSection({ plan, usage }: SubscriptionSectionProps) {
         title="Plan & usage."
         sub={
           plan.tier === "FREE"
-            ? "Free for now. The Interview Sprint opens soon — no card needed today."
+            ? "Start free, then unlock thirty focused days whenever you need them."
             : "Your current candidate practice access and usage."
         }
       />
 
       <div className="panel p-6 space-y-6">
+        {checkoutStatus === "success" && (
+          <div className="rounded-md border border-easy/40 bg-easy/10 px-4 py-3 text-sm text-text">
+            Checkout completed. Stripe is confirming your payment; your access
+            date will appear here as soon as confirmation arrives.
+          </div>
+        )}
+        {checkoutStatus === "canceled" && (
+          <div className="rounded-md border border-border bg-bg-inset/40 px-4 py-3 text-sm text-text-muted">
+            Checkout was canceled. You were not charged.
+          </div>
+        )}
         {/* Current plan row */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -103,20 +121,27 @@ export function SubscriptionSection({ plan, usage }: SubscriptionSectionProps) {
             <p className="text-sm text-text-muted mt-2 max-w-md leading-snug">
               {plan.tagline}
             </p>
+            {plan.tier === "PRO" && planExpiresAt && (
+              <p className="text-sm text-text mt-2">
+                Access through{" "}
+                <span className="font-medium">
+                  {new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "long",
+                    timeZone: "UTC",
+                  }).format(new Date(planExpiresAt))}
+                </span>
+              </p>
+            )}
           </div>
 
-          {upgradeCandidates.length > 0 && (
-            <button
-              type="button"
-              disabled
-              className="btn text-xs cursor-not-allowed opacity-80"
-              title="Paid upgrade plans are coming soon"
-            >
-              <Lock className="h-3 w-3" />
-              Upgrade
-              <ArrowUpRight className="h-3 w-3" />
-            </button>
-          )}
+          <CheckoutButton
+            label={
+              plan.tier === "PRO"
+                ? "Extend 30 days — $19"
+                : "Get 30 days — $19"
+            }
+            className="btn btn-primary text-xs"
+          />
         </div>
 
         {/* Usage row */}
@@ -152,13 +177,13 @@ export function SubscriptionSection({ plan, usage }: SubscriptionSectionProps) {
           </ul>
         </div>
 
-        {/* Coming-soon comparison row */}
+        {/* Paid-pass comparison row */}
         {upgradeCandidates.length > 0 && (
           <div
             className="rounded-md border border-dashed p-4"
             style={{ borderColor: "rgb(var(--border-base))" }}
           >
-            <p className="t-eyebrow mb-2">What lands when billing ships</p>
+            <p className="t-eyebrow mb-2">When your interview is close</p>
             <ul className="space-y-2">
               {upgradeCandidates.map((p) => (
                 <li
@@ -177,7 +202,8 @@ export function SubscriptionSection({ plan, usage }: SubscriptionSectionProps) {
               ))}
             </ul>
             <p className="text-xs text-text-dim mt-3">
-              We&apos;ll email you when the Interview Sprint opens. No annual contract or surprise renewal.
+              One payment, no automatic renewal. Another purchase adds 30 days
+              after any access you still have.
             </p>
           </div>
         )}

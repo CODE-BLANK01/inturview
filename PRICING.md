@@ -22,8 +22,10 @@ Free remains deliberately useful while the product finds retention. Tighten limi
 - Full debriefs and interview history
 - Repeat weak rounds without monthly caps
 - One payment; no annual commitment or automatic yearly contract
+- Buy another pass at any time; unused access carries forward and the next 30
+  days begin after the current expiry
 
-Interview preparation is urgent and episodic. A 30-day pass matches the candidate's job better than team tiers or an annual subscription. Billing is not live yet, so this plan remains a launch list until checkout exists.
+Interview preparation is urgent and episodic. A 30-day pass matches the candidate's job better than team tiers or an annual subscription. Stripe Checkout grants access only after a signed webhook confirms payment.
 
 ## Employers: Inturview Hire
 
