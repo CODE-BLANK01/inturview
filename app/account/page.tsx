@@ -12,7 +12,14 @@ export default async function AccountSettingsPage() {
   const user = await requireUser();
   if (!user) redirect("/signin?callbackUrl=/account");
 
-  const [profile, interviewsThisMonth] = await Promise.all([
+  const monthStart = startOfMonthUTC();
+  const [
+    profile,
+    interviewsThisMonth,
+    designSessionsThisMonth,
+    behavioralSessionsThisMonth,
+    recruiterSessionsThisMonth,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -28,7 +35,24 @@ export default async function AccountSettingsPage() {
       },
     }),
     prisma.interview.count({
-      where: { userId: user.id, startedAt: { gte: startOfMonthUTC() } },
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.designSession.count({
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "BEHAVIORAL",
+        startedAt: { gte: monthStart },
+      },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "RECRUITER_SCREEN",
+        startedAt: { gte: monthStart },
+      },
     }),
   ]);
 
@@ -63,7 +87,12 @@ export default async function AccountSettingsPage() {
             createdAt: profile.createdAt.toISOString(),
           }}
           planInfo={plan}
-          interviewsThisMonth={interviewsThisMonth}
+          usage={{
+            interviewsThisMonth,
+            designSessionsThisMonth,
+            behavioralSessionsThisMonth,
+            recruiterSessionsThisMonth,
+          }}
         />
       </main>
     </>

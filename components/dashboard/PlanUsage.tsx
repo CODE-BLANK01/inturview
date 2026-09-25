@@ -48,6 +48,7 @@ export function PlanUsage({
       limit: plan.designSessionsPerMonth,
     },
   ];
+  const hasMonthlyCaps = meters.some((meter) => meter.limit !== null);
 
   return (
     <section className="panel p-5">
@@ -69,9 +70,11 @@ export function PlanUsage({
             {priceLabel(plan)}
             {priceSuffix(plan)}
           </span>
-          <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
+          {hasMonthlyCaps && (
+            <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
+          )}
         </div>
-        <UpgradeCta />
+        {plan.tier === "FREE" && <UpgradeCta />}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">

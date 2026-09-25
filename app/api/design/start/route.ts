@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getDesignProblem } from "@/lib/designProblems";
 import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 import { captureProductEvent } from "@/lib/analytics";
+import { acquireSessionStartLock } from "@/lib/sessionStartLock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,36 +44,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Resume an existing IN_PROGRESS session for (user, problem) instead of orphaning it.
-  const existing = await prisma.designSession.findFirst({
-    where: { userId: user.id, problemId: parsed.problem_id, status: "IN_PROGRESS" },
-    orderBy: { startedAt: "desc" },
-    select: { id: true, startedAt: true },
-  });
-  if (existing) {
-    return Response.json({ ...existing, resumed: true }, { status: 200 });
-  }
-
-  // Fresh session — enforce monthly cap on the SEPARATE design counter.
   const plan = getEffectivePlan(profile.plan, user.email);
-  if (plan.designSessionsPerMonth !== null) {
-    const monthStart = startOfMonthUTC();
-    const used = await prisma.designSession.count({
-      where: { userId: user.id, startedAt: { gte: monthStart } },
-    });
-    if (used >= plan.designSessionsPerMonth) {
-      return Response.json(
-        {
-          error: `You've used all ${plan.designSessionsPerMonth} system-design sessions on the ${plan.name} plan this month. Resets on the 1st.`,
-          code: "PLAN_LIMIT_REACHED",
-          plan: plan.tier,
-          used,
-          limit: plan.designSessionsPerMonth,
-        },
-        { status: 403 }
-      );
-    }
-  }
 
   // Backfill: make sure the problem row exists (seed may be missing on fresh DB).
   const row = await prisma.systemDesignProblem.findUnique({ where: { id: parsed.problem_id } });
@@ -94,15 +66,52 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const created = await prisma.designSession.create({
-    data: { userId: user.id, problemId: parsed.problem_id },
-    select: { id: true, startedAt: true },
+  const result = await prisma.$transaction(async (tx) => {
+    await acquireSessionStartLock(tx, user.id, "system-design");
+
+    const existing = await tx.designSession.findFirst({
+      where: { userId: user.id, problemId: parsed.problem_id, status: "IN_PROGRESS" },
+      orderBy: { startedAt: "desc" },
+      select: { id: true, startedAt: true },
+    });
+    if (existing) return { outcome: "resumed" as const, session: existing };
+
+    if (plan.designSessionsPerMonth !== null) {
+      const used = await tx.designSession.count({
+        where: { userId: user.id, startedAt: { gte: startOfMonthUTC() } },
+      });
+      if (used >= plan.designSessionsPerMonth) {
+        return { outcome: "limited" as const, used };
+      }
+    }
+
+    const session = await tx.designSession.create({
+      data: { userId: user.id, problemId: parsed.problem_id },
+      select: { id: true, startedAt: true },
+    });
+    return { outcome: "created" as const, session };
   });
+
+  if (result.outcome === "limited") {
+    return Response.json(
+      {
+        error: `You've used all ${plan.designSessionsPerMonth} system-design sessions on the ${plan.name} plan this month. Resets on the 1st.`,
+        code: "PLAN_LIMIT_REACHED",
+        plan: plan.tier,
+        used: result.used,
+        limit: plan.designSessionsPerMonth,
+      },
+      { status: 403 }
+    );
+  }
+  if (result.outcome === "resumed") {
+    return Response.json({ ...result.session, resumed: true }, { status: 200 });
+  }
 
   await captureProductEvent(user.id, {
     event: "interview_started",
-    properties: { mode: "system_design", session_id: created.id },
+    properties: { mode: "system_design", session_id: result.session.id },
   });
 
-  return Response.json({ ...created, resumed: false }, { status: 201 });
+  return Response.json({ ...result.session, resumed: false }, { status: 201 });
 }

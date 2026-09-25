@@ -20,15 +20,20 @@ export interface AccountProfile {
 interface AccountPageProps {
   profile: AccountProfile;
   planInfo: PlanDefinition;
-  interviewsThisMonth: number;
+  usage: {
+    interviewsThisMonth: number;
+    designSessionsThisMonth: number;
+    behavioralSessionsThisMonth: number;
+    recruiterSessionsThisMonth: number;
+  };
 }
 
-export function AccountPage({ profile, planInfo, interviewsThisMonth }: AccountPageProps) {
+export function AccountPage({ profile, planInfo, usage }: AccountPageProps) {
   return (
     <div className="space-y-12">
       <ProfileSection profile={profile} />
       <SectionDivider />
-      <SubscriptionSection plan={planInfo} interviewsThisMonth={interviewsThisMonth} />
+      <SubscriptionSection plan={planInfo} usage={usage} />
       <SectionDivider />
       <SecuritySection email={profile.email} twoFactorEnabled={profile.twoFactorEnabled} />
       <SectionDivider tone="danger" />

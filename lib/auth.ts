@@ -143,7 +143,14 @@ export const authOptions: AuthOptions = {
           }
         }
 
-        if (user.role !== Role.ADMIN && adminEmails().has(email)) {
+        // An email allowlist is only an authorization hint after mailbox
+        // ownership has been proven. Otherwise anyone could register an
+        // allowlisted address first and receive admin access immediately.
+        if (
+          user.emailVerifiedAt &&
+          user.role !== Role.ADMIN &&
+          adminEmails().has(email)
+        ) {
           await prisma.user.update({
             where: { id: user.id },
             data: { role: Role.ADMIN },
@@ -155,7 +162,7 @@ export const authOptions: AuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name ?? undefined,
-          role: user.role,
+          role: user.emailVerifiedAt ? user.role : Role.USER,
           // Stamp the current token version into the issued JWT. Subsequent
           // requests verify this against the DB; if they mismatch, the session
           // is revoked.
@@ -254,6 +261,10 @@ export async function requireUser(): Promise<SessionUser | null> {
 export async function requireAdmin(): Promise<SessionUser | null> {
   const user = await requireUser();
   if (!user || user.role !== Role.ADMIN) return null;
+  const verified = await prisma.user.count({
+    where: { id: user.id, emailVerifiedAt: { not: null } },
+  });
+  if (verified !== 1) return null;
   return user;
 }
 

@@ -8,7 +8,12 @@ import { SectionHeader } from "./ProfileSection";
 
 interface SubscriptionSectionProps {
   plan: PlanDefinition;
-  interviewsThisMonth: number;
+  usage: {
+    interviewsThisMonth: number;
+    designSessionsThisMonth: number;
+    behavioralSessionsThisMonth: number;
+    recruiterSessionsThisMonth: number;
+  };
 }
 
 function computeDaysUntilReset(): number {
@@ -17,13 +22,7 @@ function computeDaysUntilReset(): number {
   return Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 86_400_000));
 }
 
-export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionSectionProps) {
-  const limit = plan.interviewsPerMonth;
-  const unlimited = limit === null;
-  const pct = unlimited ? 0 : Math.min(100, Math.round((interviewsThisMonth / (limit || 1)) * 100));
-  const atOrNearLimit = !unlimited && interviewsThisMonth >= (limit ?? 0);
-  const warning = !unlimited && limit !== null && limit > 0 && interviewsThisMonth / limit >= 0.8;
-
+export function SubscriptionSection({ plan, usage }: SubscriptionSectionProps) {
   // Compute days-until-reset only after mount. Calling new Date() during
   // render would put a stamp in SSR HTML that could diff against the client's
   // first render (server runs in UTC; if it ticks over midnight between SSR
@@ -34,14 +33,45 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
     setDaysUntilReset(computeDaysUntilReset());
   }, []);
 
-  const upgradeCandidates = CANDIDATE_PLANS.filter((p) => p.tier !== plan.tier);
+  const upgradeCandidates = CANDIDATE_PLANS.filter(
+    (candidate) =>
+      candidate.priceCents !== null &&
+      plan.priceCents !== null &&
+      candidate.priceCents > plan.priceCents
+  );
+  const meters = [
+    {
+      label: "Recruiter screen",
+      used: usage.recruiterSessionsThisMonth,
+      limit: plan.recruiterSessionsPerMonth,
+    },
+    {
+      label: "Behavioral",
+      used: usage.behavioralSessionsThisMonth,
+      limit: plan.behavioralSessionsPerMonth,
+    },
+    {
+      label: "Coding",
+      used: usage.interviewsThisMonth,
+      limit: plan.interviewsPerMonth,
+    },
+    {
+      label: "System design",
+      used: usage.designSessionsThisMonth,
+      limit: plan.designSessionsPerMonth,
+    },
+  ];
 
   return (
     <section>
       <SectionHeader
         eyebrow="Subscription"
         title="Plan & usage."
-        sub="Free for now. Paid plans land soon — no card needed today."
+        sub={
+          plan.tier === "FREE"
+            ? "Free for now. The Interview Sprint opens soon — no card needed today."
+            : "Your current candidate practice access and usage."
+        }
       />
 
       <div className="panel p-6 space-y-6">
@@ -75,54 +105,34 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
             </p>
           </div>
 
-          <button
-            type="button"
-            disabled
-            className="btn text-xs cursor-not-allowed opacity-80"
-            title="Paid upgrade plans are coming soon"
-          >
-            <Lock className="h-3 w-3" />
-            Upgrade
-            <ArrowUpRight className="h-3 w-3" />
-          </button>
+          {upgradeCandidates.length > 0 && (
+            <button
+              type="button"
+              disabled
+              className="btn text-xs cursor-not-allowed opacity-80"
+              title="Paid upgrade plans are coming soon"
+            >
+              <Lock className="h-3 w-3" />
+              Upgrade
+              <ArrowUpRight className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         {/* Usage row */}
         <div>
           <span className="t-eyebrow">Usage this month</span>
-          <div className="mt-2 flex items-baseline justify-between gap-2 flex-wrap">
-            <p className="text-sm text-text-muted">
-              {unlimited ? (
-                <span className="text-text">Unlimited interviews on your plan.</span>
-              ) : (
-                <>
-                  <span className="t-data text-[15px] text-text">
-                    {interviewsThisMonth} / {limit}
-                  </span>{" "}
-                  <span className="text-text-muted">
-                    interviews —{" "}
-                    {atOrNearLimit
-                      ? "you've hit the cap."
-                      : `${(limit ?? 0) - interviewsThisMonth} left${
-                          daysUntilReset !== null ? `, resets in ${daysUntilReset}d` : ""
-                        }.`}
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-
-          {!unlimited && (
-            <div className="mt-3 h-[6px] w-full overflow-hidden rounded-full bg-bg-inset">
-              <div
-                className={`h-full transition-[width] duration-300 ${
-                  atOrNearLimit ? "bg-hard" : warning ? "bg-medium" : "bg-text"
-                }`}
-                style={{ width: `${pct}%` }}
-                aria-label={`${pct}% used`}
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+            {meters.map((meter) => (
+              <UsageMeter
+                key={meter.label}
+                label={meter.label}
+                used={meter.used}
+                limit={meter.limit}
+                daysUntilReset={daysUntilReset}
               />
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
         {/* Features included */}
@@ -173,5 +183,52 @@ export function SubscriptionSection({ plan, interviewsThisMonth }: SubscriptionS
         )}
       </div>
     </section>
+  );
+}
+
+function UsageMeter({
+  label,
+  used,
+  limit,
+  daysUntilReset,
+}: {
+  label: string;
+  used: number;
+  limit: number | null;
+  daysUntilReset: number | null;
+}) {
+  const unlimited = limit === null;
+  const pct = unlimited ? 100 : Math.min(100, Math.round((used / (limit || 1)) * 100));
+  const atLimit = !unlimited && used >= (limit ?? 0);
+  const warning = !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3 text-sm mb-1.5">
+        <span className="text-text-muted">{label}</span>
+        <span className="t-data tabular-nums text-text">
+          {used}
+          {unlimited ? (
+            <span className="text-text-dim text-xs"> · unlimited</span>
+          ) : (
+            <span className="text-text-dim"> / {limit}</span>
+          )}
+        </span>
+      </div>
+      <div className="h-[6px] w-full overflow-hidden rounded-full bg-bg-inset">
+        <div
+          className={`h-full transition-[width] duration-300 ${
+            unlimited ? "bg-easy/40" : atLimit ? "bg-hard" : warning ? "bg-medium" : "bg-text"
+          }`}
+          style={{ width: `${pct}%` }}
+          aria-label={`${label} ${unlimited ? "unlimited" : `${pct}% used`}`}
+        />
+      </div>
+      {!unlimited && daysUntilReset !== null && (
+        <p className="text-[11px] text-text-dim mt-1">
+          {atLimit ? "Cap reached" : `${Math.max(0, limit - used)} left`} · resets in {daysUntilReset}d
+        </p>
+      )}
+    </div>
   );
 }

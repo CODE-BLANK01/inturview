@@ -12,7 +12,14 @@ export async function GET() {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Not signed in" }, { status: 401 });
 
-  const [profile, interviewsThisMonth] = await Promise.all([
+  const monthStart = startOfMonthUTC();
+  const [
+    profile,
+    interviewsThisMonth,
+    designSessionsThisMonth,
+    behavioralSessionsThisMonth,
+    recruiterSessionsThisMonth,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -29,7 +36,24 @@ export async function GET() {
       },
     }),
     prisma.interview.count({
-      where: { userId: user.id, startedAt: { gte: startOfMonthUTC() } },
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.designSession.count({
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "BEHAVIORAL",
+        startedAt: { gte: monthStart },
+      },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "RECRUITER_SCREEN",
+        startedAt: { gte: monthStart },
+      },
     }),
   ]);
   if (!profile) return Response.json({ error: "Not found" }, { status: 404 });
@@ -44,6 +68,9 @@ export async function GET() {
     },
     usage: {
       interviewsThisMonth,
+      designSessionsThisMonth,
+      behavioralSessionsThisMonth,
+      recruiterSessionsThisMonth,
       plan: getEffectivePlan(profile.plan, profile.email),
     },
   });
@@ -52,10 +79,7 @@ export async function GET() {
 const PatchBody = z
   .object({
     name: z.string().trim().min(1).max(80).nullable().optional(),
-    goal: z
-      .enum(["PRACTICING", "RECRUITING", "COACHING", "EXPLORING"])
-      .nullable()
-      .optional(),
+    goal: z.enum(["PRACTICING", "EXPLORING"]).nullable().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, "No fields to update");
 
