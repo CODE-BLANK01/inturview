@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
 import { CANDIDATE_PLANS, priceLabel, priceSuffix, renderFeature } from "@/lib/plans";
 import { CheckoutButton } from "@/components/billing/CheckoutButton";
@@ -30,6 +32,7 @@ export function SubscriptionSection({
   planExpiresAt,
   checkoutStatus,
 }: SubscriptionSectionProps) {
+  const router = useRouter();
   // Compute days-until-reset only after mount. Calling new Date() during
   // render would put a stamp in SSR HTML that could diff against the client's
   // first render (server runs in UTC; if it ticks over midnight between SSR
@@ -39,6 +42,21 @@ export function SubscriptionSection({
   useEffect(() => {
     setDaysUntilReset(computeDaysUntilReset());
   }, []);
+
+  // Stripe redirects back immediately after Checkout, while its webhook can
+  // arrive a moment later. Refresh the server component until the verified
+  // webhook changes the effective plan, instead of leaving the user on a
+  // stale "confirming" screen.
+  useEffect(() => {
+    if (checkoutStatus !== "success" || plan.tier === "PRO") return;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      router.refresh();
+      if (attempts >= 10) window.clearInterval(timer);
+    }, 1_500);
+    return () => window.clearInterval(timer);
+  }, [checkoutStatus, plan.tier, router]);
 
   const upgradeCandidates = CANDIDATE_PLANS.filter(
     (candidate) =>
@@ -84,8 +102,14 @@ export function SubscriptionSection({
       <div className="panel p-6 space-y-6">
         {checkoutStatus === "success" && (
           <div className="rounded-md border border-easy/40 bg-easy/10 px-4 py-3 text-sm text-text">
-            Checkout completed. Stripe is confirming your payment; your access
-            date will appear here as soon as confirmation arrives.
+            {plan.tier === "PRO" ? (
+              "Payment confirmed. Your Interview Sprint access is ready."
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                Checkout completed. Confirming your payment…
+              </span>
+            )}
           </div>
         )}
         {checkoutStatus === "canceled" && (
