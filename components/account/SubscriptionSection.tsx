@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
 import { CANDIDATE_PLANS, priceLabel, priceSuffix, renderFeature } from "@/lib/plans";
 import { CheckoutButton } from "@/components/billing/CheckoutButton";
@@ -33,6 +33,9 @@ export function SubscriptionSection({
   checkoutStatus,
 }: SubscriptionSectionProps) {
   const router = useRouter();
+  const [checkoutNoticeVisible, setCheckoutNoticeVisible] = useState(
+    Boolean(checkoutStatus)
+  );
   // Compute days-until-reset only after mount. Calling new Date() during
   // render would put a stamp in SSR HTML that could diff against the client's
   // first render (server runs in UTC; if it ticks over midnight between SSR
@@ -57,6 +60,14 @@ export function SubscriptionSection({
     }, 1_500);
     return () => window.clearInterval(timer);
   }, [checkoutStatus, plan.tier, router]);
+
+  const dismissCheckoutNotice = () => {
+    setCheckoutNoticeVisible(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("checkout");
+    url.searchParams.delete("session_id");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  };
 
   const upgradeCandidates = CANDIDATE_PLANS.filter(
     (candidate) =>
@@ -100,21 +111,41 @@ export function SubscriptionSection({
       />
 
       <div className="panel p-6 space-y-6">
-        {checkoutStatus === "success" && (
-          <div className="rounded-md border border-easy/40 bg-easy/10 px-4 py-3 text-sm text-text">
-            {plan.tier === "PRO" ? (
-              "Payment confirmed. Your Interview Sprint access is ready."
-            ) : (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                Checkout completed. Confirming your payment…
-              </span>
-            )}
+        {checkoutNoticeVisible && checkoutStatus === "success" && (
+          <div className="rounded-md border border-easy/40 bg-easy/10 px-4 py-3 text-sm text-text flex items-center justify-between gap-4">
+            <span>
+              {plan.tier === "PRO" ? (
+                "Payment confirmed. Your Interview Sprint access is ready."
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Checkout completed. Confirming your payment…
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={dismissCheckoutNotice}
+              className="shrink-0 rounded p-1 text-text-muted hover:bg-bg-inset hover:text-text transition-colors"
+              aria-label="Dismiss payment confirmation"
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
           </div>
         )}
-        {checkoutStatus === "canceled" && (
-          <div className="rounded-md border border-border bg-bg-inset/40 px-4 py-3 text-sm text-text-muted">
-            Checkout was canceled. You were not charged.
+        {checkoutNoticeVisible && checkoutStatus === "canceled" && (
+          <div className="rounded-md border border-border bg-bg-inset/40 px-4 py-3 text-sm text-text-muted flex items-center justify-between gap-4">
+            <span>Checkout was canceled. You were not charged.</span>
+            <button
+              type="button"
+              onClick={dismissCheckoutNotice}
+              className="shrink-0 rounded p-1 text-text-muted hover:bg-bg-inset hover:text-text transition-colors"
+              aria-label="Dismiss checkout notice"
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
           </div>
         )}
         {/* Current plan row */}
