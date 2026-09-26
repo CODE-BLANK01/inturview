@@ -2,7 +2,7 @@
 
 A live, spoken technical round over video. The candidate turns on camera + mic, an AI interviewer talks to them in real time (OpenAI Realtime, speech-to-speech), and at the end Claude scores the transcript plus measured delivery metrics (pace, filler words, pauses) and body-language metrics (eye contact, posture, restlessness, hands) tracked on-device with MediaPipe.
 
-This document covers: how to run it locally, how it's built, what changed in the repo, and the errors you're most likely to hit.
+This document covers how to run it locally and how it's built.
 
 ---
 
@@ -137,61 +137,3 @@ All the knobs are env vars in `services/realtime/.env.example` (`RT_VAD_THRESHOL
 Models load from Google's CDN on first use (`storage.googleapis.com/mediapipe-models/…`, ~9 MB, cached by the browser) and the WASM runtime from jsDelivr, pinned to the installed `@mediapipe/tasks-vision` version. To avoid third-party requests entirely, copy both into `public/` and point `FACE_MODEL`, `POSE_MODEL`, and `WASM_BASE` at them.
 
 If the models fail to load (old GPU, blocked CDN), the session still runs; the debrief scores `body_language` 3 with the evidence "Not measured this session." — an explicitly labelled placeholder, never an invented number.
-
----
-
-## 3. What changed, file by file
-
-### New
-
-| File | Purpose |
-| --- | --- |
-| `app/face-to-face/page.tsx` | Route. Same auth → verify-email → onboarding gate as the recruiter screen. |
-| `components/FaceToFaceSession.tsx` | The whole UI: setup (camera check, mic meter, body-language calibration, track/level picker) → live (self-view, interviewer tile, mute/camera/end, live captions, timer) → debrief + follow-up chat. |
-| `lib/realtimeClient.ts` | WebRTC connection to OpenAI, noise gate, manual response gating, barge-in, event forwarding. |
-| `lib/bodyLanguage.ts` | On-device MediaPipe face + pose tracking, calibration, per-window body-language aggregation. |
-| `lib/faceToFaceQuestions.ts` | Question bank, tracks/levels, seeded plan builder. |
-| `lib/faceToFacePrompts.ts` | Interviewer instructions, debrief prompt + JSON schema text, follow-up prompt, metrics summariser. |
-| `lib/faceToFaceToken.ts` | HS256 JWT signer for the browser → FastAPI hop; constant-time check for the service secret header. |
-| `app/api/face-to-face/start/route.ts` | Creates/resumes the session, enforces the monthly cap, builds the plan, returns the JWT. |
-| `app/api/internal/face-to-face/[id]/route.ts` | Server-to-server: returns plan + rendered instructions (+ prior transcript on resume). |
-| `app/api/internal/face-to-face/[id]/turns/route.ts` | Server-to-server: persists one transcript turn with optional metrics. |
-| `services/realtime/` | FastAPI service: `config.py` (settings), `auth.py` (JWT), `nextjs.py` (internal client), `realtime.py` (session config + client-secret minting), `metrics.py` (junk filter, WPM/fillers/pauses), `main.py` (routes + WebSocket). |
-| `FACE_TO_FACE.md` | This file. |
-
-### Modified
-
-| File | Change |
-| --- | --- |
-| `prisma/schema.prisma` | `ConversationKind.FACE_TO_FACE`; `ConversationSession.plan Json?`; `ConversationMessage.metrics Json?`. |
-| `lib/plans.ts` | `faceToFaceSessionsPerMonth` per tier (Free = 2, env-overridable). |
-| `lib/conversationTypes.ts` | `FaceToFaceDebriefSchema`; added to the `ConversationDebrief` union. |
-| `app/api/conversation/debrief/route.ts` | `FACE_TO_FACE` branch: loads `plan` and per-message `metrics`, uses the new prompt + schema. |
-| `app/api/conversation/message/route.ts` | Rejects `mode: "live"` for face-to-face (live turns go through the realtime service); follow-up prompt for the new kind. |
-| `components/conversation/ConversationDebriefView.tsx` | Dimension labels for the new kind; `kind` prop widened. |
-| `components/TopNav.tsx`, `components/dashboard/PracticeModes.tsx` | Nav entry and dashboard card (grid now 2 → 3 → 5 columns). |
-| `app/history/page.tsx`, `app/history/conversation/[id]/page.tsx` | Kind labels, track/level subtitle. |
-| `.env.local.example`, `.gitignore` | New env vars documented; `.venv` and `__pycache__` ignored. |
-
-Reused unchanged: `ConversationSession` / `ConversationMessage` / `ConversationDebrief` tables, `EndConversationDialog`, `ChatPanel`, `Timer`, `useTypewriter`, `streamConversationMessage`, the abandon route, and the Claude debrief loop.
-
----
-
-## 4. Troubleshooting
-
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `POST /api/face-to-face/start 500` and server log `REALTIME_SERVICE_SECRET is not set` | Var missing from `.env.local`, or `next dev` was started before it was added | Add it, restart `next dev` (env is read at startup). |
-| `Invalid value for argument kind. Expected ConversationKind.` | Prisma client in memory predates the schema change | Stop `next dev`, `npx prisma generate`, start again. |
-| `EPERM ... query_engine-windows.dll.node` during `db:push` / `generate` | Running dev server holds the engine file | Same as above. The schema push itself still succeeds. |
-| Browser: `:8000/... ERR_CONNECTION_REFUSED` | FastAPI isn't running | Start uvicorn (section 1b). |
-| `ImportError: attempted relative import with no known parent package` | uvicorn launched from inside `app/` | Run `uvicorn app.main:app` from `services/realtime`. |
-| `pydantic ValidationError ... realtime_service_secret` on startup | Secret missing or under 32 chars in `services/realtime/.env` | Set it to the same 32+ char value as `.env.local`. |
-| `api.openai.com/v1/realtime/calls 429` | `insufficient_quota` — the project has no prepaid credits. Minting the ephemeral key succeeds anyway because that endpoint doesn't check balance. | Add credits on the OpenAI billing page. The setup page banner shows OpenAI's exact message. |
-| Interviewer jumps in when you pause to think | Turn detection too eager | Default is `semantic_vad` + `RT_VAD_EAGERNESS=low` (most patient). On `server_vad`, raise `RT_VAD_SILENCE_MS` (e.g. 1500); for the browser wait, raise `unfinishedGraceMs` in `lib/realtimeClient.ts`. |
-| Interviewer replies to breathing / random noise | Room noisier than the defaults expect | Set `RT_TURN_DETECTION=server_vad`, then raise `RT_VAD_THRESHOLD` (try 0.85–0.9) and/or `RT_VAD_SILENCE_MS`; restart uvicorn. |
-| Interviewer waits too long before answering | Grace window + silence window add up (~2.1 s by default) | Lower `RT_VAD_SILENCE_MS` or `responseGraceMs` in `lib/realtimeClient.ts`. |
-| "Loading camera tracking…" never finishes | CDN blocked, or WASM/GPU init failed | Check the browser console; self-host the models (see Body language). The session can still start; body language is just not scored. |
-| Calibration keeps failing | Face or shoulders not in frame | Sit centred, camera at eye level, shoulders visible; ensure decent light. Or click **Skip body language** — the session runs without that dimension. |
-| Start says "Session time is up" | An old in-progress session outlived the cap | Click Start again — the stale session is abandoned and a fresh one created. |
-| Eye contact scores look wrong | Calibrated while looking at the screen, not the lens | Click **Redo** and look at the camera itself for the two seconds. |

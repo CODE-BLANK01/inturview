@@ -24,7 +24,7 @@ The interviewer is powered by Claude (Anthropic) and behaves like a real one: it
 | **System design** | `/design-problems` → `/design/[id]` | Excalidraw whiteboard + chat | scope → design → debrief |
 | **Face-to-face** | `/face-to-face` | Live voice + camera (OpenAI Realtime) | setup → live → debrief |
 
-The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup, architecture, and troubleshooting.
+The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup and architecture.
 
 Every mode green-lights with a gating signal where it makes sense (`[READY]` for coding approach, `[SCOPED]` for design scope), persists every turn, and ends with a 5-dimension scorecard + follow-up Q&A.
 
