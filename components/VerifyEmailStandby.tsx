@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { Mail, Loader2, Check, AlertTriangle } from "lucide-react";
+import { signOutTo } from "@/lib/signOutTo";
 
 interface VerifyEmailStandbyProps {
   email: string;
@@ -108,7 +108,7 @@ export function VerifyEmailStandby({ email, topMessage }: VerifyEmailStandbyProp
           <br />
           <button
             type="button"
-            onClick={() => signOut({ callbackUrl: "/signup" })}
+            onClick={() => void signOutTo("/signup")}
             className="underline underline-offset-2 hover:text-text-muted mt-1"
           >
             Sign out

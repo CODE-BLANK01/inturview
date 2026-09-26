@@ -6,6 +6,7 @@ import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 import { getBehavioralScenario } from "@/lib/behavioralScenarios";
 import { ConversationKind } from "@prisma/client";
 import { captureProductEvent } from "@/lib/analytics";
+import { acquireSessionStartLock } from "@/lib/sessionStartLock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true },
+    select: { plan: true, planExpiresAt: true, emailVerifiedAt: true, onboardingCompletedAt: true },
   });
   if (!profile) return Response.json({ error: "Account not found" }, { status: 404 });
   if (!profile.emailVerifiedAt) {
@@ -58,52 +59,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Resume IN_PROGRESS if one exists for this (user, kind, scenario).
-  const existing = await prisma.conversationSession.findFirst({
-    where: {
-      userId: user.id,
-      kind: parsed.kind as ConversationKind,
-      scenarioId: parsed.scenario_id ?? null,
-      status: "IN_PROGRESS",
-    },
-    orderBy: { startedAt: "desc" },
-    select: { id: true, startedAt: true },
-  });
-  if (existing) {
-    return Response.json({ ...existing, resumed: true }, { status: 200 });
-  }
-
-  // Fresh — enforce the right monthly cap.
-  const plan = getEffectivePlan(profile.plan, user.email);
+  const plan = getEffectivePlan(profile.plan, user.email, profile.planExpiresAt);
   const cap =
     parsed.kind === "BEHAVIORAL"
       ? plan.behavioralSessionsPerMonth
       : plan.recruiterSessionsPerMonth;
-  if (cap !== null) {
-    const monthStart = startOfMonthUTC();
-    const used = await prisma.conversationSession.count({
-      where: {
-        userId: user.id,
-        kind: parsed.kind as ConversationKind,
-        startedAt: { gte: monthStart },
-      },
-    });
-    if (used >= cap) {
-      const label =
-        parsed.kind === "BEHAVIORAL" ? "behavioral sessions" : "recruiter screens";
-      return Response.json(
-        {
-          error: `You've used all ${cap} ${label} on the ${plan.name} plan this month. Resets on the 1st.`,
-          code: "PLAN_LIMIT_REACHED",
-          plan: plan.tier,
-          used,
-          limit: cap,
-        },
-        { status: 403 }
-      );
-    }
-  }
-
   // For behavioral: backfill the scenario row if seeder hasn't run.
   if (parsed.kind === "BEHAVIORAL" && parsed.scenario_id) {
     const row = await prisma.behavioralScenario.findUnique({
@@ -124,22 +84,69 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const created = await prisma.conversationSession.create({
-    data: {
-      userId: user.id,
-      kind: parsed.kind as ConversationKind,
-      scenarioId: parsed.scenario_id ?? null,
-    },
-    select: { id: true, startedAt: true },
+  const result = await prisma.$transaction(async (tx) => {
+    const mode = parsed.kind === "BEHAVIORAL" ? "behavioral" : "recruiter-screen";
+    await acquireSessionStartLock(tx, user.id, mode);
+
+    const existing = await tx.conversationSession.findFirst({
+      where: {
+        userId: user.id,
+        kind: parsed.kind as ConversationKind,
+        scenarioId: parsed.scenario_id ?? null,
+        status: "IN_PROGRESS",
+      },
+      orderBy: { startedAt: "desc" },
+      select: { id: true, startedAt: true },
+    });
+    if (existing) return { outcome: "resumed" as const, session: existing };
+
+    if (cap !== null) {
+      const used = await tx.conversationSession.count({
+        where: {
+          userId: user.id,
+          kind: parsed.kind as ConversationKind,
+          startedAt: { gte: startOfMonthUTC() },
+        },
+      });
+      if (used >= cap) return { outcome: "limited" as const, used };
+    }
+
+    const session = await tx.conversationSession.create({
+      data: {
+        userId: user.id,
+        kind: parsed.kind as ConversationKind,
+        scenarioId: parsed.scenario_id ?? null,
+      },
+      select: { id: true, startedAt: true },
+    });
+    return { outcome: "created" as const, session };
   });
+
+  if (result.outcome === "limited") {
+    const label =
+      parsed.kind === "BEHAVIORAL" ? "behavioral sessions" : "recruiter screens";
+    return Response.json(
+      {
+        error: `You've used all ${cap} ${label} on the ${plan.name} plan this month. Resets on the 1st.`,
+        code: "PLAN_LIMIT_REACHED",
+        plan: plan.tier,
+        used: result.used,
+        limit: cap,
+      },
+      { status: 403 }
+    );
+  }
+  if (result.outcome === "resumed") {
+    return Response.json({ ...result.session, resumed: true }, { status: 200 });
+  }
 
   await captureProductEvent(user.id, {
     event: "interview_started",
     properties: {
       mode: parsed.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
-      session_id: created.id,
+      session_id: result.session.id,
     },
   });
 
-  return Response.json({ ...created, resumed: false }, { status: 201 });
+  return Response.json({ ...result.session, resumed: false }, { status: 201 });
 }

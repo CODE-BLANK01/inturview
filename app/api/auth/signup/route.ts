@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { Prisma, Role } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { captureProductEvent } from "@/lib/analytics";
-import { adminEmails } from "@/lib/auth";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { MIN_PASSWORD_LENGTH, validatePasswordStrength } from "@/lib/passwordCheck";
 import {
@@ -76,7 +75,6 @@ export async function POST(req: NextRequest) {
         email,
         name: parsed.name?.trim() || null,
         passwordHash,
-        role: adminEmails().has(email) ? Role.ADMIN : Role.USER,
       },
       select: { id: true, email: true, name: true, role: true },
     });

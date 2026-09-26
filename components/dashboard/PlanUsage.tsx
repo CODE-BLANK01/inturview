@@ -1,4 +1,5 @@
-import { ArrowUpRight, Lock } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
 import { priceLabel, priceSuffix } from "@/lib/plans";
 
@@ -48,6 +49,7 @@ export function PlanUsage({
       limit: plan.designSessionsPerMonth,
     },
   ];
+  const hasMonthlyCaps = meters.some((meter) => meter.limit !== null);
 
   return (
     <section className="panel p-5">
@@ -69,9 +71,11 @@ export function PlanUsage({
             {priceLabel(plan)}
             {priceSuffix(plan)}
           </span>
-          <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
+          {hasMonthlyCaps && (
+            <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
+          )}
         </div>
-        <UpgradeCta />
+        {plan.tier === "FREE" && <UpgradeCta />}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
@@ -130,15 +134,9 @@ function Meter({
 
 function UpgradeCta() {
   return (
-    <button
-      type="button"
-      disabled
-      title="Upgrade plans are launching soon"
-      className="btn text-xs cursor-not-allowed opacity-80"
-    >
-      <Lock className="h-3 w-3" />
-      Upgrade
+    <Link href="/account" className="btn text-xs">
+      Get 30 days
       <ArrowUpRight className="h-3 w-3" />
-    </button>
+    </Link>
   );
 }

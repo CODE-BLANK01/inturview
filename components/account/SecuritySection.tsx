@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { Check, Loader2, LogOut } from "lucide-react";
+import { signOutTo } from "@/lib/signOutTo";
 import { SectionHeader } from "./ProfileSection";
 import { TwoFactorSection } from "./TwoFactorSection";
 
@@ -56,7 +56,7 @@ export function SecuritySection({
       // is now revoked. Show a brief confirmation, then sign out → /signin.
       setPostSave("signing-out");
       setTimeout(() => {
-        signOut({ callbackUrl: "/signin?reason=password-changed" });
+        void signOutTo("/signin?reason=password-changed");
       }, 1400);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change password");
@@ -80,7 +80,7 @@ export function SecuritySection({
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || `Failed (${res.status})`);
       }
-      signOut({ callbackUrl: "/signin?reason=revoked" });
+      await signOutTo("/signin?reason=revoked");
     } catch (e) {
       setRevokeError(e instanceof Error ? e.message : "Couldn't revoke");
       setRevoking(false);

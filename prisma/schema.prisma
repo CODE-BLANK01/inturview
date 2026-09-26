@@ -26,6 +26,11 @@ enum PlanTier {
   ENTERPRISE
 }
 
+enum BillingPurchaseStatus {
+  PAID
+  REFUNDED
+}
+
 enum OnboardingGoal {
   PRACTICING
   RECRUITING
@@ -34,16 +39,21 @@ enum OnboardingGoal {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
-  name         String?
-  passwordHash String
-  role         Role        @default(USER)
-  plan         PlanTier    @default(FREE)
-  goal         OnboardingGoal?
+  id                    String                   @id @default(cuid())
+  email                 String                   @unique
+  name                  String?
+  passwordHash          String
+  role                  Role                     @default(USER)
+  plan                  PlanTier                 @default(FREE)
+  /// Stripe customer used for candidate practice-pass purchases.
+  stripeCustomerId      String?                  @unique
+  /// Paid candidate access ends at this instant. Null is reserved for free
+  /// accounts and manually granted legacy access.
+  planExpiresAt         DateTime?
+  goal                  OnboardingGoal?
   /// Non-null once the user clicks the verification link from their inbox.
   /// Authenticated requests are routed to /verify-email until this is set.
-  emailVerifiedAt DateTime?
+  emailVerifiedAt       DateTime?
   /// Non-null once the user finishes the onboarding wizard. Until then, any
   /// authenticated request that lands on /dashboard etc. is redirected back
   /// to /onboarding.
@@ -52,32 +62,65 @@ model User {
   /// (password change, role change, disable, manual "sign out everywhere").
   /// The signed JWT carries the value at issue time; requireUser() compares
   /// it to the current DB value on every protected request.
-  tokenVersion Int @default(0)
+  tokenVersion          Int                      @default(0)
   /// Non-null when TOTP MFA is enabled for the user.
-  totpEnabledAt DateTime?
+  totpEnabledAt         DateTime?
   /// AES-GCM encrypted TOTP secret. Null until the user completes setup.
-  totpSecret String?
+  totpSecret            String?
   /// Bcrypt hashes of one-time recovery codes. Stored as JSON string array.
-  totpRecoveryCodes Json?
-  flagged      Boolean     @default(false)
-  flagReason   String?
+  totpRecoveryCodes     Json?
+  flagged               Boolean                  @default(false)
+  flagReason            String?
   // Non-null = the user is disabled and can't sign in. Existing data is retained.
-  disabledAt   DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  disabledAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
   /// First authenticated dashboard visit 24h–7d after signup; prevents duplicate retention events.
-  returnedWithin7dAt DateTime?
-  interviews   Interview[]
-  designSessions DesignSession[]
-  conversations  ConversationSession[]
-  auditEntries AuditLog[]  @relation("AdminAudit")
-  resetTokens  PasswordResetToken[]
-  verificationTokens EmailVerificationToken[]
+  returnedWithin7dAt    DateTime?
+  interviews            Interview[]
+  designSessions        DesignSession[]
+  conversations         ConversationSession[]
+  auditEntries          AuditLog[]               @relation("AdminAudit")
+  resetTokens           PasswordResetToken[]
+  verificationTokens    EmailVerificationToken[]
+  billingPurchases      BillingPurchase[]
 
   @@index([role])
   @@index([flagged])
   @@index([plan])
   @@index([emailVerifiedAt])
+}
+
+model BillingPurchase {
+  id                      String                @id @default(cuid())
+  userId                  String
+  stripeCheckoutSessionId String                @unique
+  stripePaymentIntentId   String?               @unique
+  stripeCustomerId        String?
+  amountCents             Int
+  currency                String
+  accessDays              Int                   @default(30)
+  accessStartsAt          DateTime
+  accessEndsAt            DateTime
+  status                  BillingPurchaseStatus @default(PAID)
+  purchasedAt             DateTime              @default(now())
+  refundedAt              DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purchasedAt])
+  @@index([stripeCustomerId])
+  @@index([status])
+}
+
+/// Stripe retries webhook deliveries. Recording every processed event makes
+/// granting access exactly-once even when the same delivery arrives repeatedly.
+model StripeWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
 }
 
 model EmailVerificationToken {
@@ -152,16 +195,16 @@ enum InterviewStatus {
 }
 
 model Interview {
-  id             String          @id @default(cuid())
-  userId         String
-  problemId      String
-  status         InterviewStatus @default(IN_PROGRESS)
-  language       String          @default("python")
-  code           String          @default("")
-  totalScore     Int?
-  recommendation String?
-  startedAt      DateTime        @default(now())
-  completedAt    DateTime?
+  id                 String          @id @default(cuid())
+  userId             String
+  problemId          String
+  status             InterviewStatus @default(IN_PROGRESS)
+  language           String          @default("python")
+  code               String          @default("")
+  totalScore         Int?
+  recommendation     String?
+  startedAt          DateTime        @default(now())
+  completedAt        DateTime?
   // First time the interviewer emitted [READY] for this candidate's approach.
   // null when the candidate jumped to code without the interviewer signaling acceptance —
   // weighted negatively in the debrief's communication / approach_quality scores.
@@ -170,7 +213,7 @@ model Interview {
   codePhaseEnteredAt DateTime?
   // Whether the candidate clicked "Start coding" while the latest interviewer
   // signal was still [CONTINUE]. Persisted for the debrief.
-  movedToCodeEarly   Boolean   @default(false)
+  movedToCodeEarly   Boolean         @default(false)
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem  Problem   @relation(fields: [problemId], references: [id])
@@ -213,10 +256,10 @@ model Debrief {
 
 model SystemDesignProblem {
   // Slug ("design-twitter"), mirrors Problem.id convention.
-  id                       String   @id
+  id                       String @id
   title                    String
-  difficulty               String   // Easy / Medium / Hard
-  topic                    String   // Feeds, Messaging, Storage, Geospatial, ...
+  difficulty               String // Easy / Medium / Hard
+  topic                    String // Feeds, Messaging, Storage, Geospatial, ...
   /// The open prompt the AI delivers at session start.
   prompt                   String
   /// JSON: { functional: string[], nonFunctional: string[] } — used as
@@ -227,7 +270,7 @@ model SystemDesignProblem {
   referenceArchitecture    String
   /// JSON string[] — suggested deep-dive topics the AI can probe.
   deepDiveTopics           Json
-  estimatedDurationMinutes Int      @default(45)
+  estimatedDurationMinutes Int    @default(45)
 
   sessions DesignSession[]
 
@@ -242,26 +285,26 @@ enum DesignSessionStatus {
 }
 
 model DesignSession {
-  id              String              @id @default(cuid())
-  userId          String
-  problemId       String
-  status          DesignSessionStatus @default(IN_PROGRESS)
+  id                   String              @id @default(cuid())
+  userId               String
+  problemId            String
+  status               DesignSessionStatus @default(IN_PROGRESS)
   /// Excalidraw scene JSON (the elements + appState subset we care about).
   /// Debounced auto-save from the client. Null at session start.
-  canvasJson      Json?
-  totalScore      Int?
-  recommendation  String?
-  startedAt       DateTime            @default(now())
-  completedAt     DateTime?
+  canvasJson           Json?
+  totalScore           Int?
+  recommendation       String?
+  startedAt            DateTime            @default(now())
+  completedAt          DateTime?
   /// First time the interviewer emitted [SCOPED] for this session's requirements.
   /// Null when the candidate moved to design without scope acceptance —
   /// caps the Requirements/Architecture scores in debrief.
-  scopeAcceptedAt DateTime?
+  scopeAcceptedAt      DateTime?
   // First explicit transition from scope to design; analytics dedupe marker.
   designPhaseEnteredAt DateTime?
   /// Whether the candidate clicked "Start designing" while the latest signal
   /// was still [CONTINUE]. Behavioral signal feeding the rubric.
-  movedToDesignEarly Boolean          @default(false)
+  movedToDesignEarly   Boolean             @default(false)
 
   user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem  SystemDesignProblem @relation(fields: [problemId], references: [id])
@@ -277,7 +320,7 @@ model DesignMessage {
   sessionId String
   /// "scope" | "design" | "debrief" (debrief = post-debrief follow-up chat)
   phase     String
-  role      String   // "user" | "assistant"
+  role      String // "user" | "assistant"
   content   String
   createdAt DateTime @default(now())
 
@@ -316,13 +359,13 @@ enum ConversationStatus {
 
 model BehavioralScenario {
   // Slug ("conflict-with-teammate"), mirrors Problem.id convention.
-  id          String   @id
-  title       String
+  id              String @id
+  title           String
   /// "Conflict" / "Leadership" / "Failure" / "Ambiguity" / "Growth" / ...
-  category    String
+  category        String
   /// The opening question the interviewer asks. Free-form prose; the LLM
   /// will probe with STAR follow-ups.
-  prompt      String
+  prompt          String
   /// JSON string[] — the specific behaviors / signals the debrief should
   /// look for. Used as grading reference, not shown to the candidate live.
   expectedSignals Json
@@ -333,7 +376,7 @@ model BehavioralScenario {
 }
 
 model ConversationSession {
-  id             String              @id @default(cuid())
+  id             String             @id @default(cuid())
   userId         String
   kind           ConversationKind
   /// Set when kind=BEHAVIORAL; null for RECRUITER_SCREEN (single canonical flow).
@@ -342,10 +385,10 @@ model ConversationSession {
   /// ({ track, level, questionIds, maxDurationSec }). Rebuilt into the
   /// realtime interviewer instructions on demand.
   plan           Json?
-  status         ConversationStatus  @default(IN_PROGRESS)
+  status         ConversationStatus @default(IN_PROGRESS)
   totalScore     Int?
   recommendation String?
-  startedAt      DateTime            @default(now())
+  startedAt      DateTime           @default(now())
   completedAt    DateTime?
 
   user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -361,7 +404,7 @@ model ConversationSession {
 model ConversationMessage {
   id        String   @id @default(cuid())
   sessionId String
-  role      String   // "user" | "assistant"
+  role      String // "user" | "assistant"
   content   String
   /// FACE_TO_FACE user turns: delivery metrics computed by the realtime
   /// service (wpm, filler_count, duration_ms, longest_pause_ms, ...).

@@ -111,6 +111,9 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `DATABASE_URL`     | Postgres connection string.                                        |
 | `NEXTAUTH_SECRET`  | JWT signing secret. `openssl rand -base64 32`.                      |
 | `NEXTAUTH_URL`     | Public app URL (`http://localhost:3000` in dev).                   |
+| `STRIPE_SECRET_KEY` | Secret key used by server-side Checkout and webhook processing.   |
+| `STRIPE_INTERVIEW_SPRINT_PRICE_ID` | Active one-time USD $19 Stripe Price.              |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for `/api/billing/webhook`.                     |
 
 ### Optional
 
@@ -137,6 +140,26 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `UNLIMITED_PLAN_EMAILS` | _(empty)_             | Comma-separated emails granted unlimited starts without changing billing tier. |
 | `POSTHOG_PROJECT_TOKEN` | _(disabled)_          | PostHog project token for server-side event capture. |
 | `POSTHOG_HOST` | `https://us.i.posthog.com`  | PostHog ingestion host; use `https://eu.i.posthog.com` for EU projects. |
+
+### Candidate billing
+
+Create one Stripe product named `Interview Sprint` with an active one-time
+USD $19.00 Price. Set its `price_...` ID as
+`STRIPE_INTERVIEW_SPRINT_PRICE_ID`, then configure a webhook endpoint at
+`https://YOUR_DOMAIN/api/billing/webhook` for
+`checkout.session.completed`, `checkout.session.async_payment_succeeded`, and
+`charge.refunded`.
+
+For local testing, install the Stripe CLI and run:
+
+```bash
+stripe listen --forward-to localhost:3000/api/billing/webhook
+```
+
+Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout is
+the only entry point; paid access is granted by a verified webhook. Each
+successful payment adds 30 days after the user's current expiry, and webhook
+event and Checkout Session IDs make retries idempotent.
 
 ### Product analytics
 

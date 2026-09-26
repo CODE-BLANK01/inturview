@@ -8,11 +8,22 @@ import { getEffectivePlan, startOfMonthUTC } from "@/lib/plans";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Account — inturview" };
 
-export default async function AccountSettingsPage() {
+export default async function AccountSettingsPage({
+  searchParams,
+}: {
+  searchParams?: { checkout?: string };
+}) {
   const user = await requireUser();
   if (!user) redirect("/signin?callbackUrl=/account");
 
-  const [profile, interviewsThisMonth] = await Promise.all([
+  const monthStart = startOfMonthUTC();
+  const [
+    profile,
+    interviewsThisMonth,
+    designSessionsThisMonth,
+    behavioralSessionsThisMonth,
+    recruiterSessionsThisMonth,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -20,6 +31,7 @@ export default async function AccountSettingsPage() {
         name: true,
         role: true,
         plan: true,
+        planExpiresAt: true,
         goal: true,
         emailVerifiedAt: true,
         onboardingCompletedAt: true,
@@ -28,14 +40,31 @@ export default async function AccountSettingsPage() {
       },
     }),
     prisma.interview.count({
-      where: { userId: user.id, startedAt: { gte: startOfMonthUTC() } },
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.designSession.count({
+      where: { userId: user.id, startedAt: { gte: monthStart } },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "BEHAVIORAL",
+        startedAt: { gte: monthStart },
+      },
+    }),
+    prisma.conversationSession.count({
+      where: {
+        userId: user.id,
+        kind: "RECRUITER_SCREEN",
+        startedAt: { gte: monthStart },
+      },
     }),
   ]);
 
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
 
-  const plan = getEffectivePlan(profile.plan, profile.email);
+  const plan = getEffectivePlan(profile.plan, profile.email, profile.planExpiresAt);
 
   return (
     <>
@@ -63,7 +92,18 @@ export default async function AccountSettingsPage() {
             createdAt: profile.createdAt.toISOString(),
           }}
           planInfo={plan}
-          interviewsThisMonth={interviewsThisMonth}
+          usage={{
+            interviewsThisMonth,
+            designSessionsThisMonth,
+            behavioralSessionsThisMonth,
+            recruiterSessionsThisMonth,
+          }}
+          planExpiresAt={profile.planExpiresAt?.toISOString() ?? null}
+          checkoutStatus={
+            searchParams?.checkout === "success" || searchParams?.checkout === "canceled"
+              ? searchParams.checkout
+              : undefined
+          }
         />
       </main>
     </>

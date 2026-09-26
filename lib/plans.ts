@@ -109,8 +109,8 @@ export const PLANS: PlanDefinition[] = [
     behavioralSessionsPerMonth: null,
     recruiterSessionsPerMonth: null,
     faceToFaceSessionsPerMonth: 30,
-    selectable: false,
-    availabilityNote: "Opening soon",
+    selectable: true,
+    availabilityNote: "Available now",
   },
   {
     tier: PlanTier.TEAM_STARTER,
@@ -191,9 +191,17 @@ export function hasUnlimitedPlanOverride(email: string | null | undefined): bool
 
 export function getEffectivePlan(
   tier: PlanTier,
-  email: string | null | undefined
+  email: string | null | undefined,
+  planExpiresAt?: Date | null,
+  now: Date = new Date()
 ): PlanDefinition {
-  const plan = getPlan(tier);
+  // Paid Stripe passes expire automatically. A null/omitted expiry preserves
+  // manually granted legacy PRO access; every Stripe purchase always has one.
+  const effectiveTier =
+    tier === PlanTier.PRO && planExpiresAt instanceof Date && planExpiresAt <= now
+      ? PlanTier.FREE
+      : tier;
+  const plan = getPlan(effectiveTier);
   if (!hasUnlimitedPlanOverride(email)) return plan;
   // An access override changes limits, not the account's paid tier or price.
   return {

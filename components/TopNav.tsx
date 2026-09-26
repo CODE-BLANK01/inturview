@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import {
   ChevronDown,
   ClipboardList,
@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { FACE_TO_FACE_ENABLED } from "@/lib/features";
+import { signOutTo } from "@/lib/signOutTo";
 
 const PRACTICE_MODES: {
   href: string;
@@ -218,7 +219,7 @@ export function TopNav() {
                   </Link>
                   <div className="my-1 border-t border-border" />
                   <button
-                    onClick={() => signOut({ callbackUrl: "/" })}
+                    onClick={() => void signOutTo("/")}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-bg-inset inline-flex items-center gap-2"
                   >
                     <LogOut className="h-4 w-4" />

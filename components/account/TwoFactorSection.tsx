@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
 import { Check, Copy, KeyRound, Loader2, ShieldCheck, ShieldOff, X } from "lucide-react";
 import { SectionHeader } from "./ProfileSection";
+import { signOutTo } from "@/lib/signOutTo";
 
 interface SetupState {
   setupToken: string;
@@ -74,7 +74,7 @@ export function TwoFactorSection({ enabled }: { enabled: boolean }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `Failed (${res.status})`);
-      signOut({ callbackUrl: "/signin?reason=revoked" });
+      await signOutTo("/signin?reason=revoked");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't disable 2FA");
       setLoading(null);

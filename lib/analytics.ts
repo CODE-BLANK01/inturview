@@ -6,7 +6,18 @@ export type ProductEvent =
   | { event: "interview_started"; properties: { mode: Mode; session_id: string } }
   | { event: "phase_advanced"; properties: { mode: Mode; session_id: string; from: string; to: string } }
   | { event: "debrief_completed"; properties: { mode: Mode; session_id: string; score: number } }
-  | { event: "returned_within_7d"; properties: { days_since_signup: number } };
+  | { event: "returned_within_7d"; properties: { days_since_signup: number } }
+  | { event: "checkout_started"; properties: { product: "interview_sprint"; amount_cents: number } }
+  | {
+      event: "purchase_completed";
+      properties: {
+        product: "interview_sprint";
+        amount_cents: number;
+        currency: string;
+        access_days: number;
+        was_extension: boolean;
+      };
+    };
 
 export async function captureProductEvent(userId: string, data: ProductEvent): Promise<boolean> {
   const token = process.env.POSTHOG_PROJECT_TOKEN;
