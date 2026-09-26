@@ -181,13 +181,35 @@ interface RealtimeSessionResponse {
 
 const SOCKET_RECONNECT_ATTEMPTS = 5;
 
-export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; backLabel: string }) {
+export interface FaceToFaceUsage {
+  used: number;
+  /** null = unlimited on this plan. */
+  cap: number | null;
+  planName: string;
+  /** At the cap with no resumable session: starting would be refused. */
+  limitReached: boolean;
+  /** ISO date the monthly count resets. */
+  resetsOn: string;
+}
+
+export function FaceToFaceSession({
+  backHref,
+  backLabel,
+  usage,
+}: {
+  backHref: string;
+  backLabel: string;
+  usage: FaceToFaceUsage;
+}) {
   const media = useLocalMedia();
 
   const [phase, setPhase] = useState<Phase>("setup");
   const [track, setTrack] = useState<FaceToFaceTrack>("backend");
   const [level, setLevel] = useState<FaceToFaceLevel>("mid");
   const [startError, setStartError] = useState<string | null>(null);
+  // Starts true when the page loaded at the cap; flips true if the start
+  // route refuses on the cap (e.g. a session started in another tab).
+  const [limitReached, setLimitReached] = useState(usage.limitReached);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
@@ -390,6 +412,7 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
       });
       if (!startRes.ok) {
         const j = await startRes.json().catch(() => ({}));
+        if (j.code === "PLAN_LIMIT_REACHED") setLimitReached(true);
         throw new Error(j.error || `Could not start session (${startRes.status})`);
       }
       const start = (await startRes.json()) as StartResponse;
@@ -621,6 +644,8 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
             onLevel={setLevel}
             starting={phase === "starting"}
             error={startError}
+            usage={usage}
+            limitReached={limitReached}
             onStart={startInterview}
             bodyState={bodyState}
             onCalibrate={calibrateBody}
@@ -734,6 +759,8 @@ function SetupView({
   onLevel,
   starting,
   error,
+  usage,
+  limitReached,
   onStart,
   bodyState,
   onCalibrate,
@@ -746,6 +773,8 @@ function SetupView({
   onLevel: (l: FaceToFaceLevel) => void;
   starting: boolean;
   error: string | null;
+  usage: FaceToFaceUsage;
+  limitReached: boolean;
   onStart: () => void;
   bodyState: BodyState;
   onCalibrate: () => void;
@@ -763,10 +792,22 @@ function SetupView({
       ? "Calibrate body language first (two seconds)"
       : "Start the interview";
 
+  const resetsOn = new Date(usage.resetsOn).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
   return (
     <div className="space-y-4">
       <section className="panel p-5">
-        <div className="text-xs text-text-dim mb-2">Live technical round · ~20 minutes</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs text-text-dim">
+          <span>Live technical round · ~20 minutes</span>
+          <span>
+            <span className="tabular-nums">{usage.used}</span>
+            {usage.cap === null ? " · unlimited" : ` / ${usage.cap}`} this month
+          </span>
+        </div>
         <h1 className="text-xl font-semibold">Face-to-face interview</h1>
         <p className="mt-3 text-sm text-text-muted">
           A live technical interview over video. The interviewer asks about your stack, digs
@@ -777,6 +818,25 @@ function SetupView({
         </p>
       </section>
 
+      {limitReached ? (
+        <section className="panel border-hard/40 p-6 flex flex-col items-center text-center gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-hard/40 bg-hard-bg/30 text-hard">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <h2 className="text-lg font-semibold">Monthly limit reached</h2>
+          <p className="text-sm text-text-muted max-w-md">
+            You&apos;ve used all {usage.cap} face-to-face interviews on the {usage.planName}{" "}
+            plan this month. Your count resets on {resetsOn}.
+          </p>
+          <p className="text-sm text-text-muted max-w-md">
+            You can keep practicing in the other modes in the meantime.
+          </p>
+          <Link href="/dashboard" className="btn btn-primary mt-1">
+            Back to dashboard
+          </Link>
+        </section>
+      ) : (
+      <>
       {error && (
         <div className="rounded-md border border-hard/40 bg-hard-bg/30 text-hard text-sm px-3 py-2">
           {error}
@@ -938,9 +998,17 @@ function SetupView({
                 </>
               )}
             </button>
+            {/* Repeated by the button: the top banner is often scrolled out of view. */}
+            {error && (
+              <p role="alert" className="mt-2 text-sm text-hard">
+                {error}
+              </p>
+            )}
           </div>
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }

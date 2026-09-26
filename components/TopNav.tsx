@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -70,6 +70,27 @@ export function TopNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [practiceOpen, setPracticeOpen] = useState(false);
+  const practiceRef = useRef<HTMLDivElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on a click outside them. (A blur timer used to close them
+  // before a slow click on a menu item could register, so links didn't fire.)
+  useEffect(() => {
+    if (!open && !practiceOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!practiceRef.current?.contains(target)) setPracticeOpen(false);
+      if (!accountRef.current?.contains(target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, practiceOpen]);
+
+  // Close menus once navigation lands on a new route.
+  useEffect(() => {
+    setOpen(false);
+    setPracticeOpen(false);
+  }, [pathname]);
 
   const practiceActive = PRACTICE_MODES.some((m) =>
     m.pathPrefixes.some((p) => pathname === p || pathname?.startsWith(p + "/"))
@@ -103,11 +124,10 @@ export function TopNav() {
             <NavLink href="/dashboard" active={pathname === "/dashboard"}>
               Dashboard
             </NavLink>
-            <div className="relative">
+            <div className="relative" ref={practiceRef}>
               <button
                 type="button"
                 onClick={() => setPracticeOpen((v) => !v)}
-                onBlur={() => setTimeout(() => setPracticeOpen(false), 150)}
                 className={`px-3 py-1.5 rounded-md inline-flex items-center gap-1 transition-colors duration-150 ${
                   practiceActive
                     ? "text-text bg-bg-inset"
@@ -157,11 +177,10 @@ export function TopNav() {
         <nav className="flex items-center gap-2">
           <ThemeToggle />
           {isAuthed ? (
-            <div className="relative">
+            <div className="relative" ref={accountRef}>
               <button
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-text-muted hover:text-text hover:bg-bg-inset transition-colors duration-150"
                 onClick={() => setOpen((v) => !v)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
               >
                 <Avatar email={data?.user?.email ?? ""} name={data?.user?.name ?? null} />
                 <span className="hidden sm:inline max-w-[160px] truncate">

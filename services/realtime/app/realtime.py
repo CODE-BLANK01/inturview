@@ -19,14 +19,34 @@ OUTPUT_LANGUAGE_RULE = (
 )
 
 
+def build_turn_detection() -> dict[str, Any]:
+    """semantic_vad judges from the words whether the candidate is done, so a
+    mid-sentence thinking pause doesn't end the answer. server_vad is the older
+    fixed-silence detector with a loudness threshold (more noise-robust, but
+    cuts people off when they pause to think)."""
+    s = get_settings()
+    # The browser decides when the model replies (see build_session_config).
+    common = {"create_response": False, "interrupt_response": False}
+    if s.rt_turn_detection == "semantic_vad":
+        return {"type": "semantic_vad", "eagerness": s.rt_vad_eagerness, **common}
+    return {
+        "type": "server_vad",
+        "threshold": s.rt_vad_threshold,
+        "prefix_padding_ms": s.rt_vad_prefix_ms,
+        "silence_duration_ms": s.rt_vad_silence_ms,
+        **common,
+    }
+
+
 def build_session_config(instructions: str) -> dict[str, Any]:
     """Session config baked into the ephemeral client secret.
 
     The anti-noise design:
     - noise_reduction runs before VAD, so breathing and keyboard clicks are
       attenuated before the detector sees them.
-    - server_vad with a high threshold and long silence window means only
-      sustained, loud-enough speech opens a turn.
+    - semantic_vad (default) ends a turn only when the candidate sounds done;
+      server_vad (RT_TURN_DETECTION) instead needs sustained, loud-enough
+      speech to open a turn and a fixed silence to close it.
     - create_response=False: the model NEVER answers on its own. The browser
       decides to request a response only after the transcript comes back and
       passes the junk filter. interrupt_response=False for the same reason —
@@ -47,14 +67,7 @@ def build_session_config(instructions: str) -> dict[str, Any]:
                     "language": s.rt_input_language,
                     "prompt": TRANSCRIPTION_PROMPT,
                 },
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": s.rt_vad_threshold,
-                    "prefix_padding_ms": s.rt_vad_prefix_ms,
-                    "silence_duration_ms": s.rt_vad_silence_ms,
-                    "create_response": False,
-                    "interrupt_response": False,
-                },
+                "turn_detection": build_turn_detection(),
             },
             "output": {"voice": s.openai_realtime_voice},
         },

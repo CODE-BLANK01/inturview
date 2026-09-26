@@ -31,6 +31,8 @@ export interface UserTurn {
 export interface RealtimeTuning {
   /** How long to wait after a transcript lands before letting the model reply (ms). */
   responseGraceMs: number;
+  /** Longer wait used instead when the answer so far looks cut off mid-thought (ms). */
+  unfinishedGraceMs: number;
   /** Speech shorter than this while the model is talking is ignored, not treated as barge-in (ms). */
   interruptMinMs: number;
   /** Absolute RMS floor below which the gate never opens. */
@@ -41,15 +43,21 @@ export interface RealtimeTuning {
   gateSpeakingMultiplier: number;
   /** How long the signal must stay below threshold before the gate closes (ms). */
   gateReleaseMs: number;
+  /** Outgoing audio is delayed by this much so the gate opens before speech onset (ms). */
+  gatePrerollMs: number;
 }
 
 export const DEFAULT_TUNING: RealtimeTuning = {
   responseGraceMs: 1200,
+  unfinishedGraceMs: 3500,
   interruptMinMs: 700,
   gateMinRms: 0.012,
   gateFloorMultiplier: 3,
   gateSpeakingMultiplier: 2,
-  gateReleaseMs: 250,
+  // Long enough to bridge the natural gaps between words and phrases; 250 ms
+  // closed the gate mid-sentence and chopped answers into fragments.
+  gateReleaseMs: 900,
+  gatePrerollMs: 250,
 };
 
 export interface RealtimeCallbacks {
@@ -136,6 +144,33 @@ export function isUsableTranscript(raw: string): boolean {
   return true;
 }
 
+/** Words a candidate trails off on mid-thought ("…and the cache sits in front of, um"). */
+const TRAILING_WORDS = new Set([
+  "and", "but", "or", "so", "because", "cause", "since", "then", "if", "when",
+  "while", "which", "that", "where", "like", "um", "uh", "er", "hmm", "the",
+  "a", "an", "to", "of", "for", "with", "in", "on", "at", "from", "by", "is",
+  "are", "was", "would", "could", "should", "will", "can", "i", "we", "my",
+  "our", "basically", "also", "maybe", "probably",
+]);
+
+/**
+ * True when the answer so far sounds cut off mid-thought: it ends on a
+ * connective/filler word, trails off with "..." or a comma, or has no
+ * sentence-ending punctuation. The transcriber punctuates complete sentences,
+ * so a missing full stop is a useful "still thinking" signal.
+ */
+export function looksUnfinished(raw: string): boolean {
+  const text = raw.trim();
+  if (!text) return false;
+  if (/(\.\.\.|…|,|-|—)$/.test(text)) return true;
+  const words = text.toLowerCase().match(/[a-z0-9'’]+/g) ?? [];
+  const last = words[words.length - 1];
+  if (last && TRAILING_WORDS.has(last)) return true;
+  // One/two-word replies ("Yes", "Consistent hashing") often lack a full stop.
+  if (words.length <= 2) return false;
+  return !/[.?!]["”')]*$/.test(text);
+}
+
 const FUNCTION_WORDS = new Set([
   "the", "and", "but", "for", "with", "that", "this", "was", "are", "not",
   "have", "has", "had", "from", "they", "them", "then", "than", "what", "when",
@@ -155,14 +190,23 @@ function buildGatedAudio(mic: MediaStream, tuning: RealtimeTuning): GatedAudio {
   analyser.fftSize = 1024;
   const gain = ctx.createGain();
   gain.gain.value = 0;
+  // Pre-roll: the analyser hears the mic live, but the audio sent on is
+  // delayed, so the gate is already open when a word's first syllable reaches
+  // it. Without this every phrase lost its onset and transcripts came back
+  // garbled.
+  const preroll = ctx.createDelay(1);
+  preroll.delayTime.value = tuning.gatePrerollMs / 1000;
   const dest = ctx.createMediaStreamDestination();
 
   source.connect(analyser);
-  source.connect(gain);
+  source.connect(preroll);
+  preroll.connect(gain);
   gain.connect(dest);
 
   const buf = new Float32Array(analyser.fftSize);
-  let floor = 0.02;
+  // Start low and let it adapt: starting high (3 × 0.02) muted quiet speakers
+  // until the floor had time to settle.
+  let floor = 0.008;
   let open = false;
   let speaking = false;
   let lastAbove = 0;
@@ -203,6 +247,7 @@ function buildGatedAudio(mic: MediaStream, tuning: RealtimeTuning): GatedAudio {
     dispose: () => {
       window.clearInterval(timer);
       source.disconnect();
+      preroll.disconnect();
       gain.disconnect();
       ctx.close().catch(() => {});
     },
@@ -273,7 +318,12 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
 
   const armGrace = () => {
     clearGrace();
-    graceTimer = window.setTimeout(flushPending, tuning.responseGraceMs);
+    // Give a mid-thought pause more room before the interviewer jumps in.
+    const wait =
+      pending && looksUnfinished(pending.text)
+        ? tuning.unfinishedGraceMs
+        : tuning.responseGraceMs;
+    graceTimer = window.setTimeout(flushPending, wait);
   };
 
   const flushPending = () => {
@@ -302,7 +352,9 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
         if (seg) seg.end = now;
         const duration = now - (seg?.start ?? now);
         if (assistantSpeaking && duration >= tuning.interruptMinMs) {
-          send({ type: "response.cancel" });
+          // Audio keeps playing after generation finishes, so a response may
+          // no longer be active; cancelling then just returns an error.
+          if (responseActive) send({ type: "response.cancel" });
           send({ type: "output_audio_buffer.clear" });
         }
         break;
@@ -379,7 +431,9 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
         break;
       }
       case "error": {
-        const err = ev.error as { message?: string } | undefined;
+        const err = ev.error as { message?: string; code?: string } | undefined;
+        // Benign race: the reply finished just as the candidate barged in.
+        if (err?.code === "response_cancel_not_active") break;
         cb.onError(err?.message ?? "Realtime session error");
         break;
       }
