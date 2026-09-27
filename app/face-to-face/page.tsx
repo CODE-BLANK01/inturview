@@ -17,12 +17,17 @@ export default async function FaceToFacePage() {
 
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { plan: true, emailVerifiedAt: true, onboardingCompletedAt: true },
+    select: {
+      plan: true,
+      planExpiresAt: true,
+      emailVerifiedAt: true,
+      onboardingCompletedAt: true,
+    },
   });
   if (!profile?.emailVerifiedAt) redirect("/verify-email");
   if (!profile.onboardingCompletedAt) redirect("/onboarding");
 
-  const plan = getEffectivePlan(profile.plan, user.email);
+  const plan = getEffectivePlan(profile.plan, user.email, profile.planExpiresAt);
   const cap = plan.faceToFaceSessionsPerMonth;
   const monthStart = startOfMonthUTC();
   const [used, inProgress] = await Promise.all([
