@@ -18,6 +18,8 @@ interface SubscriptionSectionProps {
   };
   planExpiresAt: string | null;
   checkoutStatus?: "success" | "canceled";
+  /** True only when this exact Checkout Session exists in the paid ledger. */
+  checkoutConfirmed?: boolean;
 }
 
 function computeDaysUntilReset(): number {
@@ -31,6 +33,7 @@ export function SubscriptionSection({
   usage,
   planExpiresAt,
   checkoutStatus,
+  checkoutConfirmed,
 }: SubscriptionSectionProps) {
   const router = useRouter();
   const [checkoutNoticeVisible, setCheckoutNoticeVisible] = useState(
@@ -48,18 +51,18 @@ export function SubscriptionSection({
 
   // Stripe redirects back immediately after Checkout, while its webhook can
   // arrive a moment later. Refresh the server component until the verified
-  // webhook changes the effective plan, instead of leaving the user on a
-  // stale "confirming" screen.
+  // webhook creates this Checkout Session's ledger entry, instead of treating
+  // an existing PRO plan as proof that an extension was applied.
   useEffect(() => {
-    if (checkoutStatus !== "success" || plan.tier === "PRO") return;
+    if (checkoutStatus !== "success" || checkoutConfirmed) return;
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
       router.refresh();
-      if (attempts >= 10) window.clearInterval(timer);
+      if (attempts >= 20) window.clearInterval(timer);
     }, 1_500);
     return () => window.clearInterval(timer);
-  }, [checkoutStatus, plan.tier, router]);
+  }, [checkoutConfirmed, checkoutStatus, router]);
 
   const dismissCheckoutNotice = () => {
     setCheckoutNoticeVisible(false);
@@ -114,7 +117,7 @@ export function SubscriptionSection({
         {checkoutNoticeVisible && checkoutStatus === "success" && (
           <div className="rounded-md border border-easy/40 bg-easy/10 px-4 py-3 text-sm text-text flex items-center justify-between gap-4">
             <span>
-              {plan.tier === "PRO" ? (
+              {checkoutConfirmed ? (
                 "Payment confirmed. Your Interview Sprint access is ready."
               ) : (
                 <span className="inline-flex items-center gap-2">

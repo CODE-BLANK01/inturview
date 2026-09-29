@@ -28,6 +28,7 @@ interface AccountPageProps {
   };
   planExpiresAt: string | null;
   checkoutStatus?: "success" | "canceled";
+  checkoutConfirmed?: boolean;
 }
 
 export function AccountPage({
@@ -36,6 +37,7 @@ export function AccountPage({
   usage,
   planExpiresAt,
   checkoutStatus,
+  checkoutConfirmed,
 }: AccountPageProps) {
   return (
     <div className="space-y-12">
@@ -46,6 +48,7 @@ export function AccountPage({
         usage={usage}
         planExpiresAt={planExpiresAt}
         checkoutStatus={checkoutStatus}
+        checkoutConfirmed={checkoutConfirmed}
       />
       <SectionDivider />
       <SecuritySection email={profile.email} twoFactorEnabled={profile.twoFactorEnabled} />

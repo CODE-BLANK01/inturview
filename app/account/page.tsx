@@ -11,7 +11,7 @@ export const metadata = { title: "Account — inturview" };
 export default async function AccountSettingsPage({
   searchParams,
 }: {
-  searchParams?: { checkout?: string };
+  searchParams?: { checkout?: string; session_id?: string };
 }) {
   const user = await requireUser();
   if (!user) redirect("/signin?callbackUrl=/account");
@@ -65,6 +65,30 @@ export default async function AccountSettingsPage({
   if (!profile.emailVerifiedAt) redirect("/verify-email");
 
   const plan = getEffectivePlan(profile.plan, profile.email, profile.planExpiresAt);
+  const checkoutStatus =
+    searchParams?.checkout === "success" || searchParams?.checkout === "canceled"
+      ? searchParams.checkout
+      : undefined;
+  const checkoutSessionId =
+    typeof searchParams?.session_id === "string" &&
+    /^cs_(?:test|live)_[A-Za-z0-9]+$/.test(searchParams.session_id)
+      ? searchParams.session_id
+      : null;
+  // A successful redirect only proves that the browser returned from Stripe.
+  // Confirmation means the signed webhook created this user's ledger entry.
+  const checkoutConfirmed =
+    checkoutStatus === "success" && checkoutSessionId
+      ? Boolean(
+          await prisma.billingPurchase.findFirst({
+            where: {
+              userId: user.id,
+              stripeCheckoutSessionId: checkoutSessionId,
+              status: "PAID",
+            },
+            select: { id: true },
+          })
+        )
+      : false;
 
   return (
     <>
@@ -99,11 +123,8 @@ export default async function AccountSettingsPage({
             recruiterSessionsThisMonth,
           }}
           planExpiresAt={profile.planExpiresAt?.toISOString() ?? null}
-          checkoutStatus={
-            searchParams?.checkout === "success" || searchParams?.checkout === "canceled"
-              ? searchParams.checkout
-              : undefined
-          }
+          checkoutStatus={checkoutStatus}
+          checkoutConfirmed={checkoutStatus === "success" ? checkoutConfirmed : undefined}
         />
       </main>
     </>
