@@ -99,3 +99,19 @@ async def mint_client_secret(client: httpx.AsyncClient, instructions: str) -> di
         "expires_at": data.get("expires_at"),
         "model": s.openai_realtime_model,
     }
+
+
+def openai_realtime_ws_url() -> str:
+    return f"wss://api.openai.com/v1/realtime?model={get_settings().openai_realtime_model}"
+
+
+def build_relay_session_update(instructions: str) -> dict[str, Any]:
+    """session.update for the WebSocket relay (avatar interviews). Same
+    behaviour as the WebRTC session, but audio both ways is raw 24 kHz PCM16
+    so the interviewer's voice can be handed straight to the avatar."""
+    session = build_session_config(instructions)
+    session.pop("model", None)  # chosen in the WebSocket URL
+    pcm = {"type": "audio/pcm", "rate": 24000}
+    session["audio"]["input"]["format"] = pcm
+    session["audio"]["output"]["format"] = pcm
+    return {"type": "session.update", "session": session}

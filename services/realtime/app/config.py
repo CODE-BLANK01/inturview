@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     rt_transcribe_model: str = "gpt-4o-transcribe"
     rt_client_secret_ttl: int = 600
 
+    # HeyGen LiveAvatar (LITE mode) interviewer face. Empty key = avatar off;
+    # interviews run voice-only.
+    liveavatar_api_key: str = ""
+    liveavatar_avatar_id: str = ""
+    # Sandbox sessions are free but last ~1 minute and only offer the test
+    # avatar; the browser falls back to voice-only when the avatar ends.
+    liveavatar_sandbox: bool = False
+
     @property
     def origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

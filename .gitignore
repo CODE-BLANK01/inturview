@@ -15,3 +15,5 @@ out
 # These contain sensitive context and explicit references to past security
 # issues — never commit, never share publicly.
 INTERNAL-NOTES.md
+# Session handoff notes for AI coding sessions (local context only).
+SESSION_HANDOFF.md

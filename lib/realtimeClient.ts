@@ -12,7 +12,14 @@
  *      response.create — and we only do that after a transcript arrives and
  *      passes isUsableTranscript().
  *   3. Barge-in decided from speech duration, not from any VAD blip.
+ *
+ * With the avatar on, the transport is a WebSocket relay through the realtime
+ * service instead (see services/realtime/app/relay.py): audio both ways is raw
+ * 24 kHz PCM16, so the interviewer's voice can go straight to the avatar. The
+ * turn-taking logic is shared between the two transports.
  */
+
+import { makeResampler, PCM_RATE, pcm16Base64 } from "./pcmAudio";
 
 export type RealtimeStatus = "connecting" | "listening" | "speaking" | "disconnected";
 
@@ -73,6 +80,25 @@ export interface RealtimeHandle {
   disconnect: () => void;
   /** Inject a bracketed note the interviewer must follow (e.g. time warnings). */
   injectNote: (text: string, respond?: boolean) => void;
+  /** Relay transport only: whether the interviewer is audibly speaking right
+   *  now (from the avatar or the fallback player). Drives barge-in and the gate. */
+  setInterviewerSpeaking: (speaking: boolean) => void;
+}
+
+/** Where the interviewer's voice goes on the relay transport. */
+export interface OutputAudioSink {
+  /** One delta of interviewer voice: base64 PCM16, 24 kHz mono. */
+  write: (pcm16Base64: string) => void;
+  /** The current reply's audio is complete. */
+  end: () => void;
+  /** Barge-in: drop whatever is still queued. */
+  clear: () => void;
+}
+
+export interface RelayTransport {
+  /** wss://…/sessions/{id}/voice?token=… on the realtime service. */
+  url: string;
+  sink: OutputAudioSink;
 }
 
 const HALLUCINATIONS = new Set([
@@ -180,6 +206,8 @@ const FUNCTION_WORDS = new Set([
 interface GatedAudio {
   track: MediaStreamTrack;
   setSpeaking: (speaking: boolean) => void;
+  /** Relay only: receive the gated mic as 24 kHz float samples. */
+  capture: (onSamples: (samples: Float32Array) => void) => Promise<void>;
   dispose: () => void;
 }
 
@@ -239,13 +267,57 @@ function buildGatedAudio(mic: MediaStream, tuning: RealtimeTuning): GatedAudio {
     }
   }, 20);
 
+  let captureNodes: AudioNode[] = [];
+
   return {
     track: dest.stream.getAudioTracks()[0]!,
     setSpeaking: (s) => {
       speaking = s;
     },
+    capture: async (onSamples) => {
+      // Read the gated mic in an AudioWorklet, which runs on the audio thread.
+      // A ScriptProcessorNode runs on the main thread, and on this page (camera
+      // body tracking, avatar video) it dropped and repeated blocks: the speech
+      // reached OpenAI garbled and was transcribed as invented text.
+      const url = URL.createObjectURL(new Blob([CAPTURE_WORKLET], { type: "text/javascript" }));
+      try {
+        await ctx.audioWorklet.addModule(url);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      const worklet = new AudioWorkletNode(ctx, "inturview-mic-capture");
+      // Low-pass before downsampling to 24 kHz, so hiss and sibilants above
+      // 12 kHz don't fold back into the speech band.
+      let input: AudioNode = gain;
+      if (ctx.sampleRate > PCM_RATE) {
+        for (let i = 0; i < 2; i++) {
+          const lowpass = ctx.createBiquadFilter();
+          lowpass.type = "lowpass";
+          lowpass.frequency.value = 11000;
+          lowpass.Q.value = Math.SQRT1_2;
+          input.connect(lowpass);
+          captureNodes.push(lowpass);
+          input = lowpass;
+        }
+      }
+      const silent = ctx.createGain();
+      silent.gain.value = 0;
+      input.connect(worklet);
+      worklet.connect(silent);
+      silent.connect(ctx.destination);
+      captureNodes.push(worklet, silent);
+
+      const toPcmRate = makeResampler(ctx.sampleRate, PCM_RATE);
+      // Messages queue up if the main thread is busy; none are dropped.
+      worklet.port.onmessage = (e: MessageEvent<Float32Array>) => onSamples(toPcmRate(e.data));
+    },
     dispose: () => {
       window.clearInterval(timer);
+      captureNodes.forEach((node) => {
+        if (node instanceof AudioWorkletNode) node.port.onmessage = null;
+        node.disconnect();
+      });
+      captureNodes = [];
       source.disconnect();
       preroll.disconnect();
       gain.disconnect();
@@ -254,10 +326,44 @@ function buildGatedAudio(mic: MediaStream, tuning: RealtimeTuning): GatedAudio {
   };
 }
 
+/** Audio-thread mic tap: forwards the first input channel in 2048-sample blocks. */
+const CAPTURE_WORKLET = `
+class InterviewMicCapture extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.block = new Float32Array(2048);
+    this.filled = 0;
+  }
+  process(inputs) {
+    const channel = inputs[0] && inputs[0][0];
+    if (channel) {
+      let i = 0;
+      while (i < channel.length) {
+        const take = Math.min(channel.length - i, this.block.length - this.filled);
+        this.block.set(channel.subarray(i, i + take), this.filled);
+        this.filled += take;
+        i += take;
+        if (this.filled === this.block.length) {
+          this.port.postMessage(this.block, [this.block.buffer]);
+          this.block = new Float32Array(2048);
+          this.filled = 0;
+        }
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("inturview-mic-capture", InterviewMicCapture);
+`;
+
 export interface ConnectOptions {
+  /** WebRTC transport: ephemeral key minted by the realtime service. */
   clientSecret: string;
   micStream: MediaStream;
+  /** WebRTC transport: plays the interviewer's voice. */
   audioEl: HTMLAudioElement;
+  /** Use the WebSocket relay instead of WebRTC (avatar interviews). */
+  relay?: RelayTransport;
   callbacks: RealtimeCallbacks;
   tuning?: Partial<RealtimeTuning>;
   /** Sent as the very first response so the interviewer opens the conversation. */
@@ -268,15 +374,12 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
   const tuning = { ...DEFAULT_TUNING, ...opts.tuning };
   const cb = opts.callbacks;
   const gated = buildGatedAudio(opts.micStream, tuning);
-
-  const pc = new RTCPeerConnection();
-  pc.addTrack(gated.track, new MediaStream([gated.track]));
-  pc.ontrack = (e) => {
-    opts.audioEl.srcObject = e.streams[0] ?? null;
-    opts.audioEl.play().catch(() => {});
-  };
-
-  const dc = pc.createDataChannel("oai-events");
+  const relay = opts.relay;
+  // Set by whichever transport is in use.
+  let sendRaw: (data: string) => void = () => {};
+  let closeTransport: () => void = () => {};
+  // After a barge-in, late audio deltas from the cancelled reply are dropped.
+  let dropAudio = false;
 
   let disposed = false;
   let assistantSpeaking = false;
@@ -290,9 +393,7 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
   // per item, never in a single "current segment" slot.
   const segmentTimes = new Map<string, { start: number; end?: number }>();
 
-  const send = (event: Record<string, unknown>) => {
-    if (dc.readyState === "open") dc.send(JSON.stringify(event));
-  };
+  const send = (event: Record<string, unknown>) => sendRaw(JSON.stringify(event));
 
   const setStatus = (s: RealtimeStatus) => {
     if (!disposed) cb.onStatus(s);
@@ -355,7 +456,12 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
           // Audio keeps playing after generation finishes, so a response may
           // no longer be active; cancelling then just returns an error.
           if (responseActive) send({ type: "response.cancel" });
-          send({ type: "output_audio_buffer.clear" });
+          if (relay) {
+            dropAudio = true;
+            relay.sink.clear();
+          } else {
+            send({ type: "output_audio_buffer.clear" });
+          }
         }
         break;
       }
@@ -393,6 +499,15 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
       }
       case "response.created": {
         responseActive = true;
+        dropAudio = false;
+        break;
+      }
+      case "response.output_audio.delta": {
+        if (relay && !dropAudio) relay.sink.write(ev.delta as string);
+        break;
+      }
+      case "response.output_audio.done": {
+        if (relay && !dropAudio) relay.sink.end();
         break;
       }
       case "response.done": {
@@ -442,53 +557,133 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
     }
   };
 
-  dc.onmessage = (e) => {
+  const onMessage = (data: string) => {
     try {
-      handleEvent(JSON.parse(e.data as string));
+      handleEvent(JSON.parse(data));
     } catch {
       // Non-JSON frames are not part of the protocol; ignore.
     }
   };
 
-  const opened = new Promise<void>((resolve, reject) => {
-    dc.onopen = () => resolve();
-    dc.onerror = () => reject(new Error("Data channel failed to open"));
-  });
-
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-      setStatus("disconnected");
-    }
-  };
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-
-  const res = await fetch("https://api.openai.com/v1/realtime/calls", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${opts.clientSecret}`,
-      "Content-Type": "application/sdp",
-    },
-    body: offer.sdp,
-  });
-  if (!res.ok) {
-    gated.dispose();
-    pc.close();
-    const body = await res.text().catch(() => "");
-    let detail = body.slice(0, 300);
+  if (relay) {
+    const ws = new WebSocket(relay.url);
+    sendRaw = (data) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
+    };
+    closeTransport = () => {
+      try {
+        ws.close();
+      } catch {}
+    };
+    // The relay applies the server-owned session config first; wait for it.
+    const ready = new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error("Interviewer took too long to connect")), 15_000);
+      ws.onmessage = (e) => {
+        const data = e.data as string;
+        if (data.includes('"session.updated"')) {
+          window.clearTimeout(timer);
+          resolve();
+        }
+        onMessage(data);
+      };
+      ws.onclose = (e) => {
+        window.clearTimeout(timer);
+        reject(new Error(e.reason || `Voice connection closed (${e.code})`));
+      };
+    });
     try {
-      const parsed = JSON.parse(body) as { error?: { message?: string; code?: string } };
-      if (parsed.error?.message) {
-        detail = parsed.error.code
-          ? `${parsed.error.code}: ${parsed.error.message}`
-          : parsed.error.message;
+      await ready;
+    } catch (err) {
+      gated.dispose();
+      closeTransport();
+      throw err;
+    }
+    ws.onclose = () => setStatus("disconnected");
+    // Mic → OpenAI as 24 kHz PCM16, ~100 ms per message.
+    let pendingMic: Float32Array[] = [];
+    let pendingMicLen = 0;
+    const startCapture = gated.capture((samples) => {
+      pendingMic.push(samples);
+      pendingMicLen += samples.length;
+      if (pendingMicLen < PCM_RATE / 10) return;
+      const out = new Float32Array(pendingMicLen);
+      let o = 0;
+      for (const part of pendingMic) {
+        out.set(part, o);
+        o += part.length;
       }
-    } catch {}
-    throw new Error(`OpenAI refused the call (${res.status})${detail ? ` — ${detail}` : ""}`);
+      pendingMic = [];
+      pendingMicLen = 0;
+      send({ type: "input_audio_buffer.append", audio: pcm16Base64(out) });
+    });
+    try {
+      await startCapture;
+    } catch (err) {
+      gated.dispose();
+      closeTransport();
+      throw new Error(`Could not start the microphone capture: ${err instanceof Error ? err.message : err}`);
+    }
+  } else {
+    const pc = new RTCPeerConnection();
+    pc.addTrack(gated.track, new MediaStream([gated.track]));
+    pc.ontrack = (e) => {
+      opts.audioEl.srcObject = e.streams[0] ?? null;
+      opts.audioEl.play().catch(() => {});
+    };
+    const dc = pc.createDataChannel("oai-events");
+    sendRaw = (data) => {
+      if (dc.readyState === "open") dc.send(data);
+    };
+    closeTransport = () => {
+      try {
+        dc.close();
+      } catch {}
+      pc.close();
+      opts.audioEl.srcObject = null;
+    };
+
+    dc.onmessage = (e) => onMessage(e.data as string);
+
+    const opened = new Promise<void>((resolve, reject) => {
+      dc.onopen = () => resolve();
+      dc.onerror = () => reject(new Error("Data channel failed to open"));
+    });
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        setStatus("disconnected");
+      }
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const res = await fetch("https://api.openai.com/v1/realtime/calls", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.clientSecret}`,
+        "Content-Type": "application/sdp",
+      },
+      body: offer.sdp,
+    });
+    if (!res.ok) {
+      gated.dispose();
+      pc.close();
+      const body = await res.text().catch(() => "");
+      let detail = body.slice(0, 300);
+      try {
+        const parsed = JSON.parse(body) as { error?: { message?: string; code?: string } };
+        if (parsed.error?.message) {
+          detail = parsed.error.code
+            ? `${parsed.error.code}: ${parsed.error.message}`
+            : parsed.error.message;
+        }
+      } catch {}
+      throw new Error(`OpenAI refused the call (${res.status})${detail ? ` — ${detail}` : ""}`);
+    }
+    await pc.setRemoteDescription({ type: "answer", sdp: await res.text() });
+    await opened;
   }
-  await pc.setRemoteDescription({ type: "answer", sdp: await res.text() });
-  await opened;
 
   setStatus("listening");
   responseActive = true;
@@ -511,12 +706,8 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
         cb.onUserTurn(turn);
       }
       disposed = true;
-      try {
-        dc.close();
-      } catch {}
-      pc.close();
+      closeTransport();
       gated.dispose();
-      opts.audioEl.srcObject = null;
     },
     injectNote: (text, respond = true) => {
       send({
@@ -528,6 +719,12 @@ export async function connectRealtime(opts: ConnectOptions): Promise<RealtimeHan
         },
       });
       if (respond) requestResponse();
+    },
+    setInterviewerSpeaking: (speaking) => {
+      if (!relay || disposed) return;
+      assistantSpeaking = speaking;
+      gated.setSpeaking(speaking);
+      setStatus(speaking ? "speaking" : "listening");
     },
   };
 }

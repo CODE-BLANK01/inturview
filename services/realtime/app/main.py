@@ -18,7 +18,12 @@ from .auth import bearer_token, verify_session_token
 from .config import get_settings
 from .metrics import is_usable_transcript, turn_metrics
 from .nextjs import NextJsInternal
+from .avatar import avatar_enabled, make_liveavatar_client, start_avatar_session, stop_avatar_session
 from .realtime import make_openai_client, mint_client_secret
+from .relay import run_relay
+
+# Turns can still arrive briefly after the cap while the interviewer wraps up.
+RELAY_GRACE_SEC = 180
 
 log = logging.getLogger("realtime")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -28,9 +33,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 async def lifespan(app: FastAPI):
     app.state.nextjs = NextJsInternal()
     app.state.openai = make_openai_client()
+    app.state.liveavatar = make_liveavatar_client()
     yield
     await app.state.nextjs.aclose()
     await app.state.openai.aclose()
+    await app.state.liveavatar.aclose()
 
 
 app = FastAPI(title="inturview realtime", lifespan=lifespan)
@@ -75,6 +82,100 @@ async def create_realtime_session(
         client_secret=minted["client_secret"],
         max_duration_sec=int(session["plan"]["maxDurationSec"]),
     )
+
+
+# --------------------------------------------------------------------------
+# Interviewer avatar (HeyGen LiveAvatar, LITE mode)
+# --------------------------------------------------------------------------
+
+
+class AvatarSessionResponse(BaseModel):
+    avatar_session_id: str
+    livekit_url: str
+    livekit_client_token: str
+    ws_url: str
+    max_session_duration: int | None = None
+
+
+class StopAvatarRequest(BaseModel):
+    avatar_session_id: str
+
+
+@app.post("/sessions/{session_id}/avatar", response_model=AvatarSessionResponse)
+async def create_avatar_session(
+    session_id: str,
+    authorization: str | None = Header(default=None),
+) -> AvatarSessionResponse:
+    """Optional face for the interviewer. The browser falls back to voice-only
+    on any error here, so the interview never depends on the avatar."""
+    verify_session_token(bearer_token(authorization), session_id)
+    if not avatar_enabled():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Avatar is not configured")
+
+    nextjs: NextJsInternal = app.state.nextjs
+    session = await nextjs.get_session(session_id)
+    if session.get("status") != "IN_PROGRESS":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Session is not in progress")
+
+    started = await start_avatar_session(app.state.liveavatar)
+    log.info("started avatar sid=%s avatar_sid=%s", session_id, started["avatar_session_id"])
+    return AvatarSessionResponse(**started)
+
+
+@app.post("/sessions/{session_id}/avatar/stop")
+async def end_avatar_session(
+    session_id: str,
+    body: StopAvatarRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, bool]:
+    verify_session_token(bearer_token(authorization), session_id)
+    if not avatar_enabled():
+        return {"stopped": False}
+    stopped = await stop_avatar_session(app.state.liveavatar, body.avatar_session_id)
+    log.info("stopped avatar sid=%s avatar_sid=%s ok=%s", session_id, body.avatar_session_id, stopped)
+    return {"stopped": stopped}
+
+
+# --------------------------------------------------------------------------
+# Voice relay — avatar interviews talk to OpenAI through this socket
+# --------------------------------------------------------------------------
+
+
+@app.websocket("/sessions/{session_id}/voice")
+async def voice_relay(
+    websocket: WebSocket,
+    session_id: str,
+    token: str = Query(...),
+) -> None:
+    try:
+        verify_session_token(token, session_id)
+    except HTTPException as exc:
+        await websocket.close(code=4401, reason=str(exc.detail))
+        return
+
+    nextjs: NextJsInternal = app.state.nextjs
+    try:
+        session = await nextjs.get_session(session_id)
+    except HTTPException as exc:
+        await websocket.close(code=4409, reason=str(exc.detail))
+        return
+    if session.get("status") != "IN_PROGRESS":
+        await websocket.close(code=4409, reason="Session is not in progress")
+        return
+
+    await websocket.accept()
+    log.info("voice relay open sid=%s", session_id)
+    max_seconds = int(session["plan"]["maxDurationSec"]) + RELAY_GRACE_SEC
+    try:
+        await run_relay(websocket, session_id, session["instructions"], max_seconds)
+    except Exception:
+        log.exception("voice relay failed sid=%s", session_id)
+    finally:
+        log.info("voice relay closed sid=%s", session_id)
+        try:
+            await websocket.close()
+        except (RuntimeError, WebSocketDisconnect):
+            pass  # the browser already closed it
 
 
 # --------------------------------------------------------------------------
