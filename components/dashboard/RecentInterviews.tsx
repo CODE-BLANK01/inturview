@@ -1,56 +1,82 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import {
+  ArrowUpRight,
+  ArrowRight,
+  Code2,
+  MessageSquare,
+  Network,
+  Users,
+  Video,
+  FileCheck2,
+} from "lucide-react";
 import type { DashboardData } from "@/lib/dashboard";
-import { DifficultyBadge, RecommendationBadge } from "@/components/Badges";
-import type { Difficulty, Debrief } from "@/lib/types";
 
-export function RecentInterviews({ items }: { items: DashboardData["recent"] }) {
+const modeIcons: Record<string, typeof Code2> = {
+  Coding: Code2,
+  "System design": Network,
+  Behavioral: Users,
+  "Recruiter screen": MessageSquare,
+  "Face-to-face": Video,
+};
+
+export function RecentInterviews({
+  items,
+}: {
+  items: DashboardData["recent"];
+}) {
   return (
-    <section className="panel p-5">
-      <div className="flex items-end justify-between mb-3">
-        <h2 className="font-semibold">Recent interviews</h2>
-        <Link href="/history" className="text-xs text-text-muted hover:text-text inline-flex items-center gap-0.5">
-          View all <ChevronRight className="h-3 w-3" />
+    <section className="studio-panel recent-panel">
+      <div className="section-heading">
+        <div>
+          <h2>Recent practice rounds</h2>
+        </div>
+        <Link href="/history" className="studio-text-link">
+          View all <ArrowUpRight size={14} />
         </Link>
       </div>
-
       {items.length === 0 ? (
-        <p className="text-sm text-text-dim py-2">
-          Nothing yet. Your completed interviews will show here.
-        </p>
+        <div className="dashboard-empty">
+          <span className="empty-icon">
+            <FileCheck2 size={25} />
+          </span>
+          <h3>Your first round starts here.</h3>
+          <p>
+            Complete an interview to see your feedback and track your progress.
+          </p>
+          <Link href="/recruiter-screen" className="studio-text-link">
+            Start your first round <ArrowRight size={15} />
+          </Link>
+        </div>
       ) : (
-        <ul className="divide-y divide-border -mx-5">
-          {items.map((iv) => (
-            <li key={iv.id}>
-              <Link
-                href={`/history/${iv.id}`}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-bg-surface transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium truncate">{iv.problem.title}</span>
-                    <DifficultyBadge value={iv.problem.difficulty as Difficulty} />
+        <ul className="recent-list">
+          {items.map((iv) => {
+            const Icon = modeIcons[iv.mode] ?? MessageSquare;
+            return (
+              <li key={iv.id}>
+                <Link href={iv.href} className="recent-row">
+                  <span className="recent-icon">
+                    <Icon size={19} />
+                  </span>
+                  <div className="recent-description">
+                    <strong>{iv.title}</strong>
+                    <span>
+                      {iv.mode}
+                      {iv.completedAt
+                        ? ` · ${iv.completedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+                        : ""}
+                    </span>
                   </div>
-                  <div className="mt-0.5 text-xs text-text-dim">
-                    {iv.problem.topic}
-                    {iv.completedAt
-                      ? ` · ${new Date(iv.completedAt).toLocaleDateString()}`
-                      : ""}
-                  </div>
-                </div>
-                <div className="text-right text-sm tabular-nums shrink-0">
-                  {iv.totalScore ?? "—"}
-                  <span className="text-text-dim">/25</span>
-                </div>
-                {iv.recommendation && (
-                  <RecommendationBadge
-                    value={iv.recommendation as Debrief["overall_recommendation"]}
-                  />
-                )}
-                <ChevronRight className="h-4 w-4 text-text-dim shrink-0" />
-              </Link>
-            </li>
-          ))}
+                  <span
+                    className={`recent-score ${iv.totalScore !== null && iv.totalScore >= 20 ? "is-strong" : ""}`}
+                  >
+                    {iv.totalScore ?? "—"}
+                    <small>/25</small>
+                  </span>
+                  <ArrowUpRight className="recent-arrow" size={17} />
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

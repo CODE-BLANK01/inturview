@@ -21,14 +21,20 @@
 
   --text-primary: 26 20 16; /* Inkwell */
   --text-secondary: 107 94 84; /* Clay */
-  --text-tertiary: 138 125 112; /* Whisper — darkened for parchment readability */
+  --text-tertiary: 117 103 91; /* Whisper — darkened for parchment readability */
   --text-secondary-inverse: 196 184 173; /* Muted text on inverse bands */
   --text-tertiary-inverse: 184 169 154; /* Eyebrows / dim text on inverse bands */
   --text-ember: 196 84 26; /* Ember — Instrument Serif italic only on landing */
+  --text-ember-inverse: 232 166 123;
   --text-inverse: 250 247 242;
 
   --border-base: 232 226 217; /* Linen */
   --border-strong: 212 201 190;
+
+  --brand-soft: 253 237 225;
+  --brand-ink: 139 67 33;
+  --brand-band: 38 28 22;
+  --art-paper: #fffaf2;
 
   --score-hire: 45 106 63;
   --score-hire-bg: 212 237 218;
@@ -52,16 +58,22 @@
   --text-secondary-inverse: 90 77 67; /* Muted text on inverse bands */
   --text-tertiary-inverse: 96 84 74; /* Eyebrows / dim text on inverse bands */
   --text-ember: 232 132 90; /* Ember warm — brighter for dark bg */
+  --text-ember-inverse: 154 61 24;
   --text-inverse: 14 12 10;
 
   --border-base: 30 26 22; /* Soot */
-  --border-strong: 42 35 24;
+  --border-strong: 65 53 43;
 
-  --score-hire: 58 125 82;
+  --brand-soft: 49 34 25;
+  --brand-ink: 232 166 123;
+  --brand-band: 31 23 18;
+  --art-paper: #f2e8da;
+
+  --score-hire: 100 170 119;
   --score-hire-bg: 26 61 40;
   --score-maybe: 196 154 58;
   --score-maybe-bg: 46 32 16;
-  --score-no: 196 80 80;
+  --score-no: 220 110 104;
   --score-no-bg: 46 16 16;
 
   color-scheme: dark;
@@ -185,8 +197,9 @@ body {
 .surface-inverse .t-eyebrow {
   color: rgb(var(--text-tertiary-inverse));
 }
-.surface-inverse .text-text-ember {
-  color: rgb(var(--text-ember));
+.surface-inverse .text-text-ember,
+.surface-inverse .t-italic {
+  color: rgb(var(--text-ember-inverse));
 }
 
 /* ---------------------------------------------------------------------------
@@ -204,6 +217,8 @@ body {
     font-family: "Cabinet Grotesk", system-ui, sans-serif;
     font-weight: 700;
     letter-spacing: -0.01em;
+    border-radius: 8px;
+    min-height: 40px;
   }
   .btn-primary {
     background: rgb(var(--bg-inverse));

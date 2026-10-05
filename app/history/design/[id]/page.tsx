@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { TopNav } from "@/components/TopNav";
+import { PracticeWorkspace } from "@/components/dashboard/PracticeWorkspace";
 import { DesignDebriefView } from "@/components/design/DesignDebriefView";
 import { DifficultyBadge, TopicBadge } from "@/components/Badges";
 import { requireUser } from "@/lib/auth";
@@ -12,7 +12,11 @@ import type { DesignDebrief } from "@/lib/designTypes";
 
 export const dynamic = "force-dynamic";
 
-export default async function DesignHistoryPage({ params }: { params: { id: string } }) {
+export default async function DesignHistoryPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const user = await requireUser();
   if (!user) return null;
 
@@ -48,9 +52,8 @@ export default async function DesignHistoryPage({ params }: { params: { id: stri
   const canvasSpec = describeCanvas(session.canvasJson);
 
   return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+    <PracticeWorkspace user={user}>
+      <div className="workspace-page w-full space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <Link
             href="/history"
@@ -75,7 +78,7 @@ export default async function DesignHistoryPage({ params }: { params: { id: stri
               className="badge"
               style={{
                 background: "rgb(var(--bg-inset))",
-                color: "rgb(var(--text-muted))",
+                color: "rgb(var(--text-secondary))",
                 borderColor: "rgb(var(--border-base))",
               }}
             >
@@ -94,7 +97,7 @@ export default async function DesignHistoryPage({ params }: { params: { id: stri
             Final whiteboard
           </h2>
           <pre className="text-xs text-text-muted whitespace-pre-wrap font-mono">
-{canvasSpec}
+            {canvasSpec}
           </pre>
         </section>
 
@@ -107,8 +110,8 @@ export default async function DesignHistoryPage({ params }: { params: { id: stri
         {followUp.length > 0 && (
           <TranscriptSection title="Follow-up" messages={followUp} />
         )}
-      </main>
-    </>
+      </div>
+    </PracticeWorkspace>
   );
 }
 
@@ -121,7 +124,9 @@ function TranscriptSection({
 }) {
   return (
     <section className="panel p-5">
-      <h2 className="text-sm uppercase tracking-wide text-text-dim mb-3">{title}</h2>
+      <h2 className="text-sm uppercase tracking-wide text-text-dim mb-3">
+        {title}
+      </h2>
       <ul className="space-y-3">
         {messages.map((m, i) => (
           <li key={i} className="text-sm">

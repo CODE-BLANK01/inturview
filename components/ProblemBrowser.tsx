@@ -48,14 +48,19 @@ export function ProblemBrowser() {
   const topicsWithCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const p of PROBLEMS) counts[p.topic] = (counts[p.topic] ?? 0) + 1;
-    return TOPICS.filter((t) => counts[t] > 0).map((t) => ({ name: t, count: counts[t] }));
+    return TOPICS.filter((t) => counts[t] > 0).map((t) => ({
+      name: t,
+      count: counts[t],
+    }));
   }, []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
       <aside className="space-y-4">
         <section className="panel p-4">
-          <h3 className="text-xs uppercase tracking-wide text-text-dim mb-3">Topics</h3>
+          <h3 className="text-xs uppercase tracking-wide text-text-dim mb-3">
+            Topics
+          </h3>
           <ul className="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
             <TopicItem
               label="All topics"
@@ -76,15 +81,18 @@ export function ProblemBrowser() {
         </section>
 
         <section className="panel p-4">
-          <h3 className="text-xs uppercase tracking-wide text-text-dim mb-3">Difficulty</h3>
+          <h3 className="text-xs uppercase tracking-wide text-text-dim mb-3">
+            Difficulty
+          </h3>
           <div className="flex flex-wrap gap-1.5">
             {DIFFICULTIES.map((d) => (
               <button
                 key={d}
+                aria-pressed={difficulty === d}
                 onClick={() => setDifficulty(d)}
                 className={`badge cursor-pointer ${
                   difficulty === d
-                    ? "border-accent bg-accent/15 text-accent"
+                    ? "border-accent bg-bg-inset text-text"
                     : "border-border text-text-muted hover:border-border-strong"
                 }`}
               >
@@ -100,6 +108,7 @@ export function ProblemBrowser() {
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" />
           <input
             className="input pl-9"
+            aria-label="Search problems by name"
             placeholder="Search problems by name…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -122,7 +131,10 @@ export function ProblemBrowser() {
                 >
                   <div className="w-5 shrink-0">
                     {stat ? (
-                      <Check className="h-5 w-5 text-easy" aria-label="Completed" />
+                      <Check
+                        className="h-5 w-5 text-easy"
+                        aria-label="Completed"
+                      />
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -169,9 +181,10 @@ function TopicItem({
     <li>
       <button
         onClick={onClick}
+        aria-pressed={active}
         className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center justify-between transition-colors ${
           active
-            ? "bg-accent/15 text-accent"
+            ? "bg-bg-inset text-text"
             : "text-text-muted hover:text-text hover:bg-bg-surface"
         }`}
       >

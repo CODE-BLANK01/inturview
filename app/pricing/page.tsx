@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/SiteFooter";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { TopNav } from "@/components/TopNav";
@@ -12,7 +13,8 @@ import {
 
 export const metadata = {
   title: "Pricing — inturview",
-  description: "Simple interview-practice pricing for candidates, with employer screening kept separate.",
+  description:
+    "Simple interview-practice pricing for candidates, with employer screening kept separate.",
 };
 
 export default function PricingPage() {
@@ -29,9 +31,10 @@ export default function PricingPage() {
               Pay for the <span className="t-italic">sprint</span>, not a year.
             </h1>
             <p className="t-body mt-8 max-w-2xl text-text-muted">
-              Start free and learn where your answers break down. When your interview
-              is close, unlock thirty focused days of unlimited practice. No team seats,
-              annual contract, or employer access to your practice history.
+              Start free and learn where your answers break down. When your
+              interview is close, unlock thirty focused days of unlimited
+              practice. No team seats, annual contract, or employer access to
+              your practice history.
             </p>
 
             <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl">
@@ -55,6 +58,7 @@ export default function PricingPage() {
             </Link>
           </div>
         </section>
+        <SiteFooter />
       </main>
     </>
   );
@@ -64,12 +68,16 @@ function CandidatePlanCard({ plan }: { plan: PlanDefinition }) {
   const isFree = plan.tier === "FREE";
 
   return (
-    <article className={`panel p-6 sm:p-7 flex flex-col ${isFree ? "border-text" : ""}`}>
+    <article
+      className={`panel p-6 sm:p-7 flex flex-col ${isFree ? "border-text" : ""}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="t-eyebrow">{plan.name}</p>
           <div className="mt-3 flex items-baseline gap-1">
-            <span className="t-display text-[38px] text-text leading-none">{priceLabel(plan)}</span>
+            <span className="t-display text-[38px] text-text leading-none">
+              {priceLabel(plan)}
+            </span>
             <span className="text-xs text-text-dim">{priceSuffix(plan)}</span>
           </div>
         </div>
@@ -78,11 +86,16 @@ function CandidatePlanCard({ plan }: { plan: PlanDefinition }) {
         </span>
       </div>
 
-      <p className="text-sm text-text-muted leading-relaxed mt-5">{plan.tagline}</p>
+      <p className="text-sm text-text-muted leading-relaxed mt-5">
+        {plan.tagline}
+      </p>
       <ul className="mt-6 space-y-2 text-sm text-text-muted flex-1">
         {plan.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2">
-            <Check className="h-4 w-4 mt-0.5 shrink-0 text-text-ember" aria-hidden />
+            <Check
+              className="h-4 w-4 mt-0.5 shrink-0 text-text-ember"
+              aria-hidden
+            />
             <span>{renderFeature(feature, plan)}</span>
           </li>
         ))}

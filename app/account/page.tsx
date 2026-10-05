@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { TopNav } from "@/components/TopNav";
+import { PracticeWorkspace } from "@/components/dashboard/PracticeWorkspace";
 import { AccountPage } from "@/components/account/AccountPage";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -64,9 +64,14 @@ export default async function AccountSettingsPage({
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
 
-  const plan = getEffectivePlan(profile.plan, profile.email, profile.planExpiresAt);
+  const plan = getEffectivePlan(
+    profile.plan,
+    profile.email,
+    profile.planExpiresAt,
+  );
   const checkoutStatus =
-    searchParams?.checkout === "success" || searchParams?.checkout === "canceled"
+    searchParams?.checkout === "success" ||
+    searchParams?.checkout === "canceled"
       ? searchParams.checkout
       : undefined;
   const checkoutSessionId =
@@ -86,14 +91,13 @@ export default async function AccountSettingsPage({
               status: "PAID",
             },
             select: { id: true },
-          })
+          }),
         )
       : false;
 
   return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
+    <PracticeWorkspace user={user} plan={plan}>
+      <div className="workspace-page mx-auto max-w-4xl">
         <header className="mb-10">
           <p className="t-eyebrow mb-2">Account</p>
           <h1 className="t-section-headline text-3xl sm:text-4xl">
@@ -124,9 +128,11 @@ export default async function AccountSettingsPage({
           }}
           planExpiresAt={profile.planExpiresAt?.toISOString() ?? null}
           checkoutStatus={checkoutStatus}
-          checkoutConfirmed={checkoutStatus === "success" ? checkoutConfirmed : undefined}
+          checkoutConfirmed={
+            checkoutStatus === "success" ? checkoutConfirmed : undefined
+          }
         />
-      </main>
-    </>
+      </div>
+    </PracticeWorkspace>
   );
 }

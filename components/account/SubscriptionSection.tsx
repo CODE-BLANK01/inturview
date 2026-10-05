@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
-import { CANDIDATE_PLANS, priceLabel, priceSuffix, renderFeature } from "@/lib/plans";
+import {
+  CANDIDATE_PLANS,
+  priceLabel,
+  priceSuffix,
+  renderFeature,
+} from "@/lib/plans";
 import { CheckoutButton } from "@/components/billing/CheckoutButton";
 import { SectionHeader } from "./ProfileSection";
 
@@ -24,7 +29,9 @@ interface SubscriptionSectionProps {
 
 function computeDaysUntilReset(): number {
   const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const next = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+  );
   return Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 86_400_000));
 }
 
@@ -37,7 +44,7 @@ export function SubscriptionSection({
 }: SubscriptionSectionProps) {
   const router = useRouter();
   const [checkoutNoticeVisible, setCheckoutNoticeVisible] = useState(
-    Boolean(checkoutStatus)
+    Boolean(checkoutStatus),
   );
   // Compute days-until-reset only after mount. Calling new Date() during
   // render would put a stamp in SSR HTML that could diff against the client's
@@ -69,14 +76,18 @@ export function SubscriptionSection({
     const url = new URL(window.location.href);
     url.searchParams.delete("checkout");
     url.searchParams.delete("session_id");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(
+      {},
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   };
 
   const upgradeCandidates = CANDIDATE_PLANS.filter(
     (candidate) =>
       candidate.priceCents !== null &&
       plan.priceCents !== null &&
-      candidate.priceCents > plan.priceCents
+      candidate.priceCents > plan.priceCents,
   );
   const meters = [
     {
@@ -173,7 +184,9 @@ export function SubscriptionSection({
                 {priceLabel(plan)}
               </span>
               {priceSuffix(plan) && (
-                <span className="text-xs text-text-dim">{priceSuffix(plan)}</span>
+                <span className="text-xs text-text-dim">
+                  {priceSuffix(plan)}
+                </span>
               )}
             </div>
             <p className="text-sm text-text-muted mt-2 max-w-md leading-snug">
@@ -194,9 +207,7 @@ export function SubscriptionSection({
 
           <CheckoutButton
             label={
-              plan.tier === "PRO"
-                ? "Extend 30 days — $19"
-                : "Get 30 days — $19"
+              plan.tier === "PRO" ? "Extend 30 days — $19" : "Get 30 days — $19"
             }
             className="btn btn-primary text-xs"
           />
@@ -250,7 +261,7 @@ export function SubscriptionSection({
                 >
                   <div className="min-w-0">
                     <span className="text-text font-medium">{p.name}</span>
-                    <span className="text-text-muted">  ·  {p.tagline}</span>
+                    <span className="text-text-muted"> · {p.tagline}</span>
                   </div>
                   <span className="t-data text-text-muted text-xs shrink-0">
                     {priceLabel(p)}
@@ -282,9 +293,12 @@ function UsageMeter({
   daysUntilReset: number | null;
 }) {
   const unlimited = limit === null;
-  const pct = unlimited ? 100 : Math.min(100, Math.round((used / (limit || 1)) * 100));
+  const pct = unlimited
+    ? 100
+    : Math.min(100, Math.round((used / (limit || 1)) * 100));
   const atLimit = !unlimited && used >= (limit ?? 0);
-  const warning = !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
+  const warning =
+    !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
 
   return (
     <div>
@@ -301,8 +315,15 @@ function UsageMeter({
       </div>
       <div className="h-[6px] w-full overflow-hidden rounded-full bg-bg-inset">
         <div
+          role="img"
           className={`h-full transition-[width] duration-300 ${
-            unlimited ? "bg-easy/40" : atLimit ? "bg-hard" : warning ? "bg-medium" : "bg-text"
+            unlimited
+              ? "bg-text/30"
+              : atLimit
+                ? "bg-hard"
+                : warning
+                  ? "bg-medium"
+                  : "bg-text"
           }`}
           style={{ width: `${pct}%` }}
           aria-label={`${label} ${unlimited ? "unlimited" : `${pct}% used`}`}
@@ -310,7 +331,8 @@ function UsageMeter({
       </div>
       {!unlimited && daysUntilReset !== null && (
         <p className="text-[11px] text-text-dim mt-1">
-          {atLimit ? "Cap reached" : `${Math.max(0, limit - used)} left`} · resets in {daysUntilReset}d
+          {atLimit ? "Cap reached" : `${Math.max(0, limit - used)} left`} ·
+          resets in {daysUntilReset}d
         </p>
       )}
     </div>

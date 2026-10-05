@@ -1,23 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Infinity as InfinityIcon } from "lucide-react";
 import type { PlanDefinition } from "@/lib/plans";
-import { priceLabel, priceSuffix } from "@/lib/plans";
-
-interface PlanUsageProps {
-  plan: PlanDefinition;
-  interviewsThisMonth: number;
-  designSessionsThisMonth: number;
-  behavioralSessionsThisMonth: number;
-  recruiterSessionsThisMonth: number;
-}
-
-function daysUntilReset(): number {
-  const now = new Date();
-  const nextMonth = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
-  );
-  return Math.max(1, Math.ceil((nextMonth.getTime() - now.getTime()) / 86_400_000));
-}
 
 export function PlanUsage({
   plan,
@@ -25,11 +8,16 @@ export function PlanUsage({
   designSessionsThisMonth,
   behavioralSessionsThisMonth,
   recruiterSessionsThisMonth,
-}: PlanUsageProps) {
-  const resetDays = daysUntilReset();
+}: {
+  plan: PlanDefinition;
+  interviewsThisMonth: number;
+  designSessionsThisMonth: number;
+  behavioralSessionsThisMonth: number;
+  recruiterSessionsThisMonth: number;
+}) {
   const meters = [
     {
-      label: "Recruiter screen",
+      label: "Recruiter",
       used: recruiterSessionsThisMonth,
       limit: plan.recruiterSessionsPerMonth,
     },
@@ -44,99 +32,53 @@ export function PlanUsage({
       limit: plan.interviewsPerMonth,
     },
     {
-      label: "System design",
+      label: "Design",
       used: designSessionsThisMonth,
       limit: plan.designSessionsPerMonth,
     },
   ];
-  const hasMonthlyCaps = meters.some((meter) => meter.limit !== null);
-
+  const capped = meters.some((m) => m.limit !== null);
   return (
-    <section className="panel p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="t-eyebrow">Plan</span>
-          <span
-            className="badge"
-            style={{
-              background: "rgb(var(--bg-inverse))",
-              color: "rgb(var(--text-inverse))",
-              borderColor: "rgb(var(--bg-inverse))",
-              fontWeight: 700,
-            }}
-          >
-            {plan.name}
-          </span>
-          <span className="text-xs text-text-dim tabular-nums">
-            {priceLabel(plan)}
-            {priceSuffix(plan)}
-          </span>
-          {hasMonthlyCaps && (
-            <span className="text-xs text-text-dim">· resets in {resetDays}d</span>
-          )}
-        </div>
-        {plan.tier === "FREE" && <UpgradeCta />}
+    <section className="plan-strip" aria-label="Your plan and monthly usage">
+      <div className="plan-strip-heading">
+        <span className="plan-status-dot" />
+        <strong>{plan.name}</strong>
+        <span>{capped ? "This month’s practice" : "Unlimited practice"}</span>
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+      <div className="plan-strip-meters">
         {meters.map((m) => (
-          <Meter key={m.label} label={m.label} used={m.used} limit={m.limit} />
+          <span
+            key={m.label}
+            title={
+              m.limit === null
+                ? `${m.used} ${m.label.toLowerCase()} sessions this month, unlimited access`
+                : `${m.used} of ${m.limit} sessions used this month`
+            }
+          >
+            <span>{m.label}</span>
+            <strong
+              className={
+                m.limit !== null && m.used >= m.limit ? "text-hard" : ""
+              }
+            >
+              {m.used}
+              <span className="plan-denominator">
+                {" "}
+                /{" "}
+                {m.limit === null ? (
+                  <InfinityIcon size={13} aria-label="unlimited" />
+                ) : (
+                  m.limit
+                )}
+              </span>
+            </strong>
+          </span>
         ))}
       </div>
+      <Link href="/account" className="studio-text-link">
+        {plan.tier === "FREE" && capped ? "Get more practice" : "Manage plan"}
+        <ArrowUpRight size={14} />
+      </Link>
     </section>
-  );
-}
-
-function Meter({
-  label,
-  used,
-  limit,
-}: {
-  label: string;
-  used: number;
-  limit: number | null;
-}) {
-  const unlimited = limit === null;
-  const pct = unlimited ? 0 : Math.min(100, Math.round((used / (limit || 1)) * 100));
-  const atLimit = !unlimited && used >= (limit ?? 0);
-  const warning = !unlimited && limit !== null && limit > 0 && used / limit >= 0.8;
-  const bar = atLimit ? "bg-hard" : warning ? "bg-medium" : "bg-text";
-
-  return (
-    <div>
-      <div className="flex items-baseline justify-between text-sm mb-1.5">
-        <span className="text-text-muted">{label}</span>
-        <span className="t-data tabular-nums">
-          {used}
-          {unlimited ? (
-            <span className="text-text-dim text-xs"> · unlimited</span>
-          ) : (
-            <>
-              <span className="text-text-dim"> / {limit}</span>
-            </>
-          )}
-        </span>
-      </div>
-      <div className="h-[6px] w-full overflow-hidden rounded-full bg-bg-inset">
-        {unlimited ? (
-          <div className="h-full bg-easy/40" style={{ width: "100%" }} />
-        ) : (
-          <div
-            className={`h-full transition-[width] duration-300 ${bar}`}
-            style={{ width: `${pct}%` }}
-            aria-label={`${label} ${pct}% used`}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function UpgradeCta() {
-  return (
-    <Link href="/account" className="btn text-xs">
-      Get 30 days
-      <ArrowUpRight className="h-3 w-3" />
-    </Link>
   );
 }

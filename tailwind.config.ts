@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
-  darkMode: ['selector', '[data-theme="dark"]'],
+  darkMode: ["selector", '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
@@ -13,6 +13,7 @@ const config: Config = {
           DEFAULT: "rgb(var(--bg-page) / <alpha-value>)",
           elevated: "rgb(var(--bg-surface) / <alpha-value>)",
           surface: "rgb(var(--bg-inset) / <alpha-value>)",
+          inset: "rgb(var(--bg-inset) / <alpha-value>)",
           inverse: "rgb(var(--bg-inverse) / <alpha-value>)",
         },
         border: {

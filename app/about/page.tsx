@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/SiteFooter";
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 
@@ -54,7 +55,7 @@ export default function AboutPage() {
         <Beliefs />
         <WhatWeBuilt />
         <AboutCta />
-        <AboutFooter />
+        <SiteFooter />
       </main>
     </>
   );
@@ -73,10 +74,11 @@ function AboutHero() {
         </h1>
 
         <p className="t-body mt-8 max-w-[520px] text-text-muted">
-          inturview is an AI interview simulator for software engineers preparing for
-          real loops. Not another problem bank — a place to perform under structured
-          evaluation, get scored on how you actually show up, and do it again until
-          real interviews stop feeling like a surprise.
+          inturview is an AI interview simulator for software engineers
+          preparing for real loops. Not another problem bank — a place to
+          perform under structured evaluation, get scored on how you actually
+          show up, and do it again until real interviews stop feeling like a
+          surprise.
         </p>
       </div>
     </section>
@@ -96,24 +98,26 @@ function Origin() {
 
         <div className="mt-10 max-w-2xl space-y-6">
           <p className="t-body text-[15px] text-text-muted">
-            We kept seeing the same pattern: engineers who could solve any problem on
-            LeetCode, then go silent when asked to explain their approach out loud.
-            Candidates who nailed the optimal solution and still got a no-hire — because
-            they couldn&apos;t articulate complexity, skipped the walkthrough, or lost
-            composure under follow-up pressure.
+            We kept seeing the same pattern: engineers who could solve any
+            problem on LeetCode, then go silent when asked to explain their
+            approach out loud. Candidates who nailed the optimal solution and
+            still got a no-hire — because they couldn&apos;t articulate
+            complexity, skipped the walkthrough, or lost composure under
+            follow-up pressure.
           </p>
           <p className="t-body text-[15px] text-text-muted">
-            Mock interviews with friends helped a little. They were too nice. Too
-            forgiving. Nobody wrote a debrief. Nobody scored communication on a rubric.
-            Nobody simulated what it feels like when the room goes quiet and you realize
-            you&apos;ve been coding for four minutes without saying a word.
+            Mock interviews with friends helped a little. They were too nice.
+            Too forgiving. Nobody wrote a debrief. Nobody scored communication
+            on a rubric. Nobody simulated what it feels like when the room goes
+            quiet and you realize you&apos;ve been coding for four minutes
+            without saying a word.
           </p>
           <p
             className="t-body text-[15px] text-text-inverse"
             style={{ fontWeight: 500, lineHeight: 1.5 }}
           >
-            inturview exists to close that gap — with practice that feels real and
-            feedback that tells the truth.
+            inturview exists to close that gap — with practice that feels real
+            and feedback that tells the truth.
           </p>
         </div>
       </div>
@@ -172,16 +176,18 @@ function WhatWeBuilt() {
         </h2>
 
         <p className="t-body mt-8 max-w-[500px] text-text-muted">
-          Every mode follows the same philosophy: simulate the real thing, evaluate
-          against a rubric, and give you evidence — not vibes — so you know exactly
-          what to fix before your next loop.
+          Every mode follows the same philosophy: simulate the real thing,
+          evaluate against a rubric, and give you evidence — not vibes — so you
+          know exactly what to fix before your next loop.
         </p>
 
         <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 gap-px bg-border border border-border rounded-xl overflow-hidden">
           {MODES.map((m) => (
             <div key={m.label} className="bg-bg p-6 sm:p-8">
               <p className="t-eyebrow text-text-ember">{m.label}</p>
-              <p className="t-body-light text-[15px] mt-3 text-text-muted">{m.body}</p>
+              <p className="t-body-light text-[15px] mt-3 text-text-muted">
+                {m.body}
+              </p>
             </div>
           ))}
         </div>
@@ -210,7 +216,10 @@ function AboutCta() {
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link href="/signup" className="btn btn-primary text-[15px] px-8 py-4">
+          <Link
+            href="/signup"
+            className="btn btn-primary text-[15px] px-8 py-4"
+          >
             Start your first session
             <span aria-hidden>↗</span>
           </Link>
@@ -220,38 +229,5 @@ function AboutCta() {
         </div>
       </div>
     </section>
-  );
-}
-
-function AboutFooter() {
-  return (
-    <footer>
-      <div className="mx-auto max-w-6xl px-6 sm:px-12 py-10 text-center">
-        <nav className="mb-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-          <Link
-            href="/"
-            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
-          >
-            Home
-          </Link>
-          <Link
-            href="/about"
-            className="t-eyebrow text-text transition-colors duration-150"
-            aria-current="page"
-          >
-            About
-          </Link>
-          <Link
-            href="/contact"
-            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
-          >
-            Contact
-          </Link>
-        </nav>
-        <p className="t-eyebrow">
-          Inturview · NeetCode 150 · Made for candidates who are serious
-        </p>
-      </div>
-    </footer>
   );
 }

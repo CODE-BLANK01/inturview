@@ -1,3 +1,4 @@
+import { AuthShell } from "@/components/AuthShell";
 import { redirect } from "next/navigation";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { requireUser } from "@/lib/auth";
@@ -19,8 +20,11 @@ export default async function OnboardingPage() {
   if (row.onboardingCompletedAt) redirect("/dashboard");
 
   return (
-    <main className="min-h-screen flex items-start justify-center px-4 py-12 sm:py-16">
-      <OnboardingWizard initialName={row?.name ?? user.name} email={user.email} />
-    </main>
+    <AuthShell>
+      <OnboardingWizard
+        initialName={row?.name ?? user.name}
+        email={user.email}
+      />
+    </AuthShell>
   );
 }

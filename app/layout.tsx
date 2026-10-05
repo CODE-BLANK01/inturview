@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/components/SessionProvider";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/ThemeProvider";
 import "./globals.css";
+import "./studio.css";
 
 export const metadata: Metadata = {
   title: "inturview — practice recruiter screens and interviews",
@@ -9,7 +10,11 @@ export const metadata: Metadata = {
     "Practice recruiter screens, behavioral answers, coding, and system design with an AI interviewer. Get follow-up questions and a structured debrief.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

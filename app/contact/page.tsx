@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/SiteFooter";
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 import { ContactForm } from "@/components/ContactForm";
@@ -17,7 +18,7 @@ export default function ContactPage() {
       <main>
         <ContactHero />
         <ContactFormSection />
-        <ContactFooter />
+        <SiteFooter />
       </main>
     </>
   );
@@ -36,9 +37,9 @@ function ContactHero() {
         </h1>
 
         <p className="t-body mt-8 max-w-[520px] text-text-muted">
-          We read every message. Whether you hit a bug, have a product idea, want to
-          partner, or need help getting started — write to us and we&apos;ll get back
-          to you.
+          We read every message. Whether you hit a bug, have a product idea,
+          want to partner, or need help getting started — write to us and
+          we&apos;ll get back to you.
         </p>
 
         <p className="t-body mt-6">
@@ -68,14 +69,23 @@ function ContactFormSection() {
               working <span className="t-italic">through</span>.
             </h2>
             <p className="t-body-light text-[15px] mt-6 max-w-sm text-text-muted">
-              Include as much detail as you can — error messages, session links, or
-              what you were trying to practice. It helps us respond faster.
+              Include as much detail as you can — error messages, session links,
+              or what you were trying to practice. It helps us respond faster.
             </p>
 
             <ul className="mt-10 space-y-4">
-              <ContactNote label="Response time" value="Within a few business days" />
-              <ContactNote label="Support" value="Account, billing, and product help" />
-              <ContactNote label="Feedback" value="Feature requests and honest critiques welcome" />
+              <ContactNote
+                label="Response time"
+                value="Within a few business days"
+              />
+              <ContactNote
+                label="Support"
+                value="Account, billing, and product help"
+              />
+              <ContactNote
+                label="Feedback"
+                value="Feature requests and honest critiques welcome"
+              />
             </ul>
           </div>
 
@@ -92,38 +102,5 @@ function ContactNote({ label, value }: { label: string; value: string }) {
       <p className="t-eyebrow text-text-dim">{label}</p>
       <p className="t-body-light text-[15px] mt-1 text-text-muted">{value}</p>
     </li>
-  );
-}
-
-function ContactFooter() {
-  return (
-    <footer>
-      <div className="mx-auto max-w-6xl px-6 sm:px-12 py-10 text-center">
-        <nav className="mb-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-          <Link
-            href="/"
-            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
-          >
-            Home
-          </Link>
-          <Link
-            href="/about"
-            className="t-eyebrow text-text-dim hover:text-text transition-colors duration-150"
-          >
-            About
-          </Link>
-          <Link
-            href="/contact"
-            className="t-eyebrow text-text transition-colors duration-150"
-            aria-current="page"
-          >
-            Contact
-          </Link>
-        </nav>
-        <p className="t-eyebrow">
-          Inturview · NeetCode 150 · Made for candidates who are serious
-        </p>
-      </div>
-    </footer>
   );
 }

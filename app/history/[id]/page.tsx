@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
-import { TopNav } from "@/components/TopNav";
+import { PracticeWorkspace } from "@/components/dashboard/PracticeWorkspace";
 import { DebriefView } from "@/components/DebriefView";
 import { DifficultyBadge, TopicBadge } from "@/components/Badges";
 import { requireUser } from "@/lib/auth";
@@ -11,7 +11,11 @@ import type { Difficulty, Debrief } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function HistoryDetailPage({ params }: { params: { id: string } }) {
+export default async function HistoryDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const user = await requireUser();
   if (!user) return null;
 
@@ -31,7 +35,12 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
       completedAt: true,
       user: { select: { email: true, name: true } },
       problem: {
-        select: { title: true, difficulty: true, topic: true, leetcodeUrl: true },
+        select: {
+          title: true,
+          difficulty: true,
+          topic: true,
+          leetcodeUrl: true,
+        },
       },
       messages: {
         orderBy: { createdAt: "asc" },
@@ -58,14 +67,13 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
     ? isAbandoned
       ? `Ended early ${new Date(interview.completedAt).toLocaleString()}`
       : isCompleted
-      ? `Completed ${new Date(interview.completedAt).toLocaleString()}`
-      : new Date(interview.completedAt).toLocaleString()
+        ? `Completed ${new Date(interview.completedAt).toLocaleString()}`
+        : new Date(interview.completedAt).toLocaleString()
     : "In progress";
 
   return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-6xl px-4 py-6">
+    <PracticeWorkspace user={user}>
+      <div className="workspace-page w-full">
         {viewingOther && (
           <div className="mb-4 panel border-hard/40 bg-hard/5 px-4 py-2.5 flex items-center justify-between text-sm">
             <span className="text-hard">
@@ -90,7 +98,9 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
           <div
             className="text-xs"
             style={{
-              color: isAbandoned ? "rgb(var(--text-muted))" : "rgb(var(--text-tertiary))",
+              color: isAbandoned
+                ? "rgb(var(--text-muted))"
+                : "rgb(var(--text-tertiary))",
             }}
           >
             {statusLabel}
@@ -110,11 +120,13 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
               aria-hidden
             />
             <div className="text-sm">
-              <p className="text-text font-medium">Session ended without a debrief.</p>
+              <p className="text-text font-medium">
+                Session ended without a debrief.
+              </p>
               <p className="text-text-muted mt-0.5 text-xs leading-relaxed">
-                You ended this session before submitting your solution, so there&apos;s
-                no scorecard. The transcript and any code you wrote are below — pick the
-                problem again from{" "}
+                You ended this session before submitting your solution, so
+                there&apos;s no scorecard. The transcript and any code you wrote
+                are below — pick the problem again from{" "}
                 <Link
                   href="/problems"
                   className="underline underline-offset-2 hover:text-text"
@@ -129,7 +141,9 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
 
         <header className="panel p-5 mb-6">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <DifficultyBadge value={interview.problem.difficulty as Difficulty} />
+            <DifficultyBadge
+              value={interview.problem.difficulty as Difficulty}
+            />
             <TopicBadge value={interview.problem.topic} />
             {interview.problem.leetcodeUrl && (
               <a
@@ -205,8 +219,8 @@ export default async function HistoryDetailPage({ params }: { params: { id: stri
             </div>
           </section>
         )}
-      </main>
-    </>
+      </div>
+    </PracticeWorkspace>
   );
 }
 
@@ -217,7 +231,7 @@ function Bubble({ role, text }: { role: string; text: string }) {
       <div
         className={`max-w-[85%] whitespace-pre-wrap text-sm rounded-lg px-3 py-2 ${
           isUser
-            ? "bg-accent text-white"
+            ? "bg-accent text-white dark:text-text-inverse"
             : "bg-bg-surface border border-border text-text"
         }`}
       >

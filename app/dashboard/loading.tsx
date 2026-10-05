@@ -1,108 +1,52 @@
-import { TopNav } from "@/components/TopNav";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Brand } from "@/components/Brand";
 
 export default function DashboardLoading() {
   return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
-        <header className="mb-8 space-y-2">
-          <Skeleton h={34} className="w-72 max-w-full" />
-          <Skeleton h={16} className="w-96 max-w-full" />
-        </header>
-
-        <div className="space-y-6">
-          {/* Stat strip */}
-          <div className="panel flex divide-x divide-border overflow-hidden">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="p-5 flex-1 min-w-[140px] space-y-2">
-                <Skeleton h={10} className="w-20" />
-                <Skeleton h={28} className="w-16" />
-                <Skeleton h={10} className="w-28" />
+    <div
+      className="workspace"
+      aria-busy="true"
+      aria-label="Loading your dashboard"
+    >
+      <aside className="workspace-sidebar" aria-hidden="true">
+        <div className="workspace-brand">
+          <Brand />
+        </div>
+        <div className="mt-14 space-y-5 px-3">
+          {Array.from({ length: 7 }, (_, i) => (
+            <div key={i} className="skeleton h-7 w-full" />
+          ))}
+        </div>
+      </aside>
+      <div className="workspace-body">
+        <div className="workspace-topbar">
+          <Brand compact />
+        </div>
+        <div className="workspace-main">
+          <span role="status" className="sr-only">
+            Getting your practice space ready…
+          </span>
+          <div aria-hidden="true">
+            <div className="dashboard-welcome">
+              <div className="space-y-4 py-4">
+                <div className="skeleton h-4 w-32" />
+                <div className="skeleton h-9 w-3/4" />
+                <div className="skeleton h-4 w-full max-w-sm" />
               </div>
-            ))}
-          </div>
-
-          {/* Resume row */}
-          <div className="panel p-5">
-            <div className="flex items-center gap-4">
-              <Skeleton h={40} w={40} className="rounded-md" />
-              <div className="flex-1 space-y-2">
-                <Skeleton h={10} className="w-20" />
-                <Skeleton h={20} className="w-72" />
-                <Skeleton h={10} className="w-40" />
-              </div>
-              <Skeleton h={36} w={140} />
+              <div className="skeleton h-36" />
             </div>
-          </div>
-
-          {/* Practice mode cards */}
-          <div>
-            <Skeleton h={12} className="w-32 mb-3" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="panel p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Skeleton h={36} w={36} />
-                    <Skeleton h={20} w={70} className="rounded-full" />
-                  </div>
-                  <Skeleton h={16} className="w-32" />
-                  <Skeleton h={12} className="w-full" />
-                  <Skeleton h={12} className="w-3/4" />
-                </div>
+            <div className="skeleton h-5 w-48 mb-4" />
+            <div className="practice-cards">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="skeleton h-40" />
               ))}
             </div>
-          </div>
-
-          {/* Two-column bottom */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-            <div className="space-y-6 min-w-0">
-              <div className="panel p-5 space-y-3">
-                <Skeleton h={16} className="w-40" />
-                <Skeleton h={10} className="w-64" />
-                <div className="space-y-2.5 pt-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_72px_56px] gap-3 items-center">
-                      <div className="space-y-1.5">
-                        <Skeleton h={12} className="w-32" />
-                        <Skeleton h={6} className="w-full" />
-                      </div>
-                      <Skeleton h={10} className="w-12 justify-self-end" />
-                      <Skeleton h={10} className="w-12 justify-self-end" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel p-5 space-y-3">
-                <Skeleton h={16} className="w-40" />
-                <div className="space-y-2 pt-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 py-1.5">
-                      <Skeleton h={14} className="flex-1" />
-                      <Skeleton h={10} w={60} />
-                      <Skeleton h={20} w={70} className="rounded-full" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="panel p-5 space-y-3">
-              <Skeleton h={16} className="w-32" />
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3 py-1">
-                  <Skeleton h={32} w={32} />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton h={12} className="w-3/4" />
-                    <Skeleton h={10} className="w-full" />
-                  </div>
-                </div>
-              ))}
+            <div className="dashboard-detail-grid">
+              <div className="skeleton h-80" />
+              <div className="skeleton h-80" />
             </div>
           </div>
         </div>
-      </main>
-    </>
+      </div>
+    </div>
   );
 }
