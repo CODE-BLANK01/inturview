@@ -24,6 +24,7 @@ npm install
 Add these to `.env.local` (see `.env.local.example`):
 
 ```
+NEXT_PUBLIC_FACE_TO_FACE_ENABLED=true
 REALTIME_SERVICE_SECRET=<32+ random chars — openssl rand -base64 32>
 NEXT_PUBLIC_REALTIME_SERVICE_URL=http://localhost:8000
 FACE_TO_FACE_MAX_MINUTES=20
@@ -55,6 +56,8 @@ Edit `services/realtime/.env`:
 ```
 OPENAI_API_KEY=sk-...
 REALTIME_SERVICE_SECRET=<the SAME value as in .env.local>
+NEXTJS_INTERNAL_URL=http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Start it **from `services/realtime`** (not from inside `app/` — the package uses relative imports and reads `.env` from the current directory):
@@ -70,6 +73,30 @@ You should see `Application startup complete.` and `curl http://localhost:8000/h
 Sign in, open **Practice → Face-to-face** (or `/face-to-face`), enable camera & mic, wait for "Loading camera tracking…" to finish (first load downloads ~9 MB of MediaPipe models), click **Calibrate (2s)** while looking straight at the camera lens, pick a track and level, then **Start interview**. Within a few seconds the status pill should read *Listening* and the interviewer greets you out loud. Use headphones if you can, and keep your shoulders in frame.
 
 Never commit `.env.local` or `services/realtime/.env` — both hold secrets and are git-ignored.
+
+### 1d. Optional HeyGen interviewer video
+
+The avatar is available in face-to-face interviews. It renders the interviewer's face and lip-syncs the OpenAI voice; it does not change the interview questions or scoring.
+
+Enable it locally in the root `.env.local`:
+
+```dotenv
+NEXT_PUBLIC_FACE_TO_FACE_ENABLED=true
+NEXT_PUBLIC_FACE_TO_FACE_AVATAR_ENABLED=true
+```
+
+Set these in **`services/realtime/.env`**:
+
+```dotenv
+LIVEAVATAR_API_KEY=<your LiveAvatar API key>
+LIVEAVATAR_SANDBOX=true
+```
+
+Use a key from the LiveAvatar dashboard. The Python service does not read the root `.env.local`. Sandbox mode selects the test avatar automatically, so `LIVEAVATAR_AVATAR_ID` can stay empty. The sandbox trial lasts 60 seconds, after which the interview continues with voice only. For a longer avatar session, set `LIVEAVATAR_SANDBOX=false` and a valid `LIVEAVATAR_AVATAR_ID`; the provider account's limits apply.
+
+Restart both servers after changing environment variables, then follow the camera, calibration, and **Start interview** steps above. Keep both public feature flags `false` in production while face-to-face is on the waitlist.
+
+If port 8000 is already occupied, start the service with `--port 8001` and set `NEXT_PUBLIC_REALTIME_SERVICE_URL=http://localhost:8001` in the root `.env.local`. `NEXTJS_INTERNAL_URL` must point to the actual Next.js port, and `ALLOWED_ORIGINS` must include the exact browser origin (including its port). Check `/health` on the chosen realtime port before starting an interview.
 
 ---
 
@@ -90,6 +117,8 @@ Finish ─▶ POST /api/conversation/debrief ─▶ Next.js ─▶ Claude scores
 ```
 
 **Why two backends.** Next.js on Vercel can't hold long-lived WebSockets and has a ~4.5 MB body limit, and the OpenAI key must never reach the browser. So FastAPI mints a short-lived *ephemeral* key with the interviewer prompt baked in, and the browser talks to OpenAI directly over WebRTC (lowest latency; OpenAI handles echo cancellation and barge-in). Next.js keeps everything it already owns — auth, plan caps, Prisma, the Claude debrief.
+
+**Avatar transport.** When the avatar connects, microphone audio goes through FastAPI's `/sessions/{id}/voice` WebSocket relay to OpenAI. The returned PCM audio is sent to LiveAvatar's command WebSocket, and the browser receives the rendered video and voice through LiveKit. FastAPI creates and stops the avatar through `/sessions/{id}/avatar` and `/sessions/{id}/avatar/stop`; the LiveAvatar API key stays on the server. If the avatar cannot connect, the interview starts voice-only over WebRTC. If it ends during an interview, the relay continues and the browser plays the voice directly.
 
 **Trust boundary.** The browser gets a 15-minute HS256 JWT bound to one session id (`lib/faceToFaceToken.ts`, verified by `services/realtime/app/auth.py` with the shared `REALTIME_SERVICE_SECRET`). FastAPI → Next.js calls carry the same secret in an `x-service-secret` header. FastAPI, not the browser, is the writer of record for transcript turns.
 
