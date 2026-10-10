@@ -79,7 +79,7 @@ export function DashboardShell({
   const sidebar = (
     <>
       <Link href="/dashboard" className="workspace-brand" onClick={closeMenu}>
-        <Brand />
+        <Brand wordmarkOnly />
       </Link>
       <div className="workspace-label">Your interview workspace</div>
       <nav
@@ -224,7 +224,7 @@ export function DashboardShell({
               className="workspace-mobile-brand"
               aria-label="inturview home"
             >
-              <Brand compact />
+              <Brand compact symbolOnly />
             </Link>
             <span className="workspace-breadcrumb">
               Your workspace <ChevronRight size={13} />

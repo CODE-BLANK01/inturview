@@ -9,7 +9,7 @@ export default function DashboardLoading() {
     >
       <aside className="workspace-sidebar" aria-hidden="true">
         <div className="workspace-brand">
-          <Brand />
+          <Brand wordmarkOnly />
         </div>
         <div className="mt-14 space-y-5 px-3">
           {Array.from({ length: 7 }, (_, i) => (
@@ -19,7 +19,9 @@ export default function DashboardLoading() {
       </aside>
       <div className="workspace-body">
         <div className="workspace-topbar">
-          <Brand compact />
+          <span className="workspace-mobile-brand">
+            <Brand compact symbolOnly />
+          </span>
         </div>
         <div className="workspace-main">
           <span role="status" className="sr-only">

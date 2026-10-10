@@ -10,7 +10,7 @@ export default function ProblemsLoading() {
     >
       <aside className="workspace-sidebar" aria-hidden="true">
         <div className="workspace-brand">
-          <Brand />
+          <Brand wordmarkOnly />
         </div>
         <div className="mt-14 space-y-5 px-3">
           {Array.from({ length: 7 }, (_, i) => (
@@ -20,7 +20,9 @@ export default function ProblemsLoading() {
       </aside>
       <div className="workspace-body">
         <div className="workspace-topbar">
-          <Brand compact />
+          <span className="workspace-mobile-brand">
+            <Brand compact symbolOnly />
+          </span>
         </div>
         <main className="workspace-main">
           <header className="mb-8 space-y-2">
