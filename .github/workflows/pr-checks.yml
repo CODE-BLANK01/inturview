@@ -1,0 +1,153 @@
+name: PR checks
+
+# Separate from CI so that labelling or reviewing a PR re-runs these two checks
+# without rebuilding the whole app.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  schema:
+    name: Schema guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Did the schema change?
+        id: changed
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE" HEAD -- prisma/schema.prisma; then
+            echo "schema=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "schema=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.schema == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.changed.outputs.schema == 'true'
+        run: npm ci
+      - name: SQL this change would run
+        if: steps.changed.outputs.schema == 'true'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "$BASE:prisma/schema.prisma" > /tmp/base.prisma 2>/dev/null || cp prisma/schema.prisma /tmp/base.prisma
+          npx prisma migrate diff \
+            --from-schema-datamodel /tmp/base.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script > /tmp/schema.sql
+      - name: Check for destructive statements
+        id: guard
+        if: steps.changed.outputs.schema == 'true'
+        env:
+          ALLOW: ${{ contains(github.event.pull_request.labels.*.name, 'allow-destructive-migration') && '--allow-destructive' || '' }}
+        run: |
+          set +e
+          node scripts/schema-guard.mjs /tmp/schema.sql $ALLOW > /tmp/schema.md
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat /tmp/schema.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post the SQL on the PR
+        if: steps.changed.outputs.schema == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- schema-guard -->";
+            const body = `${marker}\n${fs.readFileSync("/tmp/schema.md", "utf8")}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find((c) => c.body?.startsWith(marker));
+            if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+      - name: Block destructive change
+        if: steps.guard.outputs.status == '1'
+        run: |
+          echo "::error::This schema change destroys data. Add the allow-destructive-migration label once you've confirmed nothing in use is lost."
+          exit 1
+
+  review:
+    name: Risky paths reviewed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            // GitHub's free plan ignores CODEOWNERS on private repos, so this
+            // check does the job: changes to these paths need an approval from
+            // someone other than the author.
+            const TEAM = ["CODE-BLANK01", "AMMS46"];
+            const RISKY = [
+              [/^prisma\/(schema\.prisma|migrations\/)/, "database schema"],
+              [/^lib\/plans\.ts$/, "plans and prices"],
+              [/^(lib\/(auth|passwordReset|passwordCheck|twoFactor)\.ts|app\/api\/auth\/|app\/api\/account\/|types\/next-auth\.d\.ts|middleware\.ts)/, "auth"],
+              [/^(lib\/(billing|stripe)\.ts|app\/api\/billing\/|components\/billing\/)/, "billing"],
+              [/(^|\/)\.env[^/]*\.example$/, "environment variables"],
+              [/^services\/realtime\/app\/auth\.py$/, "realtime auth"],
+              [/^\.github\/workflows\//, "CI"],
+            ];
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const pull_number = pr.number;
+            const author = pr.user.login;
+
+            const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number });
+            const hits = [];
+            for (const { filename } of files) {
+              const rule = RISKY.find(([re]) => re.test(filename));
+              if (rule) hits.push({ filename, area: rule[1] });
+            }
+            if (!hits.length) {
+              core.info("No risky paths changed. Self-merge once CI is green.");
+              return;
+            }
+            const areas = [...new Set(hits.map((h) => h.area))];
+            await core.summary
+              .addHeading("Risky paths in this PR", 3)
+              .addList(hits.map((h) => `${h.filename} (${h.area})`))
+              .write();
+
+            // Latest decision per reviewer, ignoring the author.
+            const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number });
+            const latest = {};
+            for (const r of reviews) {
+              if (r.user?.login && r.user.login !== author && ["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(r.state)) {
+                latest[r.user.login] = r.state;
+              }
+            }
+            if (Object.values(latest).includes("APPROVED") && !Object.values(latest).includes("CHANGES_REQUESTED")) {
+              core.info(`Approved. Touches: ${areas.join(", ")}.`);
+              return;
+            }
+
+            // Ask the teammate for a review, once.
+            const teammates = TEAM.filter((login) => login !== author);
+            const requested = (pr.requested_reviewers ?? []).map((u) => u.login);
+            const toRequest = teammates.filter((login) => !requested.includes(login) && !latest[login]);
+            if (toRequest.length && context.eventName === "pull_request") {
+              try {
+                await github.rest.pulls.requestReviewers({ owner, repo, pull_number, reviewers: toRequest });
+              } catch (e) {
+                core.warning(`Couldn't request a review from ${toRequest.join(", ")}: ${e.message}`);
+              }
+            }
+            core.setFailed(`Touches ${areas.join(", ")}. Needs an approval from someone other than @${author}.`);

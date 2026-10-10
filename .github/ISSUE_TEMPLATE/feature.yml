@@ -1,0 +1,32 @@
+name: Feature
+description: Something new or a change in behaviour
+labels: [feature]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What's wrong or missing today, from the user's side?
+    validations:
+      required: true
+  - type: input
+    id: who
+    attributes:
+      label: Who is it for?
+      placeholder: e.g. candidates prepping a recruiter screen, employers in the pilot
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Done when
+      description: Checkable acceptance criteria. Someone else should be able to verify each line.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Designs, links, open questions, things that are out of scope.
