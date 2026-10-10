@@ -7,3 +7,7 @@ export const FACE_TO_FACE_ENABLED =
  *  interview silently runs voice-only. */
 export const FACE_TO_FACE_AVATAR_ENABLED =
   process.env.NEXT_PUBLIC_FACE_TO_FACE_AVATAR_ENABLED === "true";
+
+/** Local/UI prototype only. No production Loop backend exists yet. */
+export const LOOP_PREVIEW_ENABLED =
+  process.env.NEXT_PUBLIC_LOOP_PREVIEW_ENABLED === "true";
