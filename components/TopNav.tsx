@@ -1,5 +1,7 @@
 "use client";
 
+import { MarketingNav } from "./marketing/MarketingNav";
+
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Brand } from "./Brand";
 import Link from "next/link";
@@ -68,7 +70,7 @@ const PRACTICE_MODES: {
     : []),
 ];
 
-export function TopNav() {
+export function TopNav({ marketing = false }: { marketing?: boolean }) {
   const { data, status } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -112,6 +114,7 @@ export function TopNav() {
   );
 
   const isAuthed = status === "authenticated";
+  if (marketing) return <MarketingNav />;
   const isAdmin =
     (data?.user as { role?: "USER" | "ADMIN" } | undefined)?.role === "ADMIN";
 
@@ -123,7 +126,7 @@ export function TopNav() {
           aria-label="inturview home"
           className="flex items-center shrink-0"
         >
-          <Brand />
+          <Brand wordmarkOnly />
         </Link>
 
         {isAuthed && (

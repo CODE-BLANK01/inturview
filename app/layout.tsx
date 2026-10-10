@@ -3,6 +3,7 @@ import { AuthProvider } from "@/components/SessionProvider";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/ThemeProvider";
 import "./globals.css";
 import "./studio.css";
+import "./marketing.css";
 
 export const metadata: Metadata = {
   title: "inturview — practice recruiter screens and interviews",

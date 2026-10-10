@@ -1,121 +1,143 @@
-import { SiteFooter } from "@/components/SiteFooter";
 import Link from "next/link";
-import { Check } from "lucide-react";
-import { TopNav } from "@/components/TopNav";
+import {
+  MarketingLayout,
+  Section,
+  SectionHeading,
+  Cta,
+  CtaBand,
+  Eyebrow,
+  Reveal,
+  FeatureRow,
+} from "@/components/marketing";
 import { CheckoutButton } from "@/components/billing/CheckoutButton";
 import {
   CANDIDATE_PLANS,
   priceLabel,
   priceSuffix,
   renderFeature,
-  type PlanDefinition,
 } from "@/lib/plans";
 
 export const metadata = {
   title: "Pricing — inturview",
   description:
-    "Simple interview-practice pricing for candidates, with employer screening kept separate.",
+    "Start practicing free. Get focused, time-boxed access with Interview Sprint when you need more room to practice.",
 };
-
 export default function PricingPage() {
+  const sprint = CANDIDATE_PLANS.find((plan) => plan.tier === "PRO")!;
   return (
-    <>
-      <TopNav />
-      <main>
-        <section className="border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-            <p className="t-eyebrow mb-6">Pricing for candidates</p>
-            <h1 className="t-display text-text text-[40px] sm:text-[56px] md:text-[64px] max-w-4xl">
-              Practice for the interview.
-              <br />
-              Pay for the <span className="t-italic">sprint</span>, not a year.
-            </h1>
-            <p className="t-body mt-8 max-w-2xl text-text-muted">
-              Start free and learn where your answers break down. When your
-              interview is close, unlock thirty focused days of unlimited
-              practice. No team seats, annual contract, or employer access to
-              your practice history.
-            </p>
-
-            <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl">
-              {CANDIDATE_PLANS.map((plan) => (
-                <CandidatePlanCard key={plan.tier} plan={plan} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="surface-inverse border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-12 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div>
-              <p className="t-eyebrow text-text-ember">Hiring candidates?</p>
-              <p className="t-body text-text-inverse mt-2">
-                Inturview Hire is a separate employer screening product.
-              </p>
-            </div>
-            <Link href="/employers" className="btn shrink-0">
-              Explore employer screening
-            </Link>
-          </div>
-        </section>
-        <SiteFooter />
-      </main>
-    </>
-  );
-}
-
-function CandidatePlanCard({ plan }: { plan: PlanDefinition }) {
-  const isFree = plan.tier === "FREE";
-
-  return (
-    <article
-      className={`panel p-6 sm:p-7 flex flex-col ${isFree ? "border-text" : ""}`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="t-eyebrow">{plan.name}</p>
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="t-display text-[38px] text-text leading-none">
-              {priceLabel(plan)}
-            </span>
-            <span className="text-xs text-text-dim">{priceSuffix(plan)}</span>
+    <MarketingLayout>
+      <Section className="m-pricing-hero">
+        <Reveal hero>
+          <SectionHeading
+            as="h1"
+            eyebrow="Pricing / For your next opportunity"
+            deck="Start free. Find the gaps. When the interview is close, give yourself room to work on them."
+          >
+            Pay for the <em className="t-italic">sprint.</em>
+            <br />
+            Not the year.
+          </SectionHeading>
+        </Reveal>
+        <div className="m-plan-grid">
+          {CANDIDATE_PLANS.map((plan, i) => (
+            <Reveal key={plan.tier} delay={i * 0.06}>
+              <article
+                className={
+                  plan.tier === "FREE" ? "m-plan" : "m-plan m-plan-sprint"
+                }
+              >
+                <div className="m-card-heading">
+                  <Eyebrow>{plan.name}</Eyebrow>
+                  <span className="m-neutral-badge">
+                    {plan.tier === "FREE"
+                      ? "A place to start"
+                      : "Room to repeat"}
+                  </span>
+                </div>
+                <div className="m-plan-price">
+                  <strong className="t-display-1">{priceLabel(plan)}</strong>
+                  <span>{priceSuffix(plan) || "No card required"}</span>
+                </div>
+                <p className="m-plan-tagline">{plan.tagline}</p>
+                <ul className="m-features">
+                  {plan.features.map((feature) => (
+                    <FeatureRow key={feature}>
+                      {renderFeature(feature, plan)}
+                    </FeatureRow>
+                  ))}
+                </ul>
+                <div className="m-plan-action">
+                  {plan.tier === "FREE" ? (
+                    <Cta />
+                  ) : (
+                    <CheckoutButton
+                      label={`${plan.name} — ${priceLabel(plan)}`}
+                      className="m-button m-button-secondary"
+                    />
+                  )}
+                  <p className="m-caption">
+                    {plan.tier === "FREE"
+                      ? "Monthly limits reset automatically."
+                      : "One payment. No automatic renewal."}
+                  </p>
+                </div>
+              </article>
+            </Reveal>
+          ))}
+        </div>
+      </Section>
+      <Section tone="inverse" size="md">
+        <div className="m-split">
+          <SectionHeading
+            eyebrow="A little clarity"
+            deck="Practice at your own pace. Your free account stays available when Sprint access ends."
+          >
+            More practice.
+            <br />
+            Fewer commitments.
+          </SectionHeading>
+          <div className="m-faq">
+            {[
+              [
+                "What happens when my Sprint ends?",
+                "Your account returns to the free plan and its monthly limits. Your completed debriefs and interview history stay with you.",
+              ],
+              [
+                "Can I extend my access?",
+                `Yes. Buy another ${sprint.name} pass whenever you need more time. An active pass extends from its current expiry; an expired pass starts again from purchase.`,
+              ],
+              [
+                "What is included?",
+                "Recruiter screens, behavioral practice, coding, and system design. Face-to-face video is being developed separately and is not part of this offer.",
+              ],
+              [
+                "Do I need an account before paying?",
+                "Yes. Create your account, verify your email, and finish onboarding first. Your payment is then linked to your practice account.",
+              ],
+            ].map(([question, answer]) => (
+              <details key={question}>
+                <summary>
+                  {question}
+                  <span aria-hidden="true">+</span>
+                </summary>
+                <p>{answer}</p>
+              </details>
+            ))}
           </div>
         </div>
-        <span className="badge border-border bg-bg-surface text-text-muted">
-          {isFree ? "Available now" : plan.availabilityNote}
-        </span>
-      </div>
-
-      <p className="text-sm text-text-muted leading-relaxed mt-5">
-        {plan.tagline}
-      </p>
-      <ul className="mt-6 space-y-2 text-sm text-text-muted flex-1">
-        {plan.features.map((feature) => (
-          <li key={feature} className="flex items-start gap-2">
-            <Check
-              className="h-4 w-4 mt-0.5 shrink-0 text-text-ember"
-              aria-hidden
-            />
-            <span>{renderFeature(feature, plan)}</span>
-          </li>
-        ))}
-      </ul>
-
-      {isFree ? (
-        <Link href="/signup" className="btn btn-primary mt-7">
-          Start practicing free
-        </Link>
-      ) : (
-        <div className="mt-7">
-          <CheckoutButton
-            label="Get 30 days — $19"
-            className="btn btn-primary w-full"
-          />
-          <p className="mt-2 text-xs text-text-dim">
-            One payment. Buy another pass whenever you want more time.
-          </p>
+      </Section>
+      <Section size="sm">
+        <div className="m-audience-note">
+          <p>Hiring, rather than preparing for an interview?</p>
+          <Link href="/employers">
+            Meet Inturview Hire <span aria-hidden="true">↗</span>
+          </Link>
         </div>
-      )}
-    </article>
+      </Section>
+      <CtaBand
+        title="Start with one honest round."
+        deck="You can decide how much practice you need after you have tried it."
+      />
+    </MarketingLayout>
   );
 }

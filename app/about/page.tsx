@@ -1,13 +1,17 @@
-import { SiteFooter } from "@/components/SiteFooter";
-import Link from "next/link";
-import { TopNav } from "@/components/TopNav";
-
+import {
+  MarketingLayout,
+  Section,
+  SectionHeading,
+  Cta,
+  CtaBand,
+  Eyebrow,
+  Reveal,
+} from "@/components/marketing";
 export const metadata = {
   title: "About — inturview",
   description:
-    "Why we built inturview — an AI interview simulator for engineers who want honest practice, structured feedback, and real performance under pressure.",
+    "A place to practice the performance of an interview, get honest feedback, and go again.",
 };
-
 const BELIEFS = [
   {
     num: "01",
@@ -24,210 +28,72 @@ const BELIEFS = [
     title: "Repetition under pressure builds confidence.",
     body: "The gap between your desk at midnight and a senior engineer watching you think is real. Closing it takes reps. We built a place to get those reps without burning a referral or a recruiter's time.",
   },
-] as const;
-
-const MODES = [
-  {
-    label: "Coding",
-    body: "NeetCode 150 problems in a three-phase loop — approach, code, debrief. The AI probes your reasoning before you touch the editor.",
-  },
-  {
-    label: "System design",
-    body: "Scope a problem on a whiteboard, walk through trade-offs, and get scored on the dimensions that actually matter in a design interview.",
-  },
-  {
-    label: "Behavioral",
-    body: "STAR-format drills against real interviewer questions — conflict, ambiguity, influence, failure. Scored on clarity, not charm.",
-  },
-  {
-    label: "Recruiter screen",
-    body: "A 25-minute phone screen simulation — your story, your motivation, your comp expectations. The awkward parts included.",
-  },
-] as const;
-
+];
 export default function AboutPage() {
   return (
-    <>
-      <TopNav />
-      <main>
-        <AboutHero />
-        <Origin />
-        <Beliefs />
-        <WhatWeBuilt />
-        <AboutCta />
-        <SiteFooter />
-      </main>
-    </>
-  );
-}
-
-function AboutHero() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-        <p className="t-eyebrow mb-6">About</p>
-
-        <h1 className="t-display text-text text-[40px] sm:text-[56px] md:text-[64px] max-w-3xl">
-          We built the interview practice
-          <br />
-          we couldn&apos;t <span className="t-italic">find</span>.
-        </h1>
-
-        <p className="t-body mt-8 max-w-[520px] text-text-muted">
-          inturview is an AI interview simulator for software engineers
-          preparing for real loops. Not another problem bank — a place to
-          perform under structured evaluation, get scored on how you actually
-          show up, and do it again until real interviews stop feeling like a
-          surprise.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function Origin() {
-  return (
-    <section className="surface-inverse border-b border-border">
-      <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-        <p className="t-eyebrow mb-6">Why this exists</p>
-        <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text-inverse">
-          The gap nobody
-          <br />
-          warns you <span className="t-italic">about</span>.
-        </h2>
-
-        <div className="mt-10 max-w-2xl space-y-6">
-          <p className="t-body text-[15px] text-text-muted">
-            We kept seeing the same pattern: engineers who could solve any
-            problem on LeetCode, then go silent when asked to explain their
-            approach out loud. Candidates who nailed the optimal solution and
-            still got a no-hire — because they couldn&apos;t articulate
-            complexity, skipped the walkthrough, or lost composure under
-            follow-up pressure.
-          </p>
-          <p className="t-body text-[15px] text-text-muted">
-            Mock interviews with friends helped a little. They were too nice.
-            Too forgiving. Nobody wrote a debrief. Nobody scored communication
-            on a rubric. Nobody simulated what it feels like when the room goes
-            quiet and you realize you&apos;ve been coding for four minutes
-            without saying a word.
-          </p>
-          <p
-            className="t-body text-[15px] text-text-inverse"
-            style={{ fontWeight: 500, lineHeight: 1.5 }}
+    <MarketingLayout>
+      <Section>
+        <Reveal hero>
+          <SectionHeading
+            as="h1"
+            eyebrow="Our point of view"
+            deck="You can know the work and still struggle to explain it in an interview. That gap deserves a better place to practice."
           >
-            inturview exists to close that gap — with practice that feels real
-            and feedback that tells the truth.
-          </p>
+            We built the practice
+            <br />
+            we couldn’t <em className="t-italic">find.</em>
+          </SectionHeading>
+          <div className="m-actions">
+            <Cta />
+            <Cta href="/pricing" secondary>
+              See pricing
+            </Cta>
+          </div>
+        </Reveal>
+      </Section>
+      <Section tone="inverse">
+        <div className="m-split">
+          <SectionHeading eyebrow="Why we are here">
+            Knowing it
+            <br />
+            is half the work.
+          </SectionHeading>
+          <div className="m-prose">
+            <p>
+              We kept seeing the same pattern: engineers who could solve the
+              problem, then go quiet when asked to explain their approach.
+              Strong candidates whose examples never quite showed the impact of
+              their work.
+            </p>
+            <p>
+              More questions were not the missing piece. The missing piece was
+              the follow-up. The silence while you think. A debrief that shows
+              where your answer fell short.
+            </p>
+            <p className="m-prose-emphasis">
+              Inturview exists to make that practice available before the
+              conversation counts.
+            </p>
+          </div>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function Beliefs() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-        <p className="t-eyebrow mb-6">What we believe</p>
-        <span className="block h-[2px] w-8 bg-text-ember mb-6" aria-hidden />
-
-        <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text">
-          Three convictions.
-          <br />
-          One <span className="t-italic">standard</span>.
-        </h2>
-
-        <ul className="mt-14 border-t border-border">
-          {BELIEFS.map((b) => (
-            <li
-              key={b.num}
-              className="grid grid-cols-[40px_1fr] sm:grid-cols-[80px_1fr] gap-4 sm:gap-8 py-8 border-b border-border"
-            >
-              <span className="t-eyebrow self-start">{b.num}</span>
+      </Section>
+      {BELIEFS.map((belief, i) => (
+        <Section key={belief.num} tone={i === 1 ? "inset" : "page"}>
+          <Reveal>
+            <div className="m-belief">
+              <Eyebrow>{belief.num} / What we believe</Eyebrow>
               <div>
-                <p
-                  className="t-body text-[15px] sm:text-[17px] text-text"
-                  style={{ fontWeight: 500 }}
-                >
-                  {b.title}
-                </p>
-                <p className="t-body-light text-[15px] mt-3 max-w-2xl text-text-muted">
-                  {b.body}
-                </p>
+                <h2 className="t-display-2">{belief.title}</h2>
+                <p className="m-deck">{belief.body}</p>
               </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-function WhatWeBuilt() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-        <p className="t-eyebrow mb-6">What we built</p>
-        <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl text-text">
-          Four ways to practice.
-          <br />
-          One honest <span className="t-italic">scorecard</span>.
-        </h2>
-
-        <p className="t-body mt-8 max-w-[500px] text-text-muted">
-          Every mode follows the same philosophy: simulate the real thing,
-          evaluate against a rubric, and give you evidence — not vibes — so you
-          know exactly what to fix before your next loop.
-        </p>
-
-        <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 gap-px bg-border border border-border rounded-xl overflow-hidden">
-          {MODES.map((m) => (
-            <div key={m.label} className="bg-bg p-6 sm:p-8">
-              <p className="t-eyebrow text-text-ember">{m.label}</p>
-              <p className="t-body-light text-[15px] mt-3 text-text-muted">
-                {m.body}
-              </p>
             </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AboutCta() {
-  return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-5xl px-6 sm:px-12 py-24 sm:py-32 text-center">
-        <p className="t-eyebrow mb-6 inline-block">Ready when you are</p>
-        <h2
-          className="t-display text-text text-[36px] sm:text-[48px] mx-auto max-w-2xl"
-          style={{ lineHeight: 0.95 }}
-        >
-          Serious preparation
-          <br />
-          deserves serious <span className="t-italic">practice</span>.
-        </h2>
-
-        <p className="t-body-light text-[16px] mt-8 mb-8 mx-auto max-w-md text-text-muted">
-          Pick a problem. Start talking. See what you actually look like in an
-          interview — before it counts.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/signup"
-            className="btn btn-primary text-[15px] px-8 py-4"
-          >
-            Start your first session
-            <span aria-hidden>↗</span>
-          </Link>
-          <Link href="/" className="btn btn-ghost text-[15px] px-8 py-4">
-            Back to home
-          </Link>
-        </div>
-      </div>
-    </section>
+          </Reveal>
+        </Section>
+      ))}
+      <CtaBand
+        title="Confidence needs somewhere to start."
+        deck="One round. Honest feedback. A clearer idea of what to try next."
+      />
+    </MarketingLayout>
   );
 }

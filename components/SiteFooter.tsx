@@ -7,7 +7,7 @@ export function SiteFooter() {
     <footer className="landing-footer">
       <div>
         <Link href="/" aria-label="Inturview home">
-          <Brand />
+          <Brand wordmarkOnly />
         </Link>
         <p>A little more prepared, every time.</p>
       </div>

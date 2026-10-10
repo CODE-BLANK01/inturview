@@ -1,14 +1,20 @@
-import { SiteFooter } from "@/components/SiteFooter";
 import Link from "next/link";
-import { Check } from "lucide-react";
-import { TopNav } from "@/components/TopNav";
-
+import {
+  MarketingLayout,
+  Section,
+  SectionHeading,
+  Cta,
+  CtaBand,
+  Eyebrow,
+  Reveal,
+  FeatureRow,
+} from "@/components/marketing";
+import { PLANS } from "@/lib/plans";
 export const metadata = {
-  title: "Inturview Hire — AI candidate screening",
+  title: "Inturview Hire — design partners",
   description:
-    "Create structured AI screening interviews, compare evidence-backed scorecards, and shortlist candidates for human interviews.",
+    "Help shape structured AI screening interviews, evidence-backed scorecards, and a better shortlist.",
 };
-
 const FLOW = [
   [
     "01",
@@ -26,110 +32,116 @@ const FLOW = [
     "Compare scorecards, inspect evidence, and choose who reaches a human interview.",
   ],
 ] as const;
-
 export default function EmployersPage() {
+  const pilot = PLANS.find((plan) => plan.tier === "TEAM_STARTER")!;
   return (
-    <>
-      <TopNav />
-      <main>
-        <section className="surface-inverse border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-28">
-            <p className="t-eyebrow text-text-ember mb-6">
-              Inturview Hire · design partners
-            </p>
-            <h1 className="t-display text-text-inverse text-[40px] sm:text-[56px] md:text-[64px] max-w-4xl">
-              Let every candidate interview.
-              <br />
-              Shortlist the evidence.
-            </h1>
-            <p className="t-body-light text-[17px] text-text-muted mt-8 max-w-2xl">
-              Run structured AI screening interviews before the human round.
-              Every candidate gets the same opportunity to answer; your hiring
-              team gets comparable scorecards, supporting evidence, and a
-              focused shortlist.
-            </p>
+    <MarketingLayout>
+      <Section className="m-employer-hero">
+        <Reveal hero>
+          <SectionHeading
+            as="h1"
+            eyebrow="Inturview Hire / Design partners"
+            deck="Structured AI screening before the human round. Help us build a workflow that gives your team evidence to discuss, not another pile of résumés."
+          >
+            Let the answers
+            <br />
+            make the <em className="t-italic">introduction.</em>
+          </SectionHeading>
+          <div className="m-actions">
+            <Cta href="/contact?topic=employers">Become a design partner</Cta>
+            <Cta href="#how-it-works" secondary>
+              How it works
+            </Cta>
           </div>
-        </section>
-
-        <section className="border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-24">
-            <p className="t-eyebrow mb-8">How employer screening works</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {FLOW.map(([number, title, body]) => (
-                <article key={number} className="panel p-6">
-                  <p className="t-data text-text-ember">{number}</p>
-                  <h2 className="text-lg font-semibold mt-5">{title}</h2>
-                  <p className="text-sm text-text-muted leading-relaxed mt-2">
-                    {body}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="border-b border-border">
-          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-20 sm:py-24 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-12 items-start">
-            <div>
-              <p className="t-eyebrow mb-6">The pilot</p>
-              <h2 className="t-section-headline text-[32px] sm:text-[40px] max-w-2xl">
-                Build the screening workflow around one real role.
-              </h2>
-              <ul className="mt-8 space-y-3 text-sm text-text-muted">
-                {[
-                  "Founder-led interview and rubric setup",
-                  "The first 10 completed employer-invited screens",
-                  "Evidence-backed scorecards and ranked shortlist",
-                  "A calibration review with the hiring team",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <Check
-                      className="h-4 w-4 mt-0.5 text-text-ember shrink-0"
-                      aria-hidden
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="panel p-6">
-              <p className="t-eyebrow text-text-ember">
-                Design partner pricing
-              </p>
-              <p className="t-display text-[36px] mt-3">First 10 free</p>
-              <p className="text-sm text-text-muted mt-2">
-                completed candidate screens
-              </p>
-              <div className="my-5 border-t border-border" />
-              <p className="text-sm text-text-muted leading-relaxed">
-                Then $10 per completed screen while we validate the workflow. No
-                recruiter-seat fee. Volume pricing begins after 100 completed
-                screens per month.
-              </p>
-              <a
-                href="mailto:hello@inturview.com?subject=Inturview%20Hire%20design%20partner"
-                className="btn btn-primary w-full mt-6"
-              >
-                Become a design partner
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-6 sm:px-12 py-10 text-center">
-          <p className="text-sm text-text-muted">
-            Preparing for your own interviews?{" "}
-            <Link
-              href="/pricing"
-              className="text-text underline underline-offset-4"
-            >
-              See candidate practice pricing
-            </Link>
+          <p className="m-caption m-hero-note">
+            In development. Built with a small group of hiring teams.
           </p>
-        </section>
-        <SiteFooter />
-      </main>
-    </>
+        </Reveal>
+        <div
+          className="m-employer-sequence"
+          aria-label="Create, invite, shortlist"
+        >
+          {FLOW.map(([n, title]) => (
+            <div key={n}>
+              <span className="t-eyebrow">{n}</span>
+              <span className="t-display-3">{title}</span>
+              <span aria-hidden="true">↗</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section id="how-it-works" tone="inverse">
+        <SectionHeading
+          eyebrow="The workflow"
+          deck="Set the criteria before the interview. Follow the evidence after it."
+        >
+          Three steps.
+          <br />A more useful first round.
+        </SectionHeading>
+        <div className="m-step-grid">
+          {FLOW.map(([n, title, body], i) => (
+            <Reveal key={n} delay={i * 0.06}>
+              <article className="m-step">
+                <span className="m-step-number">{n}</span>
+                <h3 className="t-display-3">{title}</h3>
+                <p>{body}</p>
+              </article>
+            </Reveal>
+          ))}
+        </div>
+      </Section>
+      <Section>
+        <div className="m-split">
+          <SectionHeading
+            eyebrow="A focused pilot"
+            deck="Work with us on one real role. Shape the interview, review what it captures, and calibrate the output with your hiring team."
+          >
+            Build the process
+            <br />
+            you would trust.
+          </SectionHeading>
+          <div className="m-pilot">
+            <Eyebrow>{pilot.name}</Eyebrow>
+            <h3 className="t-display-3">One role. Shared standards.</h3>
+            <ul className="m-features">
+              {pilot.features.map((feature) => (
+                <FeatureRow key={feature}>{feature}</FeatureRow>
+              ))}
+            </ul>
+            <p className="m-caption">
+              Pilot scope and next steps are agreed together. No self-serve
+              employer checkout.
+            </p>
+          </div>
+        </div>
+      </Section>
+      <Section tone="inset" size="md">
+        <div className="m-split">
+          <SectionHeading eyebrow="Two audiences. Clear boundaries.">
+            Practice is personal.
+            <br />
+            Hiring is separate.
+          </SectionHeading>
+          <div className="m-prose">
+            <p>
+              A candidate’s private practice history is not a hiring scorecard.
+              Employer screening is a separate, invited experience.
+            </p>
+            <p>
+              The hiring team reviews the evidence and makes the decision. The
+              purpose of the interview is to support that judgment.
+            </p>
+            <Link href="/signup" className="m-inline-link">
+              Preparing for your own interview? Start free ↗
+            </Link>
+          </div>
+        </div>
+      </Section>
+      <CtaBand
+        employer
+        title="Bring a role. Help shape the round."
+        deck="Tell us what your first interview needs to uncover."
+      />
+    </MarketingLayout>
   );
 }
