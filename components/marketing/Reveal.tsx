@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { animate } from "framer-motion";
+
+// Layout effect so the hidden start state is applied before the browser paints;
+// plain useEffect on the server, where layout effects warn and never run.
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** Progressive enhancement: SSR/no-JS content is visible. Never hides reduced-motion content. */
 export function Reveal({
@@ -16,7 +20,7 @@ export function Reveal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -50,7 +54,13 @@ export function Reveal({
       { threshold: 0.08 },
     );
     if (hero || preference.matches) play();
-    else observer.observe(node);
+    else {
+      // Hide before first paint. Without this the element renders visible,
+      // then blinks to opacity 0 when the animation starts.
+      node.style.opacity = "0";
+      node.style.transform = "translateY(12px)";
+      observer.observe(node);
+    }
     const change = () => {
       if (preference.matches) {
         played = true;
