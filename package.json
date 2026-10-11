@@ -19,7 +19,9 @@
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "postinstall": "prisma generate",
     "check:env": "node scripts/check-env.mjs",
-    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "db:new-migration": "node scripts/new-migration.mjs",
+    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy"
   },
   "prisma": {
     "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
@@ -31,6 +33,7 @@
     "@mediapipe/tasks-vision": "1.0.1",
     "@monaco-editor/react": "^4.6.0",
     "@prisma/client": "^6.19.3",
+    "@sentry/nextjs": "^8.55.0",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^14.0.0",
     "livekit-client": "^2.22.3",

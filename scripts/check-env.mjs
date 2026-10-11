@@ -5,7 +5,11 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 // Set by the platform or the toolchain, never by us.
-const PLATFORM = new Set(["NODE_ENV", "NEXT_RUNTIME", "CI", "PORT"]);
+// NEXT_PUBLIC_RELEASE and NEXT_PUBLIC_DEPLOY_CONTEXT are filled in by next.config.js.
+const PLATFORM = new Set([
+  "NODE_ENV", "NEXT_RUNTIME", "CI", "PORT",
+  "COMMIT_REF", "CONTEXT", "NEXT_PUBLIC_RELEASE", "NEXT_PUBLIC_DEPLOY_CONTEXT",
+]);
 
 function walk(dir, exts, out = []) {
   if (!existsSync(dir)) return out;
@@ -44,7 +48,7 @@ const appFiles = [
   ...walk("app", [".ts", ".tsx"]),
   ...walk("lib", [".ts", ".tsx"]),
   ...walk("components", [".ts", ".tsx"]),
-  ...["middleware.ts", "next.config.js"].filter(existsSync),
+  ...["middleware.ts", "next.config.js", "instrumentation.ts", "sentry.client.config.ts", "sentry.server.config.ts", "sentry.edge.config.ts"].filter(existsSync),
 ];
 const appUsed = new Set();
 for (const file of appFiles) {

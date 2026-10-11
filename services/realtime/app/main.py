@@ -28,6 +28,17 @@ RELAY_GRACE_SEC = 180
 log = logging.getLogger("realtime")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+if get_settings().sentry_dsn:
+    import sentry_sdk
+
+    # FastAPI and Starlette integrations turn on automatically when installed.
+    sentry_sdk.init(
+        dsn=get_settings().sentry_dsn,
+        environment=get_settings().sentry_environment,
+        traces_sample_rate=0,
+        send_default_pii=False,
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
