@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   // DATABASE_URL goes through Supabase's transaction pooler (port 6543), which
   // can't run migrations. Prisma's CLI uses this direct connection (port 5432).
@@ -424,4 +424,83 @@ model ConversationDebrief {
   createdAt  DateTime @default(now())
 
   session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Question bank ───────────────────────────────────────────────────────────
+// One library of interview questions for loops. organizationId = null means the
+// platform library; set it for questions private to one HR team. Practice
+// modes still read lib/*.ts until each is moved over.
+
+enum QuestionCategory {
+  RECRUITER_SCREEN
+  BEHAVIORAL
+  TECHNICAL
+  CODING
+  SYSTEM_DESIGN
+}
+
+enum QuestionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum QuestionSource {
+  SEED
+  ADMIN
+  AI_DRAFT
+  IMPORT
+}
+
+model Organization {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  createdAt DateTime   @default(now())
+  questions Question[]
+}
+
+model Question {
+  id             String            @id @default(cuid())
+  organizationId String?
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category       QuestionCategory
+  title          String
+  prompt         String            @db.Text
+  /// Follow-ups in order of increasing depth.
+  followUps      String[]
+  /// What a strong answer contains. Grading reference; never shown to candidates.
+  signals        String[]
+  /// Category-specific extras (coding examples, design requirements, ...).
+  details        Json?
+  levels         String[]
+  roles          String[]
+  tags           String[]
+  difficulty     String?
+  status         QuestionStatus    @default(DRAFT)
+  source         QuestionSource    @default(ADMIN)
+  /// Stable key for seeded questions so re-seeding updates instead of duplicating.
+  sourceKey      String?           @unique
+  /// 0 until first published; loops pin a specific version.
+  currentVersion Int               @default(0)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  versions       QuestionVersion[]
+
+  @@index([category, status])
+  @@index([organizationId])
+}
+
+model QuestionVersion {
+  id            String   @id @default(cuid())
+  questionId    String
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version       Int
+  /// Frozen copy of the question as published.
+  snapshot      Json
+  publishedById String?
+  publishedAt   DateTime @default(now())
+
+  @@unique([questionId, version])
 }

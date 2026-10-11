@@ -8,6 +8,7 @@ import { captureProductEvent, type Category } from "./analytics";
 const CLAUDE_PRICES: { prefix: string; input: number; cacheWrite5m: number; cacheRead: number; output: number }[] = [
   { prefix: "claude-sonnet-4-5", input: 3, cacheWrite5m: 3.75, cacheRead: 0.3, output: 15 },
   { prefix: "claude-sonnet-4-6", input: 3, cacheWrite5m: 3.75, cacheRead: 0.3, output: 15 },
+  { prefix: "claude-opus-5-5", input: 4, cacheWrite5m: 5, cacheRead: 0.2, output: 20 },
 ];
 
 /** Usage as returned on message_start / message_delta / a non-streamed response. */

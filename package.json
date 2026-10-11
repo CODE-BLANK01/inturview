@@ -21,7 +21,8 @@
     "check:env": "node scripts/check-env.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "db:new-migration": "node scripts/new-migration.mjs",
-    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy"
+    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:seed-questions": "dotenv -e .env.local -- tsx prisma/seedQuestions.ts"
   },
   "prisma": {
     "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
