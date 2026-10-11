@@ -54,11 +54,12 @@ jobs:
       - run: pip install -r requirements.txt ruff==0.6.9
       - name: Lint
         run: ruff check app
-      - name: Service imports with placeholder config
-        run: python -c "import app.main"
-        env:
-          OPENAI_API_KEY: ci-placeholder
-          REALTIME_SERVICE_SECRET: ci-placeholder-secret-0123456789abcdef
+      - name: Service imports with throwaway config
+        # Random per run, so nothing secret-shaped lives in this file.
+        run: |
+          export OPENAI_API_KEY=unused
+          export REALTIME_SERVICE_SECRET="$(openssl rand -hex 24)"
+          python -c "import app.main"
 
   secrets:
     name: Secret scan
