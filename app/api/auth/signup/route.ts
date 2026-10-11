@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       select: { id: true, email: true, name: true, role: true },
     });
 
-    await captureProductEvent(user.id, { event: "signup" });
+    await captureProductEvent(user.id, { event: "signup_completed" });
 
     // Fire verification email — don't block the response if Resend hiccups.
     // The user can hit "Resend verification" from /verify-email if needed.

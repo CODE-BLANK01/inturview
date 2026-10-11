@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { track } from "@/lib/track";
 
 type Mode = "signin" | "signup";
 
@@ -33,6 +34,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setError(null);
     try {
       if (mode === "signup") {
+        track({ event: "signup_started" });
         const res = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "content-type": "application/json" },

@@ -53,6 +53,7 @@ import {
 } from "@/lib/faceToFaceQuestions";
 import type { ChatMessage } from "@/lib/types";
 import type { ConversationDebrief } from "@/lib/conversationTypes";
+import { track as trackEvent } from "@/lib/track";
 
 type Phase = "setup" | "starting" | "live" | "debrief";
 
@@ -459,6 +460,7 @@ export function FaceToFaceSession({
         onEnded: (reason) => {
           if (reason === "closed") return;
           console.warn("[face-to-face] avatar ended, continuing voice-only:", reason);
+          trackEvent({ event: "avatar_fallback", properties: { session_id: id, reason: "ended" } });
           // From here on the relay's audio goes to the fallback player.
           avatarRef.current = null;
           avatarStopRef.current?.();
@@ -468,8 +470,10 @@ export function FaceToFaceSession({
         },
       });
       setAvatarMode("live");
+      trackEvent({ event: "avatar_connected", properties: { session_id: id } });
     } catch (err) {
       console.warn("[face-to-face] avatar unavailable, running voice-only:", err);
+      trackEvent({ event: "avatar_fallback", properties: { session_id: id, reason: "unavailable" } });
       avatarRef.current = null;
       avatarStopRef.current?.();
       avatarStopRef.current = null;

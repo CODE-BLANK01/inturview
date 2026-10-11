@@ -7,6 +7,7 @@ import { TopicBadge } from "@/components/Badges";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { ConversationDebrief } from "@/lib/conversationTypes";
+import { DebriefViewed } from "@/components/analytics/TrackOnMount";
 import {
   LEVEL_LABELS,
   TRACK_LABELS,
@@ -115,7 +116,10 @@ export default async function ConversationHistoryPage({
         </header>
 
         {debrief && (
-          <ConversationDebriefView debrief={debrief} kind={session.kind} />
+          <>
+            <DebriefViewed mode={session.kind.toLowerCase()} sessionId={session.id} />
+            <ConversationDebriefView debrief={debrief} kind={session.kind} />
+          </>
         )}
 
         <section className="panel p-5">
