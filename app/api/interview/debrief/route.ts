@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import type { Debrief } from "@/lib/types";
 import { captureProductEvent } from "@/lib/analytics";
+import { trackClaudeUsage } from "@/lib/aiCost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,6 +157,7 @@ export async function POST(req: NextRequest) {
         system,
         messages: [{ role: "user", content: userTurn }],
       });
+      await trackClaudeUsage(user.id, { category: "coding", sessionId: interview.id, model: MODEL, purpose: "debrief", usage: resp.usage });
       const text = resp.content
         .map((b) => (b.type === "text" ? b.text : ""))
         .join("")

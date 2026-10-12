@@ -110,6 +110,14 @@ export async function POST(req: NextRequest) {
       "[billing/checkout] failed:",
       error instanceof Error ? error.message : error
     );
+    await captureProductEvent(user.id, {
+      event: "checkout_failed",
+      properties: {
+        product: INTERVIEW_SPRINT.product,
+        // Error class only: Stripe messages can include customer details.
+        reason: error instanceof Error ? error.name : "unknown",
+      },
+    });
     return Response.json(
       { error: "Checkout is temporarily unavailable. Please try again." },
       { status: 503 }

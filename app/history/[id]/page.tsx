@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getProblem } from "@/lib/problems";
 import type { Difficulty, Debrief } from "@/lib/types";
+import { DebriefViewed } from "@/components/analytics/TrackOnMount";
 
 export const dynamic = "force-dynamic";
 
@@ -167,6 +168,7 @@ export default async function HistoryDetailPage({
         {debrief && (
           <section className="mb-8">
             <h2 className="text-lg font-semibold mb-3">Debrief</h2>
+            <DebriefViewed mode="coding" sessionId={interview.id} />
             <DebriefView debrief={debrief} />
           </section>
         )}

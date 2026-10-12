@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { describeCanvas } from "@/lib/designCanvas";
 import type { Difficulty } from "@/lib/types";
 import type { DesignDebrief } from "@/lib/designTypes";
+import { DebriefViewed } from "@/components/analytics/TrackOnMount";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,7 @@ export default async function DesignHistoryPage({
           </p>
         </header>
 
+        {debrief && <DebriefViewed mode="system_design" sessionId={session.id} />}
         {debrief && <DesignDebriefView debrief={debrief} />}
 
         <section className="panel p-5">

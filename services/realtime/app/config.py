@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # avatar; the browser falls back to voice-only when the avatar ends.
     liveavatar_sandbox: bool = False
 
+    # Error reporting. Empty = off. Same Sentry org as the Next.js app.
+    sentry_dsn: str = ""
+    sentry_environment: str = "development"
+
     @property
     def origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

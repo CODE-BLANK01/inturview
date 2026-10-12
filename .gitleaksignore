@@ -1,0 +1,5 @@
+# Known false positives for the CI secret scan. One fingerprint per line
+# (commit:file:rule:line). Only add a line after confirming it is not a real key.
+
+# CI placeholder for the realtime service, removed in b456245. Never a real secret.
+4e582ce88ebd3c2806dfb195d2c74dc37be045b9:.github/workflows/ci.yml:generic-api-key:61

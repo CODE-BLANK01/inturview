@@ -3,6 +3,7 @@ import { z } from "zod";
 import { OnboardingGoal } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,5 +40,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await captureProductEvent(user.id, {
+    event: "onboarding_completed",
+    properties: { goal: parsed.goal, plan: parsed.plan },
+  });
   return Response.json({ ok: true });
 }

@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { CONTACT_EMAIL, CONTACT_SUBJECTS, ContactSchema } from "@/lib/contact";
 import { sendEmail } from "@/lib/email";
+import { captureProductEvent } from "@/lib/analytics";
+import { requireUser } from "@/lib/auth";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -72,5 +74,10 @@ export async function POST(req: NextRequest) {
       },
       { status: 502 },
     );
+  const sender = await requireUser().catch(() => null);
+  await captureProductEvent(sender?.id ?? `anon_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`, {
+    event: "contact_submitted",
+    properties: { topic },
+  });
   return Response.json({ ok: true });
 }

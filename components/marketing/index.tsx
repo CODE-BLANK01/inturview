@@ -3,11 +3,13 @@ import type { ReactNode } from "react";
 import { ArrowUpRight, Check } from "lucide-react";
 import { TopNav } from "@/components/TopNav";
 import { SiteFooter } from "@/components/SiteFooter";
+import { PageView } from "@/components/analytics/TrackOnMount";
 export { Reveal } from "./Reveal";
 
 export function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="public-site">
+      <PageView />
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>

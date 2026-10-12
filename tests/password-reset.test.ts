@@ -8,6 +8,23 @@ import { POST as requestReset } from "../app/api/auth/forgot-password/route";
 import { POST as resetPassword } from "../app/api/auth/reset-password/route";
 import { appUrl, sendEmail } from "../lib/email";
 
+// Prisma's client is a Proxy that hides its methods from property descriptors,
+// so node:test's mock.method can't wrap them. Swap them directly and restore
+// the originals when the test ends.
+function stubPrisma(
+  t: { after: (fn: () => void) => void },
+  target: object,
+  name: string,
+  impl: (...args: never[]) => unknown,
+) {
+  const record = target as Record<string, unknown>;
+  const original = record[name];
+  record[name] = impl;
+  t.after(() => {
+    record[name] = original;
+  });
+}
+
 test("password reset delivery and recovery flow", async (t) => {
   const envNames = [
     "RESEND_API_KEY",
@@ -49,7 +66,7 @@ test("password reset delivery and recovery flow", async (t) => {
   let deliveryFailure = false;
   let lookups = 0;
   // All database operations and provider requests are mocked. No account is changed.
-  t.mock.method(
+  stubPrisma(t,
     prisma.user,
     "findUnique",
     async ({ where }: { where: { email?: string; id?: string } }) => {
@@ -60,7 +77,7 @@ test("password reset delivery and recovery flow", async (t) => {
         : null;
     },
   );
-  t.mock.method(
+  stubPrisma(t,
     prisma.user,
     "update",
     async ({
@@ -73,7 +90,7 @@ test("password reset delivery and recovery flow", async (t) => {
       return { ...user };
     },
   );
-  t.mock.method(
+  stubPrisma(t,
     prisma.passwordResetToken,
     "create",
     async ({ data }: { data: Omit<Token, "id" | "usedAt"> }) => {
@@ -82,7 +99,7 @@ test("password reset delivery and recovery flow", async (t) => {
       return row;
     },
   );
-  t.mock.method(
+  stubPrisma(t,
     prisma.passwordResetToken,
     "updateMany",
     async ({
@@ -101,13 +118,13 @@ test("password reset delivery and recovery flow", async (t) => {
       return { count };
     },
   );
-  t.mock.method(
+  stubPrisma(t,
     prisma.passwordResetToken,
     "findUnique",
     async ({ where }: { where: { tokenHash: string } }) =>
       tokens.find((row) => row.tokenHash === where.tokenHash) ?? null,
   );
-  t.mock.method(
+  stubPrisma(t,
     prisma.passwordResetToken,
     "update",
     async ({
@@ -122,7 +139,7 @@ test("password reset delivery and recovery flow", async (t) => {
       return row;
     },
   );
-  t.mock.method(
+  stubPrisma(t,
     prisma,
     "$transaction",
     async (operations: Promise<unknown>[]) => Promise.all(operations),

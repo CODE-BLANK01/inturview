@@ -7,10 +7,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // If you switch DATABASE_URL to a pooler (e.g. Supabase port 6543), uncomment the
-  // line below and set DIRECT_URL to the direct connection (port 5432) for migrations:
-  // directUrl = env("DIRECT_URL")
+  url       = env("DATABASE_URL")
+  // DATABASE_URL goes through Supabase's transaction pooler (port 6543), which
+  // can't run migrations. Prisma's CLI uses this direct connection (port 5432).
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {

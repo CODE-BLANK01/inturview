@@ -2,6 +2,7 @@ import { AuthShell } from "@/components/AuthShell";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { captureProductEvent } from "@/lib/analytics";
 import {
   consumeVerificationToken,
   validateVerificationToken,
@@ -57,6 +58,7 @@ export default async function VerifyEmailPage({
         tokenId: result.tokenId,
         userId: user.id,
       });
+      await captureProductEvent(user.id, { event: "email_verified" });
       redirect(next);
     }
 

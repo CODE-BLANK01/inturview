@@ -17,3 +17,6 @@ out
 INTERNAL-NOTES.md
 # Session handoff notes for AI coding sessions (local context only).
 SESSION_HANDOFF.md
+
+# TypeScript incremental build cache — changes on every build.
+tsconfig.tsbuildinfo
