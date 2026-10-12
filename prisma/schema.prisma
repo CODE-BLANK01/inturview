@@ -453,11 +453,12 @@ enum QuestionSource {
 }
 
 model Organization {
-  id        String     @id @default(cuid())
+  id        String         @id @default(cuid())
   name      String
-  slug      String     @unique
-  createdAt DateTime   @default(now())
+  slug      String         @unique
+  createdAt DateTime       @default(now())
   questions Question[]
+  loops     LoopTemplate[]
 }
 
 model Question {
@@ -503,4 +504,48 @@ model QuestionVersion {
   publishedAt   DateTime @default(now())
 
   @@unique([questionId, version])
+}
+
+// ─── Loop templates ──────────────────────────────────────────────────────────
+// An interview journey: ordered rounds, each a category, a length and either
+// specific questions or "pick N from this pool". Candidates only ever get a
+// published version, which pins question versions.
+
+enum LoopStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model LoopTemplate {
+  id             String                @id @default(cuid())
+  organizationId String?
+  organization   Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?               @db.Text
+  roleTarget     String?
+  level          String?
+  /// Editable rounds, validated by lib/loopTemplates.ts.
+  rounds         Json                  @default("[]")
+  status         LoopStatus            @default(DRAFT)
+  currentVersion Int                   @default(0)
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  versions       LoopTemplateVersion[]
+
+  @@index([organizationId, status])
+}
+
+model LoopTemplateVersion {
+  id             String       @id @default(cuid())
+  loopTemplateId String
+  loopTemplate   LoopTemplate @relation(fields: [loopTemplateId], references: [id], onDelete: Cascade)
+  version        Int
+  /// Frozen loop with resolved question versions.
+  snapshot       Json
+  publishedById  String?
+  publishedAt    DateTime     @default(now())
+
+  @@unique([loopTemplateId, version])
 }

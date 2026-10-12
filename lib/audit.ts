@@ -16,9 +16,14 @@ export type AuditAction =
   | "QUESTION_PUBLISHED"
   | "QUESTION_RETIRED"
   | "QUESTION_RESTORED"
-  | "QUESTIONS_DRAFTED";
+  | "QUESTIONS_DRAFTED"
+  | "LOOP_CREATED"
+  | "LOOP_UPDATED"
+  | "LOOP_PUBLISHED"
+  | "LOOP_ARCHIVED"
+  | "LOOP_RESTORED";
 
-export type AuditTargetType = "user" | "problem" | "interview" | "question";
+export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop";
 
 export async function writeAudit(opts: {
   adminId: string;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Prisma, QuestionCategory, QuestionSource, QuestionStatus } from "@prisma/client";
 import { prisma } from "./db";
+import { stableStringify } from "./stableJson";
 
 export const CATEGORY_LABELS: Record<QuestionCategory, string> = {
   RECRUITER_SCREEN: "Recruiter screen",
@@ -62,7 +63,7 @@ export function snapshotOf(q: QuestionSnapshot): QuestionSnapshot {
 /** True when the live question differs from what was last published. */
 export function hasUnpublishedChanges(live: QuestionSnapshot, published: QuestionSnapshot | null): boolean {
   if (!published) return true;
-  return JSON.stringify(snapshotOf(live)) !== JSON.stringify(snapshotOf(published));
+  return stableStringify(snapshotOf(live)) !== stableStringify(snapshotOf(published));
 }
 
 function toData(input: QuestionInput) {
