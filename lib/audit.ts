@@ -10,9 +10,15 @@ export type AuditAction =
   | "USER_ENABLED"
   | "USER_ROLE_CHANGED"
   | "USER_DELETED"
-  | "INTERVIEW_DELETED";
+  | "INTERVIEW_DELETED"
+  | "QUESTION_CREATED"
+  | "QUESTION_UPDATED"
+  | "QUESTION_PUBLISHED"
+  | "QUESTION_RETIRED"
+  | "QUESTION_RESTORED"
+  | "QUESTIONS_DRAFTED";
 
-export type AuditTargetType = "user" | "problem" | "interview";
+export type AuditTargetType = "user" | "problem" | "interview" | "question";
 
 export async function writeAudit(opts: {
   adminId: string;
