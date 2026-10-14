@@ -87,6 +87,8 @@ test("interviewer is told to stick to the plan and not praise answers", () => {
   assert.match(one, /Ask only the question in the plan/);
   assert.match(one, /Never add new main questions/);
   assert.match(one, /don't praise or judge answers/);
+  assert.match(one, /never call an answer good, great, solid or strong/);
+  assert.match(one, /No markdown/);
   const two = interviewerSystemPrompt({ loopName: "L", roleTarget: null, level: null, roundTitle: "R", category: "TECHNICAL", durationMinutes: 10, candidateName: null, questions: [q1, q2] });
   assert.match(two, /Ask only the 2 questions in the plan/);
 });
