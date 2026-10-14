@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { soleOwnerOf } from "@/lib/workspaces";
 import { writeAudit, type AuditAction } from "@/lib/audit";
 import { UpdateUserSchema } from "@/lib/adminSchemas";
 
@@ -122,6 +123,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     select: { id: true, email: true },
   });
   if (!target) return Response.json({ error: "Not found" }, { status: 404 });
+  const owned = await soleOwnerOf(target.id);
+  if (owned.length) {
+    return Response.json({ error: `They're the only owner of ${owned.join(", ")}. Transfer ownership first.` }, { status: 409 });
+  }
 
   await prisma.user.delete({ where: { id: params.id } });
   await writeAudit({

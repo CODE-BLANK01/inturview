@@ -149,9 +149,25 @@ export interface QuestionFilters {
   q?: string;
 }
 
-export function questionWhere(f: QuestionFilters): Prisma.QuestionWhereInput {
+/**
+ * Questions a workspace's loops may use: its own plus the published inturview
+ * library. `null` is the platform itself, which only uses its own.
+ * Another workspace's questions are never included.
+ */
+export function usableQuestionsWhere(organizationId: string | null): Prisma.QuestionWhereInput {
+  return organizationId
+    ? { OR: [{ organizationId }, { organizationId: null, status: QuestionStatus.PUBLISHED }] }
+    : { organizationId: null };
+}
+
+/** Questions owned by `organizationId` (null: the platform library), filtered. */
+export function questionWhere(f: QuestionFilters, organizationId: string | null): Prisma.QuestionWhereInput {
+  return { organizationId, ...questionFilterWhere(f) };
+}
+
+/** Just the filters, for combining with an ownership or usability condition. */
+export function questionFilterWhere(f: QuestionFilters): Prisma.QuestionWhereInput {
   return {
-    organizationId: null,
     ...(f.category && { category: f.category }),
     ...(f.status && { status: f.status }),
     ...(f.source && { source: f.source }),

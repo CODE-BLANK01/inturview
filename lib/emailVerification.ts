@@ -86,8 +86,10 @@ export async function sendVerificationEmail(opts: {
   toEmail: string;
   toName: string | null;
   rawToken: string;
+  /** Where to go after verifying, e.g. a teammate invitation. Must already be afterVerify()-checked. */
+  next?: string | null;
 }): Promise<void> {
-  const verifyUrl = `${appUrl()}/verify-email?token=${encodeURIComponent(opts.rawToken)}`;
+  const verifyUrl = `${appUrl()}/verify-email?token=${encodeURIComponent(opts.rawToken)}${opts.next ? `&next=${encodeURIComponent(opts.next)}` : ""}`;
   const first = opts.toName?.split(/\s+/)[0]?.trim();
 
   await sendEmail({

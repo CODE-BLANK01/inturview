@@ -166,7 +166,7 @@ export default async function AdminOverviewPage() {
                     {a.targetType} · {a.targetId.slice(0, 12)}
                   </span>
                   <span className="text-xs text-text-dim truncate max-w-[140px]">
-                    {a.admin.email}
+                    {a.admin?.email ?? "Deleted account"}
                   </span>
                   <span className="text-xs text-text-dim shrink-0">
                     {new Date(a.createdAt).toLocaleString(undefined, {

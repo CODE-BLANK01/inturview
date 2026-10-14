@@ -4,7 +4,7 @@ import { prisma } from "./db";
 import { liveRatesPerMinute } from "./aiCost";
 import { estimateLoopCost as estimate, totalMinutes } from "./loopEstimate";
 import { stableStringify } from "./stableJson";
-import { CATEGORY_LABELS, LEVELS } from "./questionBank";
+import { CATEGORY_LABELS, LEVELS, usableQuestionsWhere } from "./questionBank";
 
 export const MAX_ROUNDS = 8;
 export const MAX_LOOP_MINUTES = 240;
@@ -50,16 +50,40 @@ export function parseRounds(raw: unknown): LoopRoundConfig[] {
   return parsed.success ? parsed.data : [];
 }
 
-/** Which published questions a pool round can draw from. Untagged levels/roles mean "any". */
-export function poolWhere(category: QuestionCategory, pool: { tags: string[]; roles: string[]; level: string | null }): Prisma.QuestionWhereInput {
+/**
+ * Rounds from a published version's snapshot. Published fixed rounds store
+ * pinned versions instead of plain ids; this reads both, so callers never
+ * have to know the difference.
+ */
+export function publishedRounds(snapshot: unknown): LoopRoundConfig[] {
+  const rounds = (snapshot as { config?: { rounds?: unknown } } | null)?.config?.rounds;
+  if (!Array.isArray(rounds)) return [];
+  return parseRounds(
+    rounds.map((r: { questions?: { mode?: string; pinned?: { questionId: string }[] } }) =>
+      r?.questions?.mode === "fixed" && Array.isArray(r.questions.pinned)
+        ? { ...r, questions: { mode: "fixed", questionIds: r.questions.pinned.map((p) => p.questionId) } }
+        : r,
+    ),
+  );
+}
+
+/**
+ * Which published questions a pool round can draw from: the loop owner's own
+ * and, for a workspace, the inturview library. Untagged levels/roles mean "any".
+ */
+export function poolWhere(
+  category: QuestionCategory,
+  pool: { tags: string[]; roles: string[]; level: string | null },
+  organizationId: string | null,
+): Prisma.QuestionWhereInput {
   return {
-    organizationId: null,
+    AND: [usableQuestionsWhere(organizationId)],
     category,
     status: QuestionStatus.PUBLISHED,
     ...(pool.tags.length && { tags: { hasEvery: pool.tags } }),
     ...(pool.level && { OR: [{ levels: { has: pool.level } }, { levels: { isEmpty: true } }] }),
     ...(pool.roles.length && {
-      AND: [{ OR: [{ roles: { hasSome: pool.roles } }, { roles: { isEmpty: true } }] }],
+      AND: [usableQuestionsWhere(organizationId), { OR: [{ roles: { hasSome: pool.roles } }, { roles: { isEmpty: true } }] }],
     }),
   };
 }
@@ -101,20 +125,28 @@ export function readinessProblems(rounds: LoopRoundConfig[], facts: ReadinessFac
   return problems;
 }
 
-async function gatherFacts(rounds: LoopRoundConfig[], db: Prisma.TransactionClient | typeof prisma = prisma): Promise<ReadinessFacts> {
+async function gatherFacts(
+  rounds: LoopRoundConfig[],
+  organizationId: string | null,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<ReadinessFacts> {
   const ids = [...new Set(rounds.flatMap((r) => (r.questions.mode === "fixed" ? r.questions.questionIds : [])))];
+  // A question outside what this owner may use reads as "no longer exists".
   const rows = ids.length
-    ? await db.question.findMany({ where: { id: { in: ids } }, select: { id: true, category: true, status: true } })
+    ? await db.question.findMany({
+        where: { AND: [{ id: { in: ids } }, usableQuestionsWhere(organizationId)] },
+        select: { id: true, category: true, status: true },
+      })
     : [];
   const poolSizes = new Map<string, number>();
   for (const r of rounds) {
-    if (r.questions.mode === "pool") poolSizes.set(r.id, await db.question.count({ where: poolWhere(r.category, r.questions) }));
+    if (r.questions.mode === "pool") poolSizes.set(r.id, await db.question.count({ where: poolWhere(r.category, r.questions, organizationId) }));
   }
   return { fixed: new Map(rows.map((q) => [q.id, { category: q.category, status: q.status }])), poolSizes };
 }
 
-export async function checkReadiness(rounds: LoopRoundConfig[]) {
-  const facts = await gatherFacts(rounds);
+export async function checkReadiness(rounds: LoopRoundConfig[], organizationId: string | null) {
+  const facts = await gatherFacts(rounds, organizationId);
   return { problems: readinessProblems(rounds, facts), poolSizes: Object.fromEntries(facts.poolSizes) };
 }
 
@@ -133,7 +165,7 @@ export async function publishLoop(id: string, publishedById: string | null) {
     const loop = await tx.loopTemplate.findUniqueOrThrow({ where: { id } });
     if (loop.status === LoopStatus.ARCHIVED) throw new LoopNotReadyError(["Restore this loop before publishing it."]);
     const rounds = parseRounds(loop.rounds);
-    const facts = await gatherFacts(rounds, tx);
+    const facts = await gatherFacts(rounds, loop.organizationId, tx);
     const problems = readinessProblems(rounds, facts);
     if (problems.length) throw new LoopNotReadyError(problems);
 

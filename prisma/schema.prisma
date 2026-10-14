@@ -84,6 +84,9 @@ model User {
   resetTokens           PasswordResetToken[]
   verificationTokens    EmailVerificationToken[]
   billingPurchases      BillingPurchase[]
+  memberships           OrganizationMember[]
+  memberInvitesSent     MemberInvitation[]       @relation("MemberInvitationInviter")
+  supportGrants         SupportAccessGrant[]
 
   @@index([role])
   @@index([flagged])
@@ -155,14 +158,16 @@ model PasswordResetToken {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  adminId    String
+  /// Who acted: an operator, or a workspace member for workspace events.
+  /// Null once that account is deleted; the entry itself is kept.
+  adminId    String?
   action     String
   targetType String
   targetId   String
   metadata   Json?
   createdAt  DateTime @default(now())
 
-  admin User @relation("AdminAudit", fields: [adminId], references: [id])
+  admin User? @relation("AdminAudit", fields: [adminId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([adminId])
@@ -453,12 +458,85 @@ enum QuestionSource {
 }
 
 model Organization {
-  id        String         @id @default(cuid())
-  name      String
-  slug      String         @unique
-  createdAt DateTime       @default(now())
-  questions Question[]
-  loops     LoopTemplate[]
+  id                    String               @id @default(cuid())
+  name                  String
+  slug                  String               @unique
+  /// IANA zone used for deadlines shown to applicants, e.g. "America/New_York".
+  timezone              String               @default("UTC")
+  website               String?
+  logoUrl               String?
+  /// Where applicants can ask for accommodations or help.
+  contactEmail          String?
+  /// Created by an operator for a design partner; billing is handled by hand.
+  designPartner         Boolean              @default(false)
+  onboardingStep        String?
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @default(now()) @updatedAt
+  questions             Question[]
+  loops                 LoopTemplate[]
+  members               OrganizationMember[]
+  memberInvitations     MemberInvitation[]
+  supportGrants         SupportAccessGrant[]
+  campaigns             Campaign[]
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  RECRUITER
+  REVIEWER
+}
+
+/// Workspace access. Never inferred from email domain, practice plan or User.role.
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgRole
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+/// A teammate invitation. Accepting requires being signed in, verified, as exactly `email`.
+model MemberInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Lowercased.
+  email          String
+  role           OrgRole
+  /// SHA-256 of the link token.
+  tokenHash      String       @unique
+  invitedById    String?
+  invitedBy      User?        @relation("MemberInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   String?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, email])
+}
+
+/// Time-boxed, reasoned operator access to a workspace. Operators have none otherwise.
+model SupportAccessGrant {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  operatorId     String
+  operator       User         @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  reason         String       @db.Text
+  expiresAt      DateTime
+  endedAt        DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, operatorId])
 }
 
 model Question {
@@ -533,6 +611,7 @@ model LoopTemplate {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   versions       LoopTemplateVersion[]
+  campaigns      Campaign[]
 
   @@index([organizationId, status])
 }
@@ -548,4 +627,131 @@ model LoopTemplateVersion {
   publishedAt    DateTime     @default(now())
 
   @@unique([loopTemplateId, version])
+}
+
+// ─── Campaigns and invites ───────────────────────────────────────────────────
+// A campaign sends one published loop version to a group of candidates. Each
+// invite carries a personal link; only its SHA-256 hash is stored.
+
+enum InviteStatus {
+  PENDING
+  SENT
+  OPENED
+  STARTED
+  COMPLETED
+  FAILED
+  REVOKED
+}
+
+model Campaign {
+  id             String        @id @default(cuid())
+  /// The workspace that owns it. Null only for test campaigns from before workspaces.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  loopTemplateId String
+  loopTemplate   LoopTemplate  @relation(fields: [loopTemplateId], references: [id], onDelete: Restrict)
+  /// The loop version every candidate in this campaign gets.
+  loopVersion    Int
+  name           String
+  /// Optional note from the hiring team, shown in the email and on the landing page.
+  message        String?       @db.Text
+  /// Links stop working after this; null means 14 days after each invite is sent.
+  deadline       DateTime?
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  invites        Invite[]
+
+  @@index([organizationId])
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  campaignId  String
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email       String
+  name        String?
+  /// SHA-256 of the link token; resending rotates it so old links stop working.
+  tokenHash   String?      @unique
+  status      InviteStatus @default(PENDING)
+  sendCount   Int          @default(0)
+  lastError   String?
+  sentAt      DateTime?
+  expiresAt   DateTime?
+  openedAt    DateTime?
+  consentedAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  /// Deprecated, no longer written: applicants don't get accounts. Older test
+  /// rows may still hold a user ID; dropped in a later migration.
+  userId      String?
+  run         LoopRun?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
+
+// ─── Loop runs ───────────────────────────────────────────────────────────────
+// One candidate going through a loop from an invite. Each round freezes the
+// exact questions asked, so scoring and review never depend on later edits.
+
+enum LoopRunStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum RoundRunStatus {
+  IN_PROGRESS
+  SCORING
+  COMPLETED
+}
+
+model LoopRun {
+  id             String         @id @default(cuid())
+  inviteId       String         @unique
+  invite         Invite         @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  /// Deprecated, no longer written (see Invite.userId).
+  userId         String?
+  loopTemplateId String
+  loopVersion    Int
+  status         LoopRunStatus  @default(IN_PROGRESS)
+  /// 0–100, the mean of the round scores, once every round is scored.
+  overallScore   Int?
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
+  rounds         LoopRoundRun[]
+}
+
+model LoopRoundRun {
+  id          String           @id @default(cuid())
+  runId       String
+  run         LoopRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  roundIndex  Int
+  roundId     String
+  category    QuestionCategory
+  /// Frozen questions: [{ questionId, version, title, prompt, followUps, signals }]
+  questions   Json
+  status      RoundRunStatus   @default(IN_PROGRESS)
+  startedAt   DateTime         @default(now())
+  completedAt DateTime?
+  /// Structured score from the grader; see lib/loopRuns.ts.
+  scorecard   Json?
+  score       Int?
+  messages    LoopMessage[]
+
+  @@unique([runId, roundIndex])
+}
+
+model LoopMessage {
+  id         String       @id @default(cuid())
+  roundRunId String
+  roundRun   LoopRoundRun @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
+  /// "interviewer" or "candidate"
+  role       String
+  content    String       @db.Text
+  createdAt  DateTime     @default(now())
+
+  @@index([roundRunId, createdAt])
 }
