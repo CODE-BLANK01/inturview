@@ -9,6 +9,7 @@
     "lint": "next lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test:db": "node --import tsx --test --test-concurrency=1 tests/db/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:push": "dotenv -e .env.local -- prisma db push",

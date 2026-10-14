@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { soleOwnerOf } from "@/lib/workspaces";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -81,6 +82,14 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+  }
+
+  const owned = await soleOwnerOf(user.id);
+  if (owned.length) {
+    return Response.json(
+      { error: `You're the only owner of ${owned.join(", ")}. Make a teammate an owner first, or ask us to close the workspace.` },
+      { status: 400 }
+    );
   }
 
   // Cascading delete handles Interview → Message → Debrief, plus the
