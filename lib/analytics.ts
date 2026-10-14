@@ -3,7 +3,7 @@
  * answers or email addresses. The full event list, with where each one fires,
  * is in docs/analytics.md — add an event there when you add it here.
  */
-export type Category = "coding" | "system_design" | "behavioral" | "recruiter_screen" | "face_to_face";
+export type Category = "coding" | "system_design" | "behavioral" | "recruiter_screen" | "face_to_face" | "technical";
 /** @deprecated Older events call the interview category "mode". */
 export type Mode = Category;
 

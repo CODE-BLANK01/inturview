@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { parseRounds, totalMinutes } from "@/lib/loopTemplates";
+import { publishedRounds, totalMinutes } from "@/lib/loopTemplates";
 import { NewCampaignForm } from "@/components/admin/NewCampaignForm";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +14,8 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
     select: { id: true, name: true, currentVersion: true, versions: { orderBy: { version: "desc" }, take: 1, select: { snapshot: true } } },
   });
   const options = loops.map((l) => {
-    const snap = l.versions[0]?.snapshot as { config?: { rounds?: unknown } } | undefined;
-    const rounds = parseRounds(snap?.config?.rounds ?? []);
-    return { id: l.id, name: l.name, version: l.currentVersion, rounds: (snap?.config?.rounds as unknown[] | undefined)?.length ?? 0, minutes: totalMinutes(rounds) };
+    const rounds = publishedRounds(l.versions[0]?.snapshot);
+    return { id: l.id, name: l.name, version: l.currentVersion, rounds: rounds.length, minutes: totalMinutes(rounds) };
   });
   return (
     <div className="space-y-6">

@@ -10,7 +10,9 @@ export function RecipientsInput({ onChange, id = "recipients" }: { onChange: (r:
   const [fileName, setFileName] = useState<string | null>(null);
   const parsed = useMemo(() => parseRecipients(text), [text]);
 
-  useEffect(() => onChange(parsed.recipients), [parsed, onChange]);
+  useEffect(() => {
+    onChange(parsed.recipients);
+  }, [parsed, onChange]);
 
   const onFile = (file: File | undefined) => {
     if (!file) return;

@@ -24,7 +24,7 @@ const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "—");
 export default async function CampaignPage({ params }: { params: { id: string } }) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: params.id },
-    include: { loopTemplate: { select: { id: true, name: true } }, invites: { orderBy: { createdAt: "asc" } } },
+    include: { loopTemplate: { select: { id: true, name: true } }, invites: { orderBy: { createdAt: "asc" }, include: { run: { select: { overallScore: true } } } } },
   });
   if (!campaign) notFound();
   const counts: Partial<Record<InviteStatus, number>> = {};
@@ -69,7 +69,7 @@ export default async function CampaignPage({ params }: { params: { id: string } 
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left border-b border-border text-text-dim">
-                {["Candidate", "Status", "Sent", "Opened", "Finished", ""].map((h) => (
+                {["Candidate", "Status", "Score", "Sent", "Finished", ""].map((h) => (
                   <th key={h} className="font-medium text-xs uppercase tracking-[0.06em] px-4 py-2.5">{h}</th>
                 ))}
               </tr>
@@ -78,13 +78,13 @@ export default async function CampaignPage({ params }: { params: { id: string } 
               {campaign.invites.map((i) => (
                 <tr key={i.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3">
-                    <div className="font-medium">{i.name ?? i.email}</div>
+                    <Link href={`/admin/campaigns/${campaign.id}/candidates/${i.id}`} className="font-medium hover:underline underline-offset-2">{i.name ?? i.email}</Link>
                     {i.name && <div className="text-xs text-text-dim">{i.email}</div>}
                     {i.status === "FAILED" && i.lastError && <div className="text-xs text-hard mt-0.5">{i.lastError}</div>}
                   </td>
                   <td className="px-4 py-3"><span className={`badge ${PILL[i.status]}`}>{LABEL[i.status]}</span>{i.sendCount > 1 && <span className="ml-1 text-xs text-text-dim">×{i.sendCount}</span>}</td>
+                  <td className="px-4 py-3 tabular-nums font-semibold">{i.run?.overallScore ?? <span className="font-normal text-text-dim">—</span>}</td>
                   <td className="px-4 py-3 tabular-nums text-text-muted">{day(i.sentAt)}</td>
-                  <td className="px-4 py-3 tabular-nums text-text-muted">{day(i.openedAt)}</td>
                   <td className="px-4 py-3 tabular-nums text-text-muted">{day(i.completedAt)}</td>
                   <td className="px-4 py-3"><InviteRowActions inviteId={i.id} status={i.status} /></td>
                 </tr>
