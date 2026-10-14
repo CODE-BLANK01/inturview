@@ -86,6 +86,14 @@ export async function trackLiveMinutes(
   }
 }
 
+/** Current per-minute estimates for live voice and the avatar. Used by loop cost estimates. */
+export function liveRatesPerMinute() {
+  return {
+    voice: ratePerMinute(process.env.COST_REALTIME_VOICE_PER_MIN, 0.075),
+    avatar: ratePerMinute(process.env.COST_AVATAR_PER_MIN, 0.1),
+  };
+}
+
 function round(usd: number) {
   return Math.round(usd * 1e6) / 1e6;
 }
