@@ -84,6 +84,9 @@ model User {
   resetTokens           PasswordResetToken[]
   verificationTokens    EmailVerificationToken[]
   billingPurchases      BillingPurchase[]
+  memberships           OrganizationMember[]
+  memberInvitesSent     MemberInvitation[]       @relation("MemberInvitationInviter")
+  supportGrants         SupportAccessGrant[]
 
   @@index([role])
   @@index([flagged])
@@ -155,14 +158,16 @@ model PasswordResetToken {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  adminId    String
+  /// Who acted: an operator, or a workspace member for workspace events.
+  /// Null once that account is deleted; the entry itself is kept.
+  adminId    String?
   action     String
   targetType String
   targetId   String
   metadata   Json?
   createdAt  DateTime @default(now())
 
-  admin User @relation("AdminAudit", fields: [adminId], references: [id])
+  admin User? @relation("AdminAudit", fields: [adminId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([adminId])
@@ -453,12 +458,84 @@ enum QuestionSource {
 }
 
 model Organization {
-  id        String         @id @default(cuid())
-  name      String
-  slug      String         @unique
-  createdAt DateTime       @default(now())
-  questions Question[]
-  loops     LoopTemplate[]
+  id                    String               @id @default(cuid())
+  name                  String
+  slug                  String               @unique
+  /// IANA zone used for deadlines shown to applicants, e.g. "America/New_York".
+  timezone              String               @default("UTC")
+  website               String?
+  logoUrl               String?
+  /// Where applicants can ask for accommodations or help.
+  contactEmail          String?
+  /// Created by an operator for a design partner; billing is handled by hand.
+  designPartner         Boolean              @default(false)
+  onboardingStep        String?
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @default(now()) @updatedAt
+  questions             Question[]
+  loops                 LoopTemplate[]
+  members               OrganizationMember[]
+  memberInvitations     MemberInvitation[]
+  supportGrants         SupportAccessGrant[]
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  RECRUITER
+  REVIEWER
+}
+
+/// Workspace access. Never inferred from email domain, practice plan or User.role.
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgRole
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+/// A teammate invitation. Accepting requires being signed in, verified, as exactly `email`.
+model MemberInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Lowercased.
+  email          String
+  role           OrgRole
+  /// SHA-256 of the link token.
+  tokenHash      String       @unique
+  invitedById    String?
+  invitedBy      User?        @relation("MemberInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   String?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, email])
+}
+
+/// Time-boxed, reasoned operator access to a workspace. Operators have none otherwise.
+model SupportAccessGrant {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  operatorId     String
+  operator       User         @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  reason         String       @db.Text
+  expiresAt      DateTime
+  endedAt        DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, operatorId])
 }
 
 model Question {

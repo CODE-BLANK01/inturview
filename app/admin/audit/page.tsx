@@ -39,7 +39,7 @@ export default async function AdminAuditPage({
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Audit log</h1>
         <p className="text-sm text-text-muted mt-1">
-          Every admin mutation is recorded. Showing {entries.length} of {total} entries.
+          Every operator action and workspace change is recorded. Showing {entries.length} of {total} entries.
         </p>
       </header>
 
@@ -69,7 +69,7 @@ export default async function AdminAuditPage({
                       {new Date(e.createdAt).toLocaleString()}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-text-muted truncate max-w-[180px]">
-                      {e.admin.email}
+                      {e.admin?.email ?? "Deleted account"}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-text">
