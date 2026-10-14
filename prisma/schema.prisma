@@ -533,6 +533,7 @@ model LoopTemplate {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   versions       LoopTemplateVersion[]
+  campaigns      Campaign[]
 
   @@index([organizationId, status])
 }
@@ -548,4 +549,64 @@ model LoopTemplateVersion {
   publishedAt    DateTime     @default(now())
 
   @@unique([loopTemplateId, version])
+}
+
+// ─── Campaigns and invites ───────────────────────────────────────────────────
+// A campaign sends one published loop version to a group of candidates. Each
+// invite carries a personal link; only its SHA-256 hash is stored.
+
+enum InviteStatus {
+  PENDING
+  SENT
+  OPENED
+  STARTED
+  COMPLETED
+  FAILED
+  REVOKED
+}
+
+model Campaign {
+  id             String       @id @default(cuid())
+  organizationId String?
+  loopTemplateId String
+  loopTemplate   LoopTemplate @relation(fields: [loopTemplateId], references: [id], onDelete: Restrict)
+  /// The loop version every candidate in this campaign gets.
+  loopVersion    Int
+  name           String
+  /// Optional note from the hiring team, shown in the email and on the landing page.
+  message        String?      @db.Text
+  /// Links stop working after this; null means 14 days after each invite is sent.
+  deadline       DateTime?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  invites        Invite[]
+
+  @@index([organizationId])
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  campaignId  String
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email       String
+  name        String?
+  /// SHA-256 of the link token; resending rotates it so old links stop working.
+  tokenHash   String?      @unique
+  status      InviteStatus @default(PENDING)
+  sendCount   Int          @default(0)
+  lastError   String?
+  sentAt      DateTime?
+  expiresAt   DateTime?
+  openedAt    DateTime?
+  consentedAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  /// Candidate account, created automatically when they first open the link.
+  userId      String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
 }

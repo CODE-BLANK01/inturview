@@ -9,6 +9,7 @@ import {
   Database,
   Library,
   Route,
+  Send,
   Activity,
   ScrollText,
   ArrowUpLeft,
@@ -23,6 +24,7 @@ interface AdminShellProps {
 const NAV = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Users", href: "/admin/users", icon: Users },
+  { label: "Invites", href: "/admin/campaigns", icon: Send },
   { label: "Loops", href: "/admin/loops", icon: Route },
   { label: "Questions", href: "/admin/questions", icon: Library },
   { label: "Problems", href: "/admin/problems", icon: Database },

@@ -30,8 +30,11 @@ export default async function EditLoopPage({ params }: { params: { id: string } 
       </Link>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{loop.name}</h1>
+        {loop.status === "PUBLISHED" && (
+          <Link href={`/admin/campaigns/new?loop=${loop.id}`} className="btn btn-primary text-sm">Invite candidates</Link>
+        )}
         {loop.versions.length > 0 && (
-          <p className="text-xs text-text-dim">
+          <p className="text-xs text-text-dim w-full">
             Versions: {loop.versions.map((v) => `v${v.version} (${v.publishedAt.toISOString().slice(0, 10)})`).join(" · ")}
           </p>
         )}

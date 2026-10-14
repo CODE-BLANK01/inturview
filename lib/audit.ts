@@ -21,9 +21,14 @@ export type AuditAction =
   | "LOOP_UPDATED"
   | "LOOP_PUBLISHED"
   | "LOOP_ARCHIVED"
-  | "LOOP_RESTORED";
+  | "LOOP_RESTORED"
+  | "CAMPAIGN_CREATED"
+  | "CAMPAIGN_RECIPIENTS_ADDED"
+  | "INVITES_SENT"
+  | "INVITE_RESENT"
+  | "INVITE_REVOKED";
 
-export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop";
+export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop" | "campaign" | "invite";
 
 export async function writeAudit(opts: {
   adminId: string;
