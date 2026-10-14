@@ -198,14 +198,20 @@ export async function revokeInvite(inviteId: string) {
   return prisma.invite.update({ where: { id: inviteId }, data: { status: InviteStatus.REVOKED } });
 }
 
+/** What an applicant may see about the hiring company. */
+const APPLICANT_ORG = { select: { name: true, timezone: true, contactEmail: true, logoUrl: true, website: true } } as const;
+
 export type InviteLookup =
-  | { ok: true; invite: Prisma.InviteGetPayload<{ include: { campaign: true } }> }
+  | { ok: true; invite: Prisma.InviteGetPayload<{ include: { campaign: { include: { organization: typeof APPLICANT_ORG } } } }> }
   | { ok: false; reason: "unknown" | "revoked" | "expired" };
 
 /** Resolves a link token. Revoked and expired links say so plainly. */
 export async function findInviteByToken(raw: string, now = new Date()): Promise<InviteLookup> {
   if (!raw || raw.length < 20 || raw.length > 100) return { ok: false, reason: "unknown" };
-  const invite = await prisma.invite.findUnique({ where: { tokenHash: hashInviteToken(raw) }, include: { campaign: true } });
+  const invite = await prisma.invite.findUnique({
+    where: { tokenHash: hashInviteToken(raw) },
+    include: { campaign: { include: { organization: APPLICANT_ORG } } },
+  });
   if (!invite) return { ok: false, reason: "unknown" };
   if (invite.status === InviteStatus.REVOKED) return { ok: false, reason: "revoked" };
   if (invite.status !== InviteStatus.COMPLETED && invite.expiresAt && invite.expiresAt < now) return { ok: false, reason: "expired" };

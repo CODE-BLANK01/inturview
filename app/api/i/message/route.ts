@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { cachedInterviewPrompt, getAnthropic, MODEL } from "@/lib/anthropic";
 import { trackClaudeUsage, type ClaudeUsage } from "@/lib/aiCost";
 import { checkRateLimit, clientKey } from "@/lib/rateLimit";
-import { CATEGORY_TO_ANALYTICS, LoopAccessError, loadLoopContext } from "@/lib/loopRuns";
+import { applicantDistinctId, CATEGORY_TO_ANALYTICS, LoopAccessError, loadLoopContext } from "@/lib/loopRuns";
 import { COMPLETE_MARKER, interviewerSystemPrompt, MAX_CANDIDATE_TURNS, splitMarker, type FrozenQuestion } from "@/lib/loopRunEngine";
 import { toTurns } from "@/lib/loopRoundTurns";
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     questions: rr.questions as unknown as FrozenQuestion[],
   });
   const turns = toTurns([...rr.messages, { role: "candidate", content: parsed.data.content }]);
-  const distinctId = ctx.invite.userId ?? ctx.invite.id;
+  const distinctId = applicantDistinctId(ctx.invite.id);
 
   const enc = new TextEncoder();
   const abort = new AbortController();
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         const { text, complete } = splitMarker(full);
         if (text.length > emitted) send({ t: text.slice(emitted) });
         await prisma.loopMessage.create({ data: { roundRunId: rr.id, role: "interviewer", content: text } });
-        await trackClaudeUsage(distinctId, { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "interview_turn", usage: final.usage as ClaudeUsage });
+        await trackClaudeUsage(distinctId, { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "interview_turn", usage: final.usage as ClaudeUsage, organizationId: ctx.invite.campaign.organizationId });
         send({ done: true, complete });
       } catch (e) {
         if (!abort.signal.aborted) {

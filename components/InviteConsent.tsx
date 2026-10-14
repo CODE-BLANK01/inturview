@@ -5,7 +5,20 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 /** What the candidate agrees to before any round starts. Written to be read, not skipped. */
-export function InviteConsent({ token, consented }: { token: string; consented: boolean }) {
+export function InviteConsent({
+  token,
+  consented,
+  company,
+  contact,
+}: {
+  token: string;
+  consented: boolean;
+  /** The hiring company; null only for old test invites. */
+  company: string | null;
+  contact: { label: string; href: string | null };
+}) {
+  const who = company ?? "the hiring team";
+  const reach = contact.href ? <a className="underline underline-offset-2" href={contact.href}>{contact.label}</a> : <>{contact.label}</>;
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
   const [done, setDone] = useState(consented);
@@ -42,10 +55,11 @@ export function InviteConsent({ token, consented }: { token: string; consented: 
     <div className="panel p-7 space-y-4">
       <h2 className="text-lg font-semibold">Before you start</h2>
       <ul className="text-sm text-text-muted space-y-2 list-disc pl-5">
-        <li>An AI interviewer asks the questions and follow-ups. Your answers are recorded and scored against what the role needs.</li>
-        <li>People on the hiring team review the results and make every decision. The AI doesn&apos;t decide.</li>
-        <li>Your answers are used only for this application. You can ask for them to be deleted by replying to the invitation email.</li>
-        <li>Need more time, captions, a text-only format or another adjustment? Reply to the invitation email before you start and we&apos;ll arrange it.</li>
+        <li>An AI interviewer asks the questions and follow-ups. Your answers are recorded and assessed against what the role needs.</li>
+        <li>People at {who} review your answers and make every decision. The AI doesn&apos;t decide.</li>
+        <li>{company ?? "The hiring team"} sees only this interview. You don&apos;t need an inturview account, and nothing here is linked to one.</li>
+        <li>Your answers are kept for up to 12 months after a decision, then deleted. To have them deleted sooner, contact {reach}.</li>
+        <li>Need more time, captions, a text-only format or another adjustment? Contact {reach} before you start.</li>
       </ul>
       <label className="flex items-start gap-3 text-sm">
         <input id="invite-consent" type="checkbox" className="mt-1" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />

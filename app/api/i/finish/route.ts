@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const ctx = await loadLoopContext(parsed.data.token);
     const owned = await prisma.loopRoundRun.count({ where: { id: parsed.data.roundRunId, run: { inviteId: ctx.invite.id } } });
     if (!owned) return Response.json({ error: "Round not found" }, { status: 404 });
-    const rr = await finishRound(parsed.data.roundRunId, ctx.invite.userId ?? ctx.invite.id);
+    const rr = await finishRound(parsed.data.roundRunId);
     // The candidate never sees scores; only whether they can move on.
     return Response.json({ status: rr.status });
   } catch (e) {

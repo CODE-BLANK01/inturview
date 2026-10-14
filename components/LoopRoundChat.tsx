@@ -154,7 +154,7 @@ export function LoopRoundChat({
           <p className="font-medium">Round {roundIndex + 1} complete.</p>
           <p className="text-sm text-text-muted">{last ? "That was the last round. Thank you!" : "Take a break if you like. The next round is ready whenever you are."}</p>
           {/* A full page load, not client navigation: the round list must show fresh progress, not a cached copy. */}
-          <a href={`/i/${token}`} className="btn btn-primary w-full justify-center">{last ? "Finish" : "Back to your rounds"}</a>
+          <a href={last ? `/i/${token}/done` : `/i/${token}`} className="btn btn-primary w-full justify-center">{last ? "Finish" : "Back to your rounds"}</a>
         </div>
       ) : phase === "finishing" ? (
         <p className="text-sm text-text-muted inline-flex items-center gap-2" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Wrapping up this round…</p>

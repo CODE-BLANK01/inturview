@@ -80,7 +80,10 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git diff --name-only --diff-filter=A "$BASE" HEAD -- 'prisma/migrations/*/migration.sql' | grep -q .; then
+          if ! grep -qvE '^[[:space:]]*(--.*)?$' /tmp/schema.sql; then
+            # Comments or formatting only: the database doesn't change.
+            echo "No SQL changes; no migration needed."
+          elif git diff --name-only --diff-filter=A "$BASE" HEAD -- 'prisma/migrations/*/migration.sql' | grep -q .; then
             echo "Migration included."
           else
             echo "::error::schema.prisma changed but no migration was added. Run: npm run db:new-migration -- <short_name>"
