@@ -50,6 +50,23 @@ export function parseRounds(raw: unknown): LoopRoundConfig[] {
   return parsed.success ? parsed.data : [];
 }
 
+/**
+ * Rounds from a published version's snapshot. Published fixed rounds store
+ * pinned versions instead of plain ids; this reads both, so callers never
+ * have to know the difference.
+ */
+export function publishedRounds(snapshot: unknown): LoopRoundConfig[] {
+  const rounds = (snapshot as { config?: { rounds?: unknown } } | null)?.config?.rounds;
+  if (!Array.isArray(rounds)) return [];
+  return parseRounds(
+    rounds.map((r: { questions?: { mode?: string; pinned?: { questionId: string }[] } }) =>
+      r?.questions?.mode === "fixed" && Array.isArray(r.questions.pinned)
+        ? { ...r, questions: { mode: "fixed", questionIds: r.questions.pinned.map((p) => p.questionId) } }
+        : r,
+    ),
+  );
+}
+
 /** Which published questions a pool round can draw from. Untagged levels/roles mean "any". */
 export function poolWhere(category: QuestionCategory, pool: { tags: string[]; roles: string[]; level: string | null }): Prisma.QuestionWhereInput {
   return {

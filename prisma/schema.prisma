@@ -604,9 +604,72 @@ model Invite {
   completedAt DateTime?
   /// Candidate account, created automatically when they first open the link.
   userId      String?
+  run         LoopRun?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   @@unique([campaignId, email])
   @@index([campaignId, status])
+}
+
+// ─── Loop runs ───────────────────────────────────────────────────────────────
+// One candidate going through a loop from an invite. Each round freezes the
+// exact questions asked, so scoring and review never depend on later edits.
+
+enum LoopRunStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum RoundRunStatus {
+  IN_PROGRESS
+  SCORING
+  COMPLETED
+}
+
+model LoopRun {
+  id             String         @id @default(cuid())
+  inviteId       String         @unique
+  invite         Invite         @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  userId         String?
+  loopTemplateId String
+  loopVersion    Int
+  status         LoopRunStatus  @default(IN_PROGRESS)
+  /// 0–100, the mean of the round scores, once every round is scored.
+  overallScore   Int?
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
+  rounds         LoopRoundRun[]
+}
+
+model LoopRoundRun {
+  id          String           @id @default(cuid())
+  runId       String
+  run         LoopRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  roundIndex  Int
+  roundId     String
+  category    QuestionCategory
+  /// Frozen questions: [{ questionId, version, title, prompt, followUps, signals }]
+  questions   Json
+  status      RoundRunStatus   @default(IN_PROGRESS)
+  startedAt   DateTime         @default(now())
+  completedAt DateTime?
+  /// Structured score from the grader; see lib/loopRuns.ts.
+  scorecard   Json?
+  score       Int?
+  messages    LoopMessage[]
+
+  @@unique([runId, roundIndex])
+}
+
+model LoopMessage {
+  id         String       @id @default(cuid())
+  roundRunId String
+  roundRun   LoopRoundRun @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
+  /// "interviewer" or "candidate"
+  role       String
+  content    String       @db.Text
+  createdAt  DateTime     @default(now())
+
+  @@index([roundRunId, createdAt])
 }

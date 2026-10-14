@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 /** What the candidate agrees to before any round starts. Written to be read, not skipped. */
 export function InviteConsent({ token, consented }: { token: string; consented: boolean }) {
+  const router = useRouter();
   const [agreed, setAgreed] = useState(false);
   const [done, setDone] = useState(consented);
   const [busy, setBusy] = useState(false);
@@ -18,7 +20,10 @@ export function InviteConsent({ token, consented }: { token: string; consented: 
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token }),
     }).catch(() => null);
-    if (res?.ok) setDone(true);
+    if (res?.ok) {
+      setDone(true);
+      router.refresh(); // the page now shows the rounds
+    }
     else setError((await res?.json().catch(() => ({})))?.error ?? "Something went wrong. Try again.");
     setBusy(false);
   };
@@ -28,7 +33,7 @@ export function InviteConsent({ token, consented }: { token: string; consented: 
       <div className="panel p-7 space-y-2" role="status">
         <h2 className="text-lg font-semibold">You&apos;re all set</h2>
         <p className="text-sm text-text-muted">
-          Thanks. Your first round opens here. Keep this link: you can come back to it any time before it expires.
+          Thanks. Loading your rounds…
         </p>
       </div>
     );

@@ -1,8 +1,9 @@
 import { AuthShell } from "@/components/AuthShell";
 import { prisma } from "@/lib/db";
 import { findInviteByToken, markOpened } from "@/lib/invites";
-import { parseRounds, totalMinutes } from "@/lib/loopTemplates";
+import { publishedRounds, totalMinutes } from "@/lib/loopTemplates";
 import { CATEGORY_LABELS } from "@/lib/questionBank";
+import Link from "next/link";
 import { InviteConsent } from "@/components/InviteConsent";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,10 @@ export default async function InvitePage({ params }: { params: { token: string }
     select: { snapshot: true },
   });
   const config = (version?.snapshot as { config?: { name: string; description: string | null; rounds: unknown } } | undefined)?.config;
-  const rounds = parseRounds(config?.rounds ?? []);
+  const rounds = publishedRounds(version?.snapshot);
+  const run = await prisma.loopRun.findUnique({ where: { inviteId: invite.id }, select: { rounds: { select: { roundIndex: true, status: true } } } });
+  const doneRounds = new Set((run?.rounds ?? []).filter((r) => r.status !== "IN_PROGRESS").map((r) => r.roundIndex));
+  const inProgressRound = run?.rounds.find((r) => r.status === "IN_PROGRESS")?.roundIndex ?? null;
   const first = invite.name?.split(/\s+/)[0];
   const until = invite.expiresAt?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
 
@@ -66,8 +70,37 @@ export default async function InvitePage({ params }: { params: { token: string }
             {until && <> The link works until {until}.</>}
           </p>
         </div>
-        <InviteConsent token={params.token} consented={!!invite.consentedAt} />
+        {invite.consentedAt ? (
+          <RoundsPanel token={params.token} roundCount={rounds.length} done={doneRounds} inProgress={inProgressRound} finished={invite.status === "COMPLETED"} />
+        ) : (
+          <InviteConsent token={params.token} consented={false} />
+        )}
       </div>
     </AuthShell>
+  );
+}
+
+function RoundsPanel({ token, roundCount, done, inProgress, finished }: { token: string; roundCount: number; done: Set<number>; inProgress: number | null; finished: boolean }) {
+  if (finished || (roundCount > 0 && done.size >= roundCount)) {
+    return (
+      <div className="panel p-7 space-y-2" role="status">
+        <h2 className="text-lg font-semibold">You&apos;re done. Thank you.</h2>
+        <p className="text-sm text-text-muted">The hiring team will review your interview and get back to you. You can close this page.</p>
+      </div>
+    );
+  }
+  const next = inProgress ?? [...Array(roundCount).keys()].find((i) => !done.has(i)) ?? 0;
+  return (
+    <div className="panel p-7 space-y-4">
+      <h2 className="text-lg font-semibold">{done.size === 0 && inProgress === null ? "Ready when you are" : `Round ${next + 1} of ${roundCount}`}</h2>
+      <p className="text-sm text-text-muted">
+        {done.size > 0 ? `${done.size} of ${roundCount} rounds done. ` : ""}
+        Find a quiet spot. Answer the way you would in a real interview: specific examples beat general statements.
+      </p>
+      <Link href={`/i/${token}/round/${next}`} className="btn btn-primary w-full justify-center">
+        {inProgress !== null ? `Continue round ${next + 1}` : `Start round ${next + 1}`}
+      </Link>
+      <p className="text-xs text-text-dim">Keep this link. You can come back to it any time before it expires.</p>
+    </div>
   );
 }

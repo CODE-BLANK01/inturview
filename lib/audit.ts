@@ -26,7 +26,8 @@ export type AuditAction =
   | "CAMPAIGN_RECIPIENTS_ADDED"
   | "INVITES_SENT"
   | "INVITE_RESENT"
-  | "INVITE_REVOKED";
+  | "INVITE_REVOKED"
+  | "ROUND_RESCORED";
 
 export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop" | "campaign" | "invite";
 
