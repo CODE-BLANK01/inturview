@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { track } from "@/lib/track";
+import { safeNext } from "@/lib/nextPath";
 
 type Mode = "signin" | "signup";
 
@@ -16,9 +17,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
   // honor an explicit callbackUrl (e.g. from a deep link) or get sent to
   // /dashboard — server-side gates re-route them to /verify-email or
   // /onboarding as needed.
+  const intended = safeNext(params.get("callbackUrl"));
+  // New accounts verify their email first; the intended page rides along so
+  // an invited teammate lands back on their invitation, not practice onboarding.
   const callbackUrl =
-    params.get("callbackUrl") ||
-    (mode === "signup" ? "/verify-email" : "/dashboard");
+    mode === "signup"
+      ? `/verify-email${intended ? `?next=${encodeURIComponent(intended)}` : ""}`
+      : intended || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
@@ -42,6 +47,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             email: email.trim(),
             password,
             name: name.trim() || undefined,
+            next: intended ?? undefined,
           }),
         });
         if (!res.ok) {

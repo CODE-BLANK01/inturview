@@ -1,5 +1,6 @@
 import { AuthShell } from "@/components/AuthShell";
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/nextPath";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { captureProductEvent } from "@/lib/analytics";
@@ -13,14 +14,16 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Verify your email — inturview" };
 
 interface VerifyEmailPageProps {
-  searchParams: { token?: string };
+  searchParams: { token?: string; next?: string };
 }
 
 export default async function VerifyEmailPage({
   searchParams,
 }: VerifyEmailPageProps) {
   const user = await requireUser();
-  if (!user) redirect("/signin?callbackUrl=/verify-email");
+  const intended = safeNext(searchParams.next);
+  const here = `/verify-email${searchParams.token || intended ? "?" : ""}${[searchParams.token && `token=${encodeURIComponent(searchParams.token)}`, intended && `next=${encodeURIComponent(intended)}`].filter(Boolean).join("&")}`;
+  if (!user) redirect(`/signin?callbackUrl=${encodeURIComponent(here)}`);
 
   const profile = await prisma.user.findUnique({
     where: { id: user.id },
@@ -28,7 +31,8 @@ export default async function VerifyEmailPage({
   });
   if (!profile) redirect("/signin");
 
-  const next = profile.onboardingCompletedAt ? "/dashboard" : "/onboarding";
+  // An explicit destination (e.g. a teammate invitation) wins over practice onboarding.
+  const next = intended ?? (profile.onboardingCompletedAt ? "/dashboard" : "/onboarding");
 
   // If they're already verified and visit this page (with or without token),
   // bounce them forward.
@@ -46,6 +50,7 @@ export default async function VerifyEmailPage({
           <AuthShell>
             <VerifyEmailStandby
               email={profile.email}
+              next={intended}
               topMessage={{
                 tone: "error",
                 text: "That verification link belongs to a different account. Sign out and try the link again, or request a fresh one below.",
@@ -74,6 +79,7 @@ export default async function VerifyEmailPage({
       <AuthShell>
         <VerifyEmailStandby
           email={profile.email}
+          next={intended}
           topMessage={{ tone: "error", text: reasonText }}
         />
       </AuthShell>
@@ -83,7 +89,7 @@ export default async function VerifyEmailPage({
   // No token in URL — standby state, prompt to check inbox / resend.
   return (
     <AuthShell>
-      <VerifyEmailStandby email={profile.email} />
+      <VerifyEmailStandby email={profile.email} next={intended} />
     </AuthShell>
   );
 }

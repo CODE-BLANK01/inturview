@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { safeNext } from "@/lib/nextPath";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 const Body = z.object({
   email: z.string().email().max(200),
   name: z.string().trim().min(1).max(80).optional(),
+  next: z.string().max(300).optional(),
   password: z
     .string()
     .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
         toEmail: user.email,
         toName: user.name,
         rawToken,
+        next: safeNext(parsed.next),
       });
     } catch (err) {
       console.error("[signup] verification email failed:", err instanceof Error ? err.message : err);
