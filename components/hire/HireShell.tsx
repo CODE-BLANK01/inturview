@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpLeft, Building2, LayoutDashboard, LifeBuoy, Settings, Users } from "lucide-react";
+import { ArrowUpLeft, Building2, LayoutDashboard, Library, LifeBuoy, Route, Send, Settings, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Brand } from "@/components/Brand";
 
 interface HireShellProps {
@@ -14,19 +15,25 @@ interface HireShellProps {
   support: { expiresAt: string; reason: string } | null;
   /** More than one workspace: show a link back to the picker. */
   canSwitch: boolean;
+  /** Nav items this viewer may open, decided on the server from their role. */
+  nav: HireNavKey[];
 }
 
-// Only what exists. Roles, loops and candidates join this list as they ship.
-const NAV = [
-  { label: "Overview", path: "", icon: LayoutDashboard },
-  { label: "Team", path: "/team", icon: Users },
-  { label: "Settings", path: "/settings", icon: Settings },
-];
+export type HireNavKey = "overview" | "invites" | "loops" | "questions" | "team" | "settings";
 
-export function HireShell({ children, org, roleLabel, user, support, canSwitch }: HireShellProps) {
+const NAV: Record<HireNavKey, { label: string; path: string; icon: LucideIcon }> = {
+  overview: { label: "Overview", path: "", icon: LayoutDashboard },
+  invites: { label: "Invites", path: "/invites", icon: Send },
+  loops: { label: "Loops", path: "/loops", icon: Route },
+  questions: { label: "Questions", path: "/questions", icon: Library },
+  team: { label: "Team", path: "/team", icon: Users },
+  settings: { label: "Settings", path: "/settings", icon: Settings },
+};
+
+export function HireShell({ children, org, roleLabel, user, support, canSwitch, nav }: HireShellProps) {
   const pathname = usePathname();
   const base = `/hire/${org.slug}`;
-  const items = NAV.map((n) => {
+  const items = nav.map((key) => NAV[key]).map((n) => {
     const href = base + n.path;
     return { ...n, href, active: n.path ? pathname?.startsWith(href) : pathname === base };
   });

@@ -65,12 +65,18 @@ test("saved rounds are validated; corrupt data loads as empty, not a crash", () 
 });
 
 test("pool matching treats untagged levels and roles as 'any'", () => {
-  const w = poolWhere(QuestionCategory.TECHNICAL, { tags: ["kafka"], roles: ["backend"], level: "senior" });
+  const w = poolWhere(QuestionCategory.TECHNICAL, { tags: ["kafka"], roles: ["backend"], level: "senior" }, null);
   assert.equal(w.status, "PUBLISHED");
   assert.deepEqual(w.tags, { hasEvery: ["kafka"] });
   assert.deepEqual(w.OR, [{ levels: { has: "senior" } }, { levels: { isEmpty: true } }]);
-  assert.deepEqual(w.AND, [{ OR: [{ roles: { hasSome: ["backend"] } }, { roles: { isEmpty: true } }] }]);
-  assert.equal(poolWhere(QuestionCategory.TECHNICAL, { tags: [], roles: [], level: null }).OR, undefined);
+  assert.deepEqual(w.AND, [{ organizationId: null }, { OR: [{ roles: { hasSome: ["backend"] } }, { roles: { isEmpty: true } }] }]);
+  assert.equal(poolWhere(QuestionCategory.TECHNICAL, { tags: [], roles: [], level: null }, null).OR, undefined);
+});
+
+test("a workspace pool draws from its own questions and the published library, never another workspace", () => {
+  const w = poolWhere(QuestionCategory.BEHAVIORAL, { tags: [], roles: [], level: null }, "org_a");
+  assert.deepEqual(w.AND, [{ OR: [{ organizationId: "org_a" }, { organizationId: null, status: "PUBLISHED" }] }]);
+  assert.deepEqual(poolWhere(QuestionCategory.BEHAVIORAL, { tags: [], roles: [], level: null }, null).AND, [{ organizationId: null }]);
 });
 
 test("snapshot comparison ignores key order, as Postgres reorders stored JSON", async () => {

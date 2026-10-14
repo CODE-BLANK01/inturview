@@ -12,6 +12,13 @@ const nextConfig = {
     serverComponentsExternalPackages: ["@anthropic-ai/sdk"],
     instrumentationHook: true,
   },
+  async redirects() {
+    // The platform library moved under /admin/content when hiring moved into workspaces.
+    return [
+      { source: "/admin/questions/:path*", destination: "/admin/content/questions/:path*", permanent: false },
+      { source: "/admin/loops/:path*", destination: "/admin/content/loops/:path*", permanent: false },
+    ];
+  },
 };
 
 module.exports = withSentryConfig(nextConfig, {
