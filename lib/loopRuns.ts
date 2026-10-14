@@ -74,12 +74,17 @@ async function candidateUserId(email: string, name: string | null): Promise<stri
   }
 }
 
-async function frozenQuestions(round: LoopRoundConfig, pinned: { questionId: string; version: number }[] | undefined, exclude: Set<string>): Promise<FrozenQuestion[]> {
+async function frozenQuestions(
+  round: LoopRoundConfig,
+  pinned: { questionId: string; version: number }[] | undefined,
+  exclude: Set<string>,
+  organizationId: string | null,
+): Promise<FrozenQuestion[]> {
   let refs: { questionId: string; version: number }[];
   if (round.questions.mode === "fixed") {
     refs = pinned ?? [];
   } else {
-    const candidates = await prisma.question.findMany({ where: poolWhere(round.category, round.questions), select: { id: true, currentVersion: true } });
+    const candidates = await prisma.question.findMany({ where: poolWhere(round.category, round.questions, organizationId), select: { id: true, currentVersion: true } });
     const fresh = candidates.filter((c) => !exclude.has(c.id));
     refs = pickRandom(fresh.length >= round.questions.count ? fresh : candidates, round.questions.count).map((c) => ({ questionId: c.id, version: c.currentVersion }));
   }
@@ -132,7 +137,8 @@ export async function startRound(ctx: LoopContext, index: number) {
   });
   const publishedRound = ((versionRow?.snapshot as { config: { rounds: { id: string; questions: { pinned?: { questionId: string; version: number }[] } }[] } }).config.rounds).find((r) => r.id === round.id);
   const asked = new Set(existingRuns.flatMap((r) => (r.questions as unknown as FrozenQuestion[]).map((q) => q.questionId)));
-  const questions = await frozenQuestions(round, publishedRound?.questions.pinned, asked);
+  // The campaign belongs to the same workspace as its loop.
+  const questions = await frozenQuestions(round, publishedRound?.questions.pinned, asked, ctx.invite.campaign.organizationId);
   if (questions.length === 0) throw new LoopAccessError("This round has no questions available. Reply to the invitation email and we'll sort it out.", 500);
 
   try {
