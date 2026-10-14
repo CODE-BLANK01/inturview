@@ -12,3 +12,5 @@ if (!["localhost", "127.0.0.1", "postgres"].includes(host)) {
 }
 process.env.DATABASE_URL = url;
 delete process.env.RESEND_API_KEY;
+// Signs invite links in tests; never a real secret.
+process.env.NEXTAUTH_SECRET ||= "test-only-secret";
