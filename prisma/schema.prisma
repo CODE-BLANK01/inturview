@@ -682,6 +682,7 @@ model Invite {
   consentedAt DateTime?
   startedAt   DateTime?
   completedAt DateTime?
+  deliveries  Delivery[]
   /// Deprecated, no longer written: applicants don't get accounts. Older test
   /// rows may still hold a user ID; dropped in a later migration.
   userId      String?
@@ -696,6 +697,42 @@ model Invite {
 // ─── Loop runs ───────────────────────────────────────────────────────────────
 // One candidate going through a loop from an invite. Each round freezes the
 // exact questions asked, so scoring and review never depend on later edits.
+
+enum DeliveryState {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+/// One email send of an invite (the first send or a resend). Rows are their own
+/// queue: a worker claims QUEUED rows with a lease, sends, and finishes only if
+/// it still holds the claim, so a cancel or a newer claim always wins.
+/// At most one QUEUED/SENDING row per invite (partial unique index in SQL).
+model Delivery {
+  id                String        @id @default(cuid())
+  inviteId          String
+  invite            Invite        @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  state             DeliveryState @default(QUEUED)
+  /// SHA-256 of this delivery's link token. The token is derived from the
+  /// delivery ID, so a retry sends the same link instead of a competing one.
+  tokenHash         String        @unique
+  /// Set on each claim; the final write must match it.
+  claimId           String?
+  claimedAt         DateTime?
+  attempts          Int           @default(0)
+  /// Not before this time (backoff after a failed attempt).
+  runAfter          DateTime      @default(now())
+  lastError         String?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([state, runAfter])
+  @@index([inviteId])
+}
 
 enum LoopRunStatus {
   IN_PROGRESS

@@ -117,9 +117,10 @@ export type BatchResult = { ok: true; messageId?: string } | { ok: false; error:
 
 /**
  * Sends up to 100 emails in one Resend request. A bad address fails only its
- * own message; the result array lines up with the input.
+ * own message; the result array lines up with the input. Repeating a request
+ * with the same `idempotencyKey` within 24 hours doesn't send it twice.
  */
-export async function sendEmailBatch(messages: SendEmailParams[]): Promise<BatchResult[]> {
+export async function sendEmailBatch(messages: SendEmailParams[], opts: { idempotencyKey?: string } = {}): Promise<BatchResult[]> {
   if (messages.length === 0) return [];
   if (messages.length > 100) throw new Error("sendEmailBatch takes at most 100 messages");
   if (process.env.NODE_ENV === "production") {
@@ -144,7 +145,7 @@ export async function sendEmailBatch(messages: SendEmailParams[]): Promise<Batch
         ...(m.html ? { html: m.html } : {}),
         ...(m.replyTo ? { replyTo: m.replyTo } : {}),
       })),
-      { batchValidation: "permissive" },
+      { batchValidation: "permissive", ...(opts.idempotencyKey && { idempotencyKey: opts.idempotencyKey }) },
     );
     if (error || !data) return messages.map(() => ({ ok: false, error: error?.message ?? "Resend error" }));
     // Successful messages come back in order, skipping the failed indexes.

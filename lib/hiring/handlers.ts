@@ -30,7 +30,8 @@ import {
   publishLoop,
   setLoopArchived,
 } from "../loopTemplates";
-import { addRecipients, InviteActionError, resendInvite, revokeInvite, sendNextBatch } from "../invites";
+import { addRecipients, InviteActionError, resendInvite, revokeInvite } from "../invites";
+import { processDeliveries, queueCampaign, remainingFor } from "../delivery";
 import { RecipientsSchema } from "../recipients";
 import { scoreRound } from "../loopRuns";
 
@@ -316,13 +317,18 @@ export async function addRecipientsHandler(ctx: HiringCtx, req: NextRequest, id:
   return json(result);
 }
 
-/** Sends one batch; the screen keeps calling while `remaining` is above zero. */
+/**
+ * Queues the campaign's unsent invites and sends one batch now. The screen keeps
+ * calling while `remaining` is above zero; the scheduled worker finishes anything
+ * left (retries after a failure, or a closed tab).
+ */
 export async function sendBatchHandler(ctx: HiringCtx, req: NextRequest, id: string) {
   const parsed = z.object({ retryFailed: z.boolean().default(false) }).safeParse((await body(req)) ?? {});
   if (!parsed.success) return json({ error: "Invalid request" }, 400);
   if (!(await ownCampaign(ctx, id))) return notFound("Campaign");
   try {
-    const result = await sendNextBatch(id, { retryFailed: parsed.data.retryFailed });
+    await queueCampaign(id, { retryFailed: parsed.data.retryFailed });
+    const result = { ...(await processDeliveries({ campaignId: id, limit: 50 })), remaining: await remainingFor(id) };
     if (result.sent || result.failed) await audit(ctx, "INVITES_SENT", "campaign", id, result);
     return json(result);
   } catch (e) {
@@ -341,9 +347,9 @@ export async function inviteActionHandler(ctx: HiringCtx, req: NextRequest, id: 
       await audit(ctx, "INVITE_REVOKED", "invite", id);
       return json({ ok: true });
     }
-    const { sent } = await resendInvite(id);
+    const { sent, error } = await resendInvite(id);
     await audit(ctx, "INVITE_RESENT", "invite", id, { sent });
-    return sent ? json({ ok: true }) : json({ error: "The email didn't go through. Check the address and try again." }, 502);
+    return sent ? json({ ok: true }) : json({ error: error ?? "The email didn't go through. Check the address and try again." }, 502);
   } catch (e) {
     if (e instanceof InviteActionError) return json({ error: e.message }, 409);
     throw e;
