@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { processDeliveries } from "@/lib/delivery";
+import { processJobs } from "@/lib/jobs";
+import { scoringHandlers } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,14 +24,15 @@ function authorized(req: Request): boolean {
 export async function POST(req: Request) {
   if (!authorized(req)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const started = Date.now();
-  const totals = { sent: 0, failed: 0, retrying: 0, batches: 0 };
+  const emails = { sent: 0, failed: 0, retrying: 0 };
+  const jobs = { done: 0, failed: 0, retrying: 0 };
+  const handlers = scoringHandlers();
   while (Date.now() - started < BUDGET_MS) {
-    const r = await processDeliveries({ limit: 50 });
-    totals.sent += r.sent;
-    totals.failed += r.failed;
-    totals.retrying += r.retrying;
-    if (r.sent + r.failed + r.retrying === 0) break;
-    totals.batches++;
+    const d = await processDeliveries({ limit: 50 });
+    const j = await processJobs(handlers, { limit: 5 });
+    for (const k of Object.keys(emails) as (keyof typeof emails)[]) emails[k] += d[k];
+    for (const k of Object.keys(jobs) as (keyof typeof jobs)[]) jobs[k] += j[k];
+    if (d.sent + d.failed + d.retrying + j.done + j.failed + j.retrying === 0) break;
   }
-  return Response.json(totals);
+  return Response.json({ emails, jobs });
 }

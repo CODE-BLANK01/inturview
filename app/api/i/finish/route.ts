@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, clientKey } from "@/lib/rateLimit";
-import { finishRound, LoopAccessError, loadLoopContext } from "@/lib/loopRuns";
+import { LoopAccessError, loadLoopContext } from "@/lib/loopRuns";
+import { finishRound } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

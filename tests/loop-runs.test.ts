@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { COMPLETE_MARKER, interviewerSystemPrompt, overallScore, parseScorecard, pickRandom, scoringPrompt, splitMarker, type FrozenQuestion } from "../lib/loopRunEngine";
+import { COMPLETE_MARKER, interviewerSystemPrompt, overallScore, pickRandom, roundScore, scoringPrompt, splitMarker, unansweredScorecard, validateGrade, type FrozenQuestion } from "../lib/loopRunEngine";
 import { JOIN_TURN, toTurns } from "../lib/loopRoundTurns";
 import { publishedRounds } from "../lib/loopTemplates";
 
@@ -31,14 +31,40 @@ test("the end marker is stripped and detected", () => {
   assert.deepEqual(splitMarker("Next question?"), { text: "Next question?", complete: false });
 });
 
-test("scorecards: valid replies parse; unknown questions and bad JSON are rejected", () => {
-  const reply = `Here:\n${JSON.stringify({ questions: [{ questionId: "q1", score: 4, evidence: "Specific story", missing: "" }, { questionId: "zzz", score: 5, evidence: "x" }], overall: 72, strengths: ["Specific"], improvements: [], summary: "Solid." })}`;
-  const sc = parseScorecard(reply, ["q1", "q2"])!;
-  assert.equal(sc.overall, 72);
-  assert.deepEqual(sc.questions.map((q) => q.questionId), ["q1"], "invented question ids are dropped");
-  assert.equal(parseScorecard("not json", ["q1"]), null);
-  assert.equal(parseScorecard(JSON.stringify({ questions: [{ questionId: "q1", score: 9, evidence: "x" }], overall: 50, summary: "s" }), ["q1"]), null, "out-of-range score");
-  assert.equal(parseScorecard(JSON.stringify({ questions: [{ questionId: "zzz", score: 3, evidence: "x" }], overall: 50, summary: "s" }), ["q1"]), null, "no real questions left");
+const reply = (questions: unknown[], extra: Record<string, unknown> = {}) =>
+  `Here you go:\n${JSON.stringify({ questions, strengths: ["Specific"], improvements: [], summary: "Clear story.", ...extra })}`;
+const graded = (questionId: string, score: number | null, reason?: string) => ({ questionId, score, evidence: "x", missing: "", ...(reason && { notAssessedReason: reason }) });
+
+test("a valid grade keeps the asking order and computes the score itself", () => {
+  const r = validateGrade(reply([graded("q2", 3), graded("q1", 5)], { overall: 99 }), ["q1", "q2"]);
+  assert.ok(r.ok);
+  assert.deepEqual(r.scorecard.questions.map((q) => q.questionId), ["q1", "q2"]);
+  assert.equal(r.scorecard.score, 75, "mean 4 on 1–5 is 75; the model's own overall is ignored");
+  assert.deepEqual([r.scorecard.assessed, r.scorecard.total], [2, 2]);
+});
+
+test("duplicate, missing and unknown question ids make the whole grade invalid", () => {
+  const dup = validateGrade(reply([graded("q1", 4), graded("q1", 2), graded("q2", 3)]), ["q1", "q2"]);
+  assert.ok(!dup.ok && dup.problems.some((p) => /graded twice/.test(p)));
+  const missing = validateGrade(reply([graded("q1", 4)]), ["q1", "q2"]);
+  assert.ok(!missing.ok && missing.problems.some((p) => /q2 wasn't graded/.test(p)));
+  const unknown = validateGrade(reply([graded("q1", 4), graded("q2", 4), graded("zzz", 5)]), ["q1", "q2"]);
+  assert.ok(!unknown.ok && unknown.problems.some((p) => /zzz wasn't part/.test(p)));
+  assert.equal(validateGrade("not json", ["q1"]).ok, false);
+  assert.equal(validateGrade(reply([graded("q1", 9)]), ["q1"]).ok, false, "out-of-range score");
+});
+
+test("an unassessed question must say why, and doesn't count toward the score", () => {
+  assert.equal(validateGrade(reply([graded("q1", 4), graded("q2", null)]), ["q1", "q2"]).ok, false);
+  const r = validateGrade(reply([graded("q1", 4), graded("q2", null, "Time ran out before it.")]), ["q1", "q2"]);
+  assert.ok(r.ok);
+  assert.deepEqual([r.scorecard.score, r.scorecard.assessed, r.scorecard.total], [75, 1, 2]);
+});
+
+test("a silent round has no score, every question explained", () => {
+  const sc = unansweredScorecard(["q1", "q2"]);
+  assert.equal(sc.score, null);
+  assert.ok(sc.questions.every((q) => q.score === null && q.notAssessedReason));
 });
 
 test("grading prompt includes signals and labels speakers", () => {
@@ -48,10 +74,18 @@ test("grading prompt includes signals and labels speakers", () => {
   assert.match(user, /CANDIDATE: I disagreed with my lead\./);
 });
 
-test("overall score waits for every round", () => {
-  assert.equal(overallScore([80, 61]), 71);
-  assert.equal(overallScore([80, null]), null);
-  assert.equal(overallScore([]), null);
+test("round scores scale 1–5 to 0–100; overall weights rounds by length and reports coverage", () => {
+  assert.deepEqual(roundScore([{ score: 1 }, { score: 5 }]), { score: 50, assessed: 2, total: 2 });
+  assert.deepEqual(roundScore([{ score: null }]), { score: null, assessed: 0, total: 1 });
+  assert.deepEqual(
+    overallScore([
+      { score: 100, minutes: 30, assessed: 3, total: 3 },
+      { score: 40, minutes: 10, assessed: 1, total: 2 },
+      { score: null, minutes: 20, assessed: 0, total: 2 },
+    ]),
+    { score: 85, assessed: 4, total: 7 },
+  );
+  assert.equal(overallScore([]).score, null);
 });
 
 test("turns start with the join turn and merge back-to-back messages", () => {
