@@ -104,3 +104,18 @@ the crash page, so normal pages stay light.
 
 Open a PR from `dev` into `main`. When it merges, Netlify deploys production,
 runs migrations against the prod database, and Discord gets a deploy message.
+
+## 8. Database tests on your machine — anyone, 5 min once
+
+`npm run test:db` checks workspace isolation and permissions against a real
+Postgres. It refuses to run against anything but `localhost`, `127.0.0.1` or
+CI's `postgres` service, so it can't touch the shared dev database.
+
+```bash
+docker run --rm -d --name iv-test -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=intervue_test -p 55432:5432 postgres:16
+export TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/intervue_test
+DATABASE_URL=$TEST_DATABASE_URL DIRECT_URL=$TEST_DATABASE_URL npx prisma migrate deploy
+npm run test:db
+```
+
+CI runs the same thing in the "Database" job on every PR.

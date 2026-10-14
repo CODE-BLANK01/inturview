@@ -14,6 +14,7 @@ import {
   ScrollText,
   ArrowUpLeft,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 
 interface AdminShellProps {
@@ -24,6 +25,7 @@ interface AdminShellProps {
 const NAV = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Users", href: "/admin/users", icon: Users },
+  { label: "Workspaces", href: "/admin/organizations", icon: Building2 },
   { label: "Invites", href: "/admin/campaigns", icon: Send },
   { label: "Loops", href: "/admin/loops", icon: Route },
   { label: "Questions", href: "/admin/questions", icon: Library },
