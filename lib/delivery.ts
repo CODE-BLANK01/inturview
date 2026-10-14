@@ -39,7 +39,8 @@ export const tokenHashOf = (raw: string) => createHash("sha256").update(raw).dig
 
 function newDelivery(inviteId: string) {
   const id = `dl_${randomBytes(12).toString("base64url")}`;
-  return { id, inviteId, tokenHash: tokenHashOf(deliveryToken(id)) };
+  // runAfter from the app clock, not the column default (see lib/jobs.ts enqueueJob).
+  return { id, inviteId, tokenHash: tokenHashOf(deliveryToken(id)), runAfter: new Date() };
 }
 
 /** Queues one send per invite. Invites with a send already in flight are skipped. */
