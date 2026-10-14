@@ -1,6 +1,6 @@
 # Three products, one platform
 
-Status: **proposal, awaiting sign-off.** Nothing here is implemented yet.
+Status: **approved 2026-10-14.** Decisions in §10 are settled. Implementation follows the phases in §8.
 
 inturview becomes three products on one codebase, one database and one sign-in:
 
@@ -248,14 +248,14 @@ These journeys, tested in CI with isolated data and mocked email, Stripe and mod
 
 ---
 
-## 10. Decisions needed
+## 10. Decisions (settled 2026-10-14)
 
-| # | Decision | Recommendation |
-|---|---|---|
-| D1 | Can any company create a workspace, or only design partners? | **Design partners only for now:** an operator creates the workspace and sends the owner invitation. Self-serve sits behind a flag until employer pricing exists. |
-| D2 | How are delivery and scoring jobs run on Netlify? | **A `Job` table plus a Netlify Scheduled Function every minute**, with an immediate attempt after enqueue. Needs Netlify config. |
-| D3 | PRs #5 and #6 | **Close as superseded** once Phase 2 lands; keep #4 and move its builder. |
-| D4 | Retention for applicant data | **Delete transcripts and scores 12 months after the decision,** or sooner on request; owners can set a shorter period. |
+| # | Decision |
+|---|---|
+| D1 | **Design partners only.** An operator creates the workspace and sends the owner invitation. Self-serve workspace creation is built behind `HIRE_SELF_SERVE_ENABLED` and stays off until employer pricing exists. |
+| D2 | **A `Job` table plus a Netlify Scheduled Function every minute,** with an immediate attempt after enqueue. |
+| D3 | **PRs #5 and #6 are superseded** by Phases 1–2 and closed once Phase 2 lands. PR #4's builder is reused. |
+| D4 | **Applicant transcripts and scores are deleted 12 months after the decision,** or sooner on request; owners can set a shorter period. |
 
 ## 11. External configuration still required
 
