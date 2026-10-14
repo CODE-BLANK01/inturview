@@ -354,11 +354,11 @@ export async function inviteActionHandler(ctx: HiringCtx, req: NextRequest, id: 
 export async function rescoreHandler(ctx: HiringCtx, id: string) {
   const rr = await prisma.loopRoundRun.findFirst({
     where: { id, run: { invite: { campaign: { organizationId: ctx.organizationId } } } },
-    select: { status: true, run: { select: { userId: true } } },
+    select: { status: true },
   });
   if (!rr) return notFound("Round");
   if (rr.status === "IN_PROGRESS") return json({ error: "The candidate hasn't finished this round yet." }, 409);
-  const updated = await scoreRound(id, rr.run.userId ?? ctx.actorId);
+  const updated = await scoreRound(id);
   await audit(ctx, "ROUND_RESCORED", "invite", id, { status: updated.status });
   return updated.status === "COMPLETED" ? json({ ok: true, score: updated.score }) : json({ error: "Grading failed again. Try in a minute." }, 502);
 }

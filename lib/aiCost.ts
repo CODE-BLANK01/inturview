@@ -34,7 +34,15 @@ export function claudeCostUsd(model: string, usage: ClaudeUsage): { costUsd: num
 /** One Claude call: an interviewer turn or a debrief. Never throws. */
 export async function trackClaudeUsage(
   userId: string,
-  opts: { category: Category; sessionId: string; model: string; purpose: "interview_turn" | "debrief"; usage: ClaudeUsage },
+  opts: {
+    category: Category;
+    sessionId: string;
+    model: string;
+    purpose: "interview_turn" | "debrief";
+    usage: ClaudeUsage;
+    /** The hiring workspace paying for an applicant's interview. */
+    organizationId?: string | null;
+  },
 ): Promise<void> {
   const { costUsd, priced } = claudeCostUsd(opts.model, opts.usage);
   await captureProductEvent(userId, {
@@ -51,6 +59,7 @@ export async function trackClaudeUsage(
       cache_read_tokens: opts.usage.cache_read_input_tokens ?? 0,
       cost_usd: costUsd,
       estimated: !priced,
+      ...(opts.organizationId !== undefined && { organization_id: opts.organizationId }),
     },
   });
 }

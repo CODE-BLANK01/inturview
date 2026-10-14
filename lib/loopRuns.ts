@@ -1,5 +1,3 @@
-import { randomBytes } from "crypto";
-import bcrypt from "bcryptjs";
 import { InviteStatus, LoopRunStatus, Prisma, QuestionCategory, RoundRunStatus } from "@prisma/client";
 import { prisma } from "./db";
 import { getAnthropic, MODEL } from "./anthropic";
@@ -55,24 +53,11 @@ export async function loadLoopContext(token: string): Promise<LoopContext> {
   };
 }
 
-/** The candidate's account: created on first start, or the existing one with that email. */
-async function candidateUserId(email: string, name: string | null): Promise<string> {
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  if (existing) return existing.id;
-  // An unguessable password they never see; "Forgot password" lets them claim the account later.
-  const passwordHash = await bcrypt.hash(randomBytes(24).toString("base64url"), 10);
-  try {
-    const user = await prisma.user.create({
-      data: { email, name, passwordHash, emailVerifiedAt: new Date(), onboardingCompletedAt: new Date() },
-      select: { id: true },
-    });
-    return user.id;
-  } catch (e) {
-    // Two requests (double click, two tabs) created it at the same moment; use the winner.
-    if ((e as { code?: string }).code === "P2002") return (await prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true } })).id;
-    throw e;
-  }
-}
+/**
+ * Analytics identity for an applicant. Applicants have no account: they are
+ * the invite, and nothing links them to a practice user.
+ */
+export const applicantDistinctId = (inviteId: string) => `applicant:${inviteId}`;
 
 async function frozenQuestions(
   round: LoopRoundConfig,
@@ -115,10 +100,9 @@ export async function startRound(ctx: LoopContext, index: number) {
 
   let run = ctx.invite.run;
   if (!run) {
-    const userId = await candidateUserId(ctx.invite.email, ctx.invite.name);
     try {
       run = await prisma.loopRun.create({
-        data: { inviteId: ctx.invite.id, userId, loopTemplateId: ctx.invite.campaign.loopTemplateId, loopVersion: ctx.invite.campaign.loopVersion },
+        data: { inviteId: ctx.invite.id, loopTemplateId: ctx.invite.campaign.loopTemplateId, loopVersion: ctx.invite.campaign.loopVersion },
         include: { rounds: { orderBy: { roundIndex: "asc" } } },
       });
     } catch (e) {
@@ -127,7 +111,7 @@ export async function startRound(ctx: LoopContext, index: number) {
     }
     await prisma.invite.updateMany({
       where: { id: ctx.invite.id, startedAt: null },
-      data: { userId, status: InviteStatus.STARTED, startedAt: new Date() },
+      data: { status: InviteStatus.STARTED, startedAt: new Date() },
     });
   }
 
@@ -156,20 +140,23 @@ export async function startRound(ctx: LoopContext, index: number) {
 }
 
 /** Scores a finished round. Safe to call twice: only one caller moves it to SCORING. */
-export async function finishRound(roundRunId: string, distinctUserId: string) {
+export async function finishRound(roundRunId: string) {
   const claimed = await prisma.loopRoundRun.updateMany({
     where: { id: roundRunId, status: RoundRunStatus.IN_PROGRESS },
     data: { status: RoundRunStatus.SCORING, completedAt: new Date() },
   });
   if (claimed.count === 0) return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
-  return scoreRound(roundRunId, distinctUserId);
+  return scoreRound(roundRunId);
 }
 
 /** Grades the transcript against each question's signals. A failure leaves the round in SCORING for a re-score. */
-export async function scoreRound(roundRunId: string, distinctUserId: string) {
+export async function scoreRound(roundRunId: string) {
   const rr = await prisma.loopRoundRun.findUniqueOrThrow({
     where: { id: roundRunId },
-    include: { messages: { orderBy: { createdAt: "asc" } } },
+    include: {
+      messages: { orderBy: { createdAt: "asc" } },
+      run: { select: { inviteId: true, invite: { select: { campaign: { select: { organizationId: true } } } } } },
+    },
   });
   const questions = rr.questions as unknown as FrozenQuestion[];
   const candidateSpoke = rr.messages.some((m) => m.role === "candidate" && m.content.trim().length > 0);
@@ -178,7 +165,14 @@ export async function scoreRound(roundRunId: string, distinctUserId: string) {
     try {
       const { system, user } = scoringPrompt(questions, rr.messages);
       const resp = await getAnthropic().messages.create({ model: MODEL, max_tokens: 2000, system, messages: [{ role: "user", content: user }] });
-      await trackClaudeUsage(distinctUserId, { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "debrief", usage: resp.usage as ClaudeUsage });
+      await trackClaudeUsage(applicantDistinctId(rr.run.inviteId), {
+        category: CATEGORY_TO_ANALYTICS[rr.category],
+        sessionId: rr.id,
+        model: MODEL,
+        purpose: "debrief",
+        usage: resp.usage as ClaudeUsage,
+        organizationId: rr.run.invite.campaign.organizationId,
+      });
       scorecard = parseScorecard(resp.content.map((b) => (b.type === "text" ? b.text : "")).join(""), questions.map((q) => q.questionId));
     } catch (e) {
       console.error("[loop/score] grader failed:", e instanceof Error ? e.message : e);

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getAnthropic, MODEL } from "@/lib/anthropic";
 import { trackClaudeUsage, type ClaudeUsage } from "@/lib/aiCost";
 import { checkRateLimit, clientKey } from "@/lib/rateLimit";
-import { CATEGORY_TO_ANALYTICS, LoopAccessError, loadLoopContext, startRound } from "@/lib/loopRuns";
+import { applicantDistinctId, CATEGORY_TO_ANALYTICS, LoopAccessError, loadLoopContext, startRound } from "@/lib/loopRuns";
 import { interviewerSystemPrompt, splitMarker, type FrozenQuestion } from "@/lib/loopRunEngine";
 import { JOIN_TURN } from "@/lib/loopRoundTurns";
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         questions: rr.questions as unknown as FrozenQuestion[],
       });
       const resp = await getAnthropic().messages.create({ model: MODEL, max_tokens: 400, system, messages: [{ role: "user", content: JOIN_TURN }] });
-      await trackClaudeUsage(ctx.invite.userId ?? ctx.invite.id, { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "interview_turn", usage: resp.usage as ClaudeUsage });
+      await trackClaudeUsage(applicantDistinctId(ctx.invite.id), { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "interview_turn", usage: resp.usage as ClaudeUsage, organizationId: ctx.invite.campaign.organizationId });
       const opening = splitMarker(resp.content.map((b) => (b.type === "text" ? b.text : "")).join("")).text;
       await prisma.loopMessage.create({ data: { roundRunId: rr.id, role: "interviewer", content: opening } });
       messages = await prisma.loopMessage.findMany({ where: { roundRunId: rr.id }, orderBy: { createdAt: "asc" }, select: { id: true, role: true, content: true } });
