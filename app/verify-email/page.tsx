@@ -1,6 +1,6 @@
 import { AuthShell } from "@/components/AuthShell";
 import { redirect } from "next/navigation";
-import { safeNext } from "@/lib/nextPath";
+import { afterVerify } from "@/lib/nextPath";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { captureProductEvent } from "@/lib/analytics";
@@ -21,7 +21,7 @@ export default async function VerifyEmailPage({
   searchParams,
 }: VerifyEmailPageProps) {
   const user = await requireUser();
-  const intended = safeNext(searchParams.next);
+  const intended = afterVerify(searchParams.next);
   const here = `/verify-email${searchParams.token || intended ? "?" : ""}${[searchParams.token && `token=${encodeURIComponent(searchParams.token)}`, intended && `next=${encodeURIComponent(intended)}`].filter(Boolean).join("&")}`;
   if (!user) redirect(`/signin?callbackUrl=${encodeURIComponent(here)}`);
 

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { safeNext } from "@/lib/nextPath";
+import { afterVerify } from "@/lib/nextPath";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import {
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       toEmail: profile.email,
       toName: profile.name,
       rawToken,
-      next: safeNext(body?.next),
+      next: afterVerify(body?.next),
     });
   } catch (err) {
     console.error("[resend-verification] failed:", err instanceof Error ? err.message : err);

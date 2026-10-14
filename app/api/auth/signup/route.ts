@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { safeNext } from "@/lib/nextPath";
+import { afterVerify } from "@/lib/nextPath";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         toEmail: user.email,
         toName: user.name,
         rawToken,
-        next: safeNext(parsed.next),
+        next: afterVerify(parsed.next),
       });
     } catch (err) {
       console.error("[signup] verification email failed:", err instanceof Error ? err.message : err);

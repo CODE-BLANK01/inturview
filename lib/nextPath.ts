@@ -7,7 +7,14 @@ export function safeNext(value: unknown): string | null {
   const v = value.trim();
   if (!v.startsWith("/") || v.startsWith("//") || v.startsWith("/\\") || v.length > 300) return null;
   if (/[\u0000-\u001f]/.test(v) || /^\/+[a-z][a-z0-9+.-]*:/i.test(v)) return null;
-  // Never bounce back into the auth pages themselves.
-  if (/^\/(signin|signup|verify-email)(\/|\?|$)/.test(v)) return null;
+  // Never bounce back into sign-in or sign-up. (/verify-email?token=… is a
+  // legitimate place to return to after signing in from the email link.)
+  if (/^\/(signin|signup)(\/|\?|$)/.test(v)) return null;
   return v;
+}
+
+/** Where to go once the email is verified: anywhere safeNext allows except verification itself. */
+export function afterVerify(value: unknown): string | null {
+  const v = safeNext(value);
+  return v && !/^\/verify-email(\/|\?|$)/.test(v) ? v : null;
 }

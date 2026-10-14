@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { track } from "@/lib/track";
-import { safeNext } from "@/lib/nextPath";
+import { afterVerify, safeNext } from "@/lib/nextPath";
 
 type Mode = "signin" | "signup";
 
@@ -20,11 +20,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const intended = safeNext(params.get("callbackUrl"));
   // New accounts verify their email first; the intended page rides along so
   // an invited teammate lands back on their invitation, not practice onboarding.
+  const afterSignup = afterVerify(intended);
   const callbackUrl =
     mode === "signup"
-      ? `/verify-email${intended ? `?next=${encodeURIComponent(intended)}` : ""}`
+      ? `/verify-email${afterSignup ? `?next=${encodeURIComponent(afterSignup)}` : ""}`
       : intended || "/dashboard";
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => params.get("email")?.slice(0, 200) ?? "");
+  // Switching between sign in and sign up keeps the destination and email.
+  const carry = (path: string) => {
+    const q = new URLSearchParams();
+    if (intended) q.set("callbackUrl", intended);
+    if (email.trim()) q.set("email", email.trim());
+    const s = q.toString();
+    return s ? `${path}?${s}` : path;
+  };
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [needsSecondFactor, setNeedsSecondFactor] = useState(false);
@@ -47,7 +56,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             email: email.trim(),
             password,
             name: name.trim() || undefined,
-            next: intended ?? undefined,
+            next: afterSignup ?? undefined,
           }),
         });
         if (!res.ok) {
@@ -242,7 +251,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             <>
               No account yet?{" "}
               <Link
-                href="/signup"
+                href={carry("/signup")}
                 className="text-accent underline underline-offset-4"
               >
                 Sign up
@@ -252,7 +261,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             <>
               Already have an account?{" "}
               <Link
-                href="/signin"
+                href={carry("/signin")}
                 className="text-accent underline underline-offset-4"
               >
                 Sign in
