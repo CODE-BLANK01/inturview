@@ -1,4 +1,6 @@
-import { AuthShell } from "@/components/AuthShell";
+import { redirect } from "next/navigation";
+import { ApplicantShell } from "@/components/applicant/ApplicantShell";
+import { contactFor, deadlineText } from "@/lib/applicant";
 import { prisma } from "@/lib/db";
 import { findInviteByToken, markOpened } from "@/lib/invites";
 import { publishedRounds, totalMinutes } from "@/lib/loopTemplates";
@@ -10,9 +12,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Your interview — inturview", robots: { index: false, follow: false } };
 
 const MESSAGES = {
-  unknown: ["This link doesn't work", "Check that you opened the full link from your email. If it still doesn't work, reply to the invitation email and we'll send a new one."],
+  unknown: ["This link doesn't work", "Check that you opened the full link from your email. If it still doesn't work, reply to the invitation email and the hiring team will send a new one."],
   revoked: ["This invitation was cancelled", "If you think that's a mistake, reply to the invitation email."],
-  expired: ["This link has expired", "Reply to the invitation email and ask for a new link."],
+  expired: ["This link has expired", "Reply to the invitation email and ask the hiring team for a new link."],
 } as const;
 
 export default async function InvitePage({ params }: { params: { token: string } }) {
@@ -20,15 +22,17 @@ export default async function InvitePage({ params }: { params: { token: string }
   if (!found.ok) {
     const [title, body] = MESSAGES[found.reason];
     return (
-      <AuthShell>
+      <ApplicantShell company={null}>
         <div className="w-full max-w-md mx-auto panel p-7">
           <h1 className="t-section-headline text-2xl mb-2">{title}</h1>
           <p className="t-body-light text-sm text-text-muted">{body}</p>
         </div>
-      </AuthShell>
+      </ApplicantShell>
     );
   }
   const { invite } = found;
+  const company = invite.campaign.organization;
+  if (invite.status === "COMPLETED") redirect(`/i/${params.token}/done`);
   await markOpened(invite.id);
 
   const version = await prisma.loopTemplateVersion.findUnique({
@@ -40,14 +44,17 @@ export default async function InvitePage({ params }: { params: { token: string }
   const run = await prisma.loopRun.findUnique({ where: { inviteId: invite.id }, select: { rounds: { select: { roundIndex: true, status: true } } } });
   const doneRounds = new Set((run?.rounds ?? []).filter((r) => r.status !== "IN_PROGRESS").map((r) => r.roundIndex));
   const inProgressRound = run?.rounds.find((r) => r.status === "IN_PROGRESS")?.roundIndex ?? null;
+  // Every round is in: show the confirmation, even while scoring is still running.
+  if (rounds.length > 0 && doneRounds.size >= rounds.length) redirect(`/i/${params.token}/done`);
   const first = invite.name?.split(/\s+/)[0];
-  const until = invite.expiresAt?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  const until = invite.expiresAt ? deadlineText(invite.expiresAt, company?.timezone ?? "UTC") : null;
+  const contact = contactFor(company);
 
   return (
-    <AuthShell>
+    <ApplicantShell company={company}>
       <div className="w-full max-w-xl mx-auto space-y-5">
         <div className="panel p-7 space-y-4">
-          <p className="t-eyebrow">Interview invitation</p>
+          <p className="t-eyebrow">{company ? `Interview with ${company.name}` : "Interview invitation"}</p>
           <h1 className="t-section-headline text-3xl">{first ? `${first}, here's your interview` : "Here's your interview"}</h1>
           <p className="text-lg font-medium">{config?.name ?? "Interview"}</p>
           {config?.description && <p className="text-sm text-text-muted">{config.description}</p>}
@@ -67,28 +74,24 @@ export default async function InvitePage({ params }: { params: { token: string }
           </ol>
           <p className="text-sm text-text-muted">
             About {totalMinutes(rounds)} minutes in total. You can take a break between rounds.
-            {until && <> The link works until {until}.</>}
+            {until && <> Finish by {until}.</>}
+          </p>
+          <p className="text-sm text-text-muted">
+            Questions, or need an adjustment?{" "}
+            {contact.href ? <a className="underline underline-offset-2" href={contact.href}>{contact.label}</a> : <>Reply to {contact.label}.</>}
           </p>
         </div>
         {invite.consentedAt ? (
-          <RoundsPanel token={params.token} roundCount={rounds.length} done={doneRounds} inProgress={inProgressRound} finished={invite.status === "COMPLETED"} />
+          <RoundsPanel token={params.token} roundCount={rounds.length} done={doneRounds} inProgress={inProgressRound} />
         ) : (
-          <InviteConsent token={params.token} consented={false} />
+          <InviteConsent token={params.token} consented={false} company={company?.name ?? null} contact={contact} />
         )}
       </div>
-    </AuthShell>
+    </ApplicantShell>
   );
 }
 
-function RoundsPanel({ token, roundCount, done, inProgress, finished }: { token: string; roundCount: number; done: Set<number>; inProgress: number | null; finished: boolean }) {
-  if (finished || (roundCount > 0 && done.size >= roundCount)) {
-    return (
-      <div className="panel p-7 space-y-2" role="status">
-        <h2 className="text-lg font-semibold">You&apos;re done. Thank you.</h2>
-        <p className="text-sm text-text-muted">The hiring team will review your interview and get back to you. You can close this page.</p>
-      </div>
-    );
-  }
+function RoundsPanel({ token, roundCount, done, inProgress }: { token: string; roundCount: number; done: Set<number>; inProgress: number | null }) {
   const next = inProgress ?? [...Array(roundCount).keys()].find((i) => !done.has(i)) ?? 0;
   return (
     <div className="panel p-7 space-y-4">

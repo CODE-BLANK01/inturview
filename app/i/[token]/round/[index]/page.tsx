@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AuthShell } from "@/components/AuthShell";
+import { ApplicantShell } from "@/components/applicant/ApplicantShell";
 import { prisma } from "@/lib/db";
 import { findInviteByToken } from "@/lib/invites";
 import { publishedRounds } from "@/lib/loopTemplates";
@@ -21,7 +21,7 @@ export default async function LoopRoundPage({ params }: { params: { token: strin
   const round = rounds[index];
   if (!Number.isInteger(index) || !round) redirect(`/i/${params.token}`);
   return (
-    <AuthShell>
+    <ApplicantShell company={found.invite.campaign.organization}>
       <LoopRoundChat
         token={params.token}
         roundIndex={index}
@@ -30,6 +30,6 @@ export default async function LoopRoundPage({ params }: { params: { token: strin
         minutes={round.durationMinutes}
         isCoding={round.category === "CODING" || round.category === "SYSTEM_DESIGN"}
       />
-    </AuthShell>
+    </ApplicantShell>
   );
 }
