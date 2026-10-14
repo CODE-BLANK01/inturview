@@ -20,7 +20,7 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
     // Emails that bounced and rounds whose scoring didn't finish.
     seesCandidates
       ? prisma.invite.count({
-          where: { campaign: { organizationId: org.id }, OR: [{ status: "FAILED" }, { run: { rounds: { some: { status: "SCORING" } } } }] },
+          where: { campaign: { organizationId: org.id }, OR: [{ status: "FAILED" }, { run: { rounds: { some: { status: "SCORING_FAILED" } } } }] },
         })
       : 0,
   ]);

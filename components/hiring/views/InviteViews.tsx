@@ -30,6 +30,9 @@ const PILL: Record<InviteStatus, string> = {
 };
 const LABEL: Record<InviteStatus, string> = { PENDING: "queued", SENT: "sent", OPENED: "opened", STARTED: "started", COMPLETED: "finished", FAILED: "failed", REVOKED: "cancelled" };
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "—");
+/** Scorecards saved before validation was tightened (the grader's own overall, no coverage). */
+type LegacyScorecard = Omit<Scorecard, "version" | "assessed" | "total" | "score"> & { overall: number };
+
 const band = (n: number) => (n >= 75 ? "text-easy" : n >= 50 ? "text-medium" : "text-hard");
 
 function BackLink({ href, label }: { href: string; label: string }) {
@@ -224,7 +227,17 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
     where: { id: inviteId, campaignId, campaign: { organizationId } },
     include: {
       campaign: { select: { id: true, name: true, loopTemplateId: true, loopVersion: true } },
-      run: { include: { rounds: { orderBy: { roundIndex: "asc" }, include: { messages: { orderBy: { createdAt: "asc" } } } } } },
+      run: {
+        include: {
+          rounds: {
+            orderBy: { roundIndex: "asc" },
+            include: {
+              messages: { orderBy: { createdAt: "asc" } },
+              attempts: { orderBy: { attempt: "desc" }, select: { attempt: true, status: true, error: true, createdAt: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!invite) notFound();
@@ -245,7 +258,10 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
         {invite.run?.overallScore != null && (
           <div className="text-right">
             <div className={`text-4xl font-semibold tabular-nums ${band(invite.run.overallScore)}`}>{invite.run.overallScore}</div>
-            <div className="text-xs text-text-dim">overall, out of 100</div>
+            <div className="text-xs text-text-dim">
+              overall, out of 100
+              {invite.run.totalQuestions ? ` · ${invite.run.assessedQuestions} of ${invite.run.totalQuestions} questions assessed` : ""}
+            </div>
           </div>
         )}
       </header>
@@ -253,7 +269,8 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
 
       {plan.map((round, i) => {
         const rr = invite.run?.rounds.find((r) => r.roundIndex === i);
-        const sc = rr?.scorecard as Scorecard | null | undefined;
+        const sc = rr?.scorecard as (Scorecard | LegacyScorecard) | null | undefined;
+        const failures = rr?.attempts.filter((a) => a.status !== "SUCCEEDED") ?? [];
         const qs = (rr?.questions ?? []) as unknown as FrozenQuestion[];
         return (
           <section key={round.id} className="panel p-5 space-y-4">
@@ -265,8 +282,19 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
                 {!rr && <span className="text-sm text-text-dim">Not started</span>}
                 {rr?.status === "IN_PROGRESS" && <span className="text-sm text-medium">In progress</span>}
                 {rr?.status === "SCORING" && (
+                  <span className="text-sm text-medium">
+                    Scoring{failures.length ? `, retrying (${failures.length} attempt${failures.length === 1 ? "" : "s"} so far)` : "…"}
+                  </span>
+                )}
+                {rr?.status === "SCORING_FAILED" && (
                   <>
-                    <span className="text-sm text-hard">Scoring didn&apos;t finish</span>
+                    <span className="text-sm text-hard">Scoring failed after {failures.length} attempts</span>
+                    {canRescore && <RescoreButton roundRunId={rr.id} />}
+                  </>
+                )}
+                {rr?.status === "COMPLETED" && rr.score == null && (
+                  <>
+                    <span className="text-sm text-text-dim">Nothing to score</span>
                     {canRescore && <RescoreButton roundRunId={rr.id} />}
                   </>
                 )}
@@ -281,6 +309,7 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
 
             {sc && (
               <div className="space-y-3">
+                {"version" in sc && <p className="text-xs text-text-dim">{sc.assessed} of {sc.total} questions assessed</p>}
                 <p className="text-sm">{sc.summary}</p>
                 <div className="grid sm:grid-cols-2 gap-3 text-sm">
                   {sc.strengths.length > 0 && <div><p className="text-xs uppercase tracking-[0.08em] text-text-dim mb-1">Strengths</p><ul className="list-disc pl-4 space-y-0.5">{sc.strengths.map((s) => <li key={s}>{s}</li>)}</ul></div>}
@@ -288,19 +317,39 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
                 </div>
                 <table className="min-w-full text-sm">
                   <tbody>
-                    {sc.questions.map((q) => (
+                    {sc.questions.map((q: Scorecard["questions"][number]) => (
                       <tr key={q.questionId} className="border-t border-border align-top">
-                        <td className="py-2 pr-3 tabular-nums font-semibold whitespace-nowrap">{q.score}/5</td>
+                        <td className="py-2 pr-3 tabular-nums font-semibold whitespace-nowrap">{q.score == null ? "—" : `${q.score}/5`}</td>
                         <td className="py-2">
                           <p className="font-medium">{qs.find((x) => x.questionId === q.questionId)?.title ?? "Question"}</p>
-                          <p className="text-text-muted">{q.evidence}</p>
-                          {q.missing && <p className="text-text-dim">Missing: {q.missing}</p>}
+                          {q.score == null ? (
+                            <p className="text-text-dim">Not assessed: {q.notAssessedReason}</p>
+                          ) : (
+                            <>
+                              <p className="text-text-muted">{q.evidence}</p>
+                              {q.missing && <p className="text-text-dim">Missing: {q.missing}</p>}
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            )}
+
+            {failures.length > 0 && canRescore && (
+              <details className="text-xs text-text-dim">
+                <summary className="cursor-pointer">Scoring attempts that didn&apos;t work ({failures.length})</summary>
+                <ul className="mt-2 space-y-1">
+                  {failures.map((a) => (
+                    <li key={a.attempt}>
+                      #{a.attempt} · {a.status === "INVALID" ? "reply didn't validate" : "model call failed"} · {a.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                      {a.error && <span className="block text-text-dim/80 truncate">{a.error}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
 
             {rr && rr.messages.length > 0 && (
