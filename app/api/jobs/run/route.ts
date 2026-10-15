@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { processDeliveries } from "@/lib/delivery";
 import { processJobs } from "@/lib/jobs";
-import { scoringHandlers } from "@/lib/scoring";
+import { finishOverdueRounds, scoringHandlers } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
   const emails = { sent: 0, failed: 0, retrying: 0 };
   const jobs = { done: 0, failed: 0, retrying: 0 };
   const handlers = scoringHandlers();
+  const roundsClosed = await finishOverdueRounds();
   while (Date.now() - started < BUDGET_MS) {
     const d = await processDeliveries({ limit: 50 });
     const j = await processJobs(handlers, { limit: 5 });
@@ -34,5 +35,5 @@ export async function POST(req: Request) {
     for (const k of Object.keys(jobs) as (keyof typeof jobs)[]) jobs[k] += j[k];
     if (d.sent + d.failed + d.retrying + j.done + j.failed + j.retrying === 0) break;
   }
-  return Response.json({ emails, jobs });
+  return Response.json({ emails, jobs, roundsClosed });
 }

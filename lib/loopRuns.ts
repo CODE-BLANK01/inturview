@@ -5,6 +5,7 @@ import { findInviteByToken } from "./invites";
 import { poolWhere, publishedRounds, type LoopRoundConfig } from "./loopTemplates";
 import { pickRandom, type FrozenQuestion } from "./loopRunEngine";
 import type { QuestionSnapshot } from "./questionBank";
+import { hardDeadline } from "./roundTiming";
 
 export const CATEGORY_TO_ANALYTICS: Record<QuestionCategory, Category> = {
   RECRUITER_SCREEN: "recruiter_screen",
@@ -125,7 +126,14 @@ export async function startRound(ctx: LoopContext, index: number) {
 
   try {
     const roundRun = await prisma.loopRoundRun.create({
-      data: { runId: run.id, roundIndex: index, roundId: round.id, category: round.category, questions: questions as unknown as Prisma.InputJsonValue },
+      data: {
+        runId: run.id,
+        roundIndex: index,
+        roundId: round.id,
+        category: round.category,
+        questions: questions as unknown as Prisma.InputJsonValue,
+        deadlineAt: hardDeadline(new Date(), round.durationMinutes),
+      },
     });
     return { roundRun, created: true };
   } catch (e) {
