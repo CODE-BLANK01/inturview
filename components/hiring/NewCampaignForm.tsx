@@ -59,14 +59,25 @@ export function NewCampaignForm({
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Couldn't create the campaign (${res.status})`);
       setPhase("sending");
-      await sendAll(paths.api, body.id, { onProgress: setProgress }).catch((err) => setError(err instanceof Error ? err.message : "Sending stopped"));
+      const sent = await sendAll(paths.api, body.id, { onProgress: setProgress }).catch((err) => {
+        setError(err instanceof Error ? err.message : "Sending stopped");
+        return null;
+      });
       // Inviting from a role: stay on the role, where the new candidates now appear.
       if (roleId) {
         setPhase("idle");
         setRecipients([]);
         setFormKey((k) => k + 1);
         setProgress(null);
-        setNotice(`Invited ${body.added}.${body.alreadyInvited ? ` ${body.alreadyInvited} already invited for this role, skipped.` : ""}`);
+        // Say what actually happened to the emails, not just how many people were added.
+        const parts = [
+          `${body.added} added`,
+          sent ? `${sent.sent} email${sent.sent === 1 ? "" : "s"} sent` : null,
+          sent?.remaining ? `${sent.remaining} queued, going out in the next few minutes` : null,
+          sent?.failed ? `${sent.failed} failed (see Needs attention)` : null,
+          body.alreadyInvited ? `${body.alreadyInvited} already invited for this role, skipped` : null,
+        ].filter(Boolean);
+        setNotice(`${parts.join(" · ")}.`);
         router.refresh();
       } else router.push(`${paths.invites}/${body.id}`);
     } catch (err) {

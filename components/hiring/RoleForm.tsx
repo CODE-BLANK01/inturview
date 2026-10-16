@@ -83,14 +83,18 @@ export function RoleStatusButtons({ roleId, status }: { roleId: string; status: 
   const paths = useHiringPaths();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const setStatus = async (next: "OPEN" | "PAUSED" | "CLOSED") => {
     setBusy(true);
-    await fetch(`${paths.api}/roles/${roleId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: next }) }).catch(() => null);
+    setError(null);
+    const res = await fetch(`${paths.api}/roles/${roleId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: next }) }).catch(() => null);
     setBusy(false);
+    if (!res?.ok) return setError((await res?.json().catch(() => ({})))?.error ?? "That didn't save. Try again.");
     router.refresh();
   };
   return (
-    <span className="inline-flex gap-2">
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {error && <span role="alert" className="text-sm text-hard">{error}</span>}
       {status !== "OPEN" && <button type="button" className="btn text-sm" disabled={busy} onClick={() => setStatus("OPEN")}>Reopen</button>}
       {status === "OPEN" && <button type="button" className="btn text-sm" disabled={busy} onClick={() => setStatus("PAUSED")}>Pause</button>}
       {status !== "CLOSED" && <button type="button" className="btn text-sm" disabled={busy} onClick={() => setStatus("CLOSED")}>Close role</button>}
