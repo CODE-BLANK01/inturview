@@ -7,6 +7,7 @@ import { Loader2, Send } from "lucide-react";
 import type { Recipient } from "@/lib/recipients";
 import { RecipientsInput } from "./RecipientsInput";
 import { sendAll } from "./SendProgress";
+import { inviteEmail, inviteExpiry } from "@/lib/inviteEmail";
 
 export interface PublishedLoop {
   id: string;
@@ -16,7 +17,18 @@ export interface PublishedLoop {
   minutes: number;
 }
 
-export function NewCampaignForm({ loops, defaultLoopId, roleId }: { loops: PublishedLoop[]; defaultLoopId?: string; roleId?: string }) {
+export function NewCampaignForm({
+  loops,
+  defaultLoopId,
+  roleId,
+  company = null,
+}: {
+  loops: PublishedLoop[];
+  defaultLoopId?: string;
+  roleId?: string;
+  /** Shown in the email preview exactly as it will be sent. */
+  company?: { name: string; contactEmail: string | null } | null;
+}) {
   const paths = useHiringPaths();
   const router = useRouter();
   const [loopId, setLoopId] = useState(defaultLoopId && loops.some((l) => l.id === defaultLoopId) ? defaultLoopId : loops[0]?.id ?? "");
@@ -28,6 +40,7 @@ export function NewCampaignForm({ loops, defaultLoopId, roleId }: { loops: Publi
   const [progress, setProgress] = useState<{ sent: number; failed: number; remaining: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
   /** Bumped after a send from a role page to clear the pasted list. */
   const [formKey, setFormKey] = useState(0);
   const loop = loops.find((l) => l.id === loopId);
@@ -97,6 +110,13 @@ export function NewCampaignForm({ loops, defaultLoopId, roleId }: { loops: Publi
 
       <RecipientsInput key={formKey} onChange={setRecipients} />
 
+      <div className="space-y-2">
+        <button type="button" className="text-sm text-text-muted underline underline-offset-2 hover:text-text" onClick={() => setShowEmail((v) => !v)} disabled={!loop}>
+          {showEmail ? "Hide the email" : "Preview the email candidates get"}
+        </button>
+        {showEmail && loop && <EmailPreview loop={loop} message={message} deadline={deadline} company={company} first={recipients[0] ?? null} />}
+      </div>
+
       {error && <div className="panel border-hard/40 bg-hard/10 px-3 py-2 text-sm text-hard">{error}</div>}
       {notice && !error && <p className="text-sm text-accent" role="status">{notice}</p>}
       {progress && (
@@ -109,5 +129,47 @@ export function NewCampaignForm({ loops, defaultLoopId, roleId }: { loops: Publi
         {phase === "creating" ? "Creating…" : phase === "sending" ? "Sending invites…" : `Send ${recipients.length || ""} invite${recipients.length === 1 ? "" : "s"}`}
       </button>
     </form>
+  );
+}
+
+/** The invitation exactly as it will be sent, using the first pasted candidate when there is one. */
+function EmailPreview({
+  loop,
+  message,
+  deadline,
+  company,
+  first,
+}: {
+  loop: PublishedLoop;
+  message: string;
+  deadline: string;
+  company: { name: string; contactEmail: string | null } | null;
+  first: Recipient | null;
+}) {
+  const email = inviteEmail({
+    to: first?.email ?? "candidate@example.com",
+    name: first?.name ?? "Ada Lovelace",
+    loopName: loop.name,
+    rounds: loop.rounds,
+    minutes: loop.minutes,
+    message: message.trim() || null,
+    link: `${window.location.origin}/i/your-personal-link`,
+    expiresAt: inviteExpiry(new Date(), deadline ? new Date(`${deadline}T23:59:59Z`) : null),
+    company: company?.name ?? null,
+    replyTo: company?.contactEmail ?? null,
+  });
+  return (
+    <div className="panel overflow-hidden">
+      <dl className="grid grid-cols-[80px_1fr] gap-x-3 gap-y-1 px-4 py-3 text-xs border-b border-border">
+        <dt className="text-text-dim">To</dt>
+        <dd>{email.to}</dd>
+        <dt className="text-text-dim">Subject</dt>
+        <dd className="font-medium">{email.subject}</dd>
+        <dt className="text-text-dim">Replies go to</dt>
+        <dd>{email.replyTo}</dd>
+      </dl>
+      {/* Sandboxed: the email's HTML can't run anything here. */}
+      <iframe title="Email preview" sandbox="" srcDoc={email.html} className="w-full h-[420px] bg-white" />
+    </div>
   );
 }

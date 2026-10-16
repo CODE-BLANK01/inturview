@@ -54,3 +54,10 @@ test("funnel is cumulative: a finished candidate also opened and started", () =>
   const f = funnelFrom({ SENT: 5, OPENED: 3, STARTED: 2, COMPLETED: 4, FAILED: 1, PENDING: 2, REVOKED: 1 });
   assert.deepEqual(f, { invited: 18, sent: 14, opened: 9, started: 6, completed: 4, pending: 2, failed: 1, revoked: 1 });
 });
+
+test("a company's invitation signs off as the company", async () => {
+  const { inviteEmail } = await import("../lib/invites");
+  const e = inviteEmail({ to: "a@b.test", name: null, loopName: "L", rounds: 1, minutes: 20, message: null, link: "https://x/i/t", expiresAt: new Date("2026-10-30T00:00:00Z"), company: "Acme & Co" });
+  assert.match(e.text, /— The Acme & Co hiring team, via inturview$/);
+  assert.match(e.html!, /The Acme &amp; Co hiring team/);
+});

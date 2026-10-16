@@ -139,7 +139,7 @@ export async function RolesView({ organizationId, paths, canEdit }: Scope & { ca
 }
 
 export async function RoleDetailView({ organizationId, paths, id, canEdit, canSend }: Scope & { id: string; canEdit: boolean; canSend: boolean }) {
-  const role = await prisma.hiringRole.findFirst({ where: { id, organizationId } });
+  const role = await prisma.hiringRole.findFirst({ where: { id, organizationId }, include: { organization: { select: { name: true, contactEmail: true } } } });
   if (!role) notFound();
   const [loops, candidates] = await Promise.all([publishedLoops(organizationId), listCandidates(organizationId, { roleId: id })]);
   const counts = countByStage(candidates);
@@ -184,7 +184,7 @@ export async function RoleDetailView({ organizationId, paths, id, canEdit, canSe
               Publish a loop first. <Link href={paths.loops} className="underline underline-offset-2">Go to loops</Link>
             </p>
           ) : (
-            <NewCampaignForm loops={loops} defaultLoopId={role.loopTemplateId ?? undefined} roleId={role.id} />
+            <NewCampaignForm loops={loops} defaultLoopId={role.loopTemplateId ?? undefined} roleId={role.id} company={role.organization} />
           )}
         </section>
       )}
