@@ -8,6 +8,7 @@ import { trackClaudeUsage, type ClaudeUsage } from "./aiCost";
 import { enqueueJob, processJobs, type JobHandler } from "./jobs";
 import { applicantDistinctId, CATEGORY_TO_ANALYTICS } from "./loopRuns";
 import { publishedRounds } from "./loopTemplates";
+import { campaignSnapshot, SNAPSHOT_FIELDS } from "./loopSnapshot";
 import { overallScore, scoringPrompt, unansweredScorecard, validateGrade, type FrozenQuestion, type Scorecard } from "./loopRunEngine";
 
 export const SCORE_JOB = "score_round";
@@ -158,12 +159,8 @@ export async function rescoreRound(roundRunId: string, grade?: Grader) {
 
 /** Recomputes the run's overall score; completes the run once every round is scored. */
 async function refreshRun(runId: string) {
-  const run = await prisma.loopRun.findUniqueOrThrow({ where: { id: runId }, include: { rounds: true } });
-  const version = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: run.loopTemplateId, version: run.loopVersion } },
-    select: { snapshot: true },
-  });
-  const plan = publishedRounds(version?.snapshot);
+  const run = await prisma.loopRun.findUniqueOrThrow({ where: { id: runId }, include: { rounds: true, invite: { select: { campaign: { select: SNAPSHOT_FIELDS } } } } });
+  const plan = publishedRounds(await campaignSnapshot(run.invite.campaign));
   if (run.rounds.length < plan.length || run.rounds.some((r) => r.status !== RoundRunStatus.COMPLETED)) return;
   const overall = overallScore(
     run.rounds.map((r) => {

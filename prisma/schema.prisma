@@ -652,27 +652,33 @@ enum InviteStatus {
 }
 
 model Campaign {
-  id             String        @id @default(cuid())
+  id              String        @id @default(cuid())
   /// The workspace that owns it. Null only for test campaigns from before workspaces.
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  loopTemplateId String
-  loopTemplate   LoopTemplate  @relation(fields: [loopTemplateId], references: [id], onDelete: Restrict)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  loopTemplateId  String
+  loopTemplate    LoopTemplate  @relation(fields: [loopTemplateId], references: [id], onDelete: Restrict)
   /// The loop version every candidate in this campaign gets.
-  loopVersion    Int
-  name           String
+  loopVersion     Int
+  name            String
   /// Optional note from the hiring team, shown in the email and on the landing page.
-  message        String?       @db.Text
+  message         String?       @db.Text
   /// Links stop working after this; null means 14 days after each invite is sent.
-  deadline       DateTime?
+  deadline        DateTime?
   /// The hiring role these candidates applied for. Campaigns are internal
   /// batches; the hiring team sees roles and candidates.
-  hiringRoleId   String?
-  hiringRole     HiringRole?   @relation(fields: [hiringRoleId], references: [id], onDelete: SetNull)
-  createdById    String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  invites        Invite[]
+  hiringRoleId    String?
+  hiringRole      HiringRole?   @relation(fields: [hiringRoleId], references: [id], onDelete: SetNull)
+  /// A teammate trying the loop as a candidate. Never emailed, never listed or
+  /// counted; runs the draft frozen into previewSnapshot.
+  preview         Boolean       @default(false)
+  previewSnapshot Json?
+  /// The loop revision that was previewed.
+  previewRevision Int?
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  invites         Invite[]
 
   @@index([organizationId])
   @@index([hiringRoleId])

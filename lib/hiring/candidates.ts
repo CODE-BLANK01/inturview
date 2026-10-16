@@ -23,7 +23,8 @@ export interface CandidateRow {
 export async function listCandidates(organizationId: string, opts: { roleId?: string; assignedTo?: string } = {}): Promise<CandidateRow[]> {
   const invites = await prisma.invite.findMany({
     where: {
-      campaign: { organizationId, ...(opts.roleId && { hiringRoleId: opts.roleId }) },
+      // Previews are a teammate trying the loop, not a candidate.
+      campaign: { organizationId, preview: false, ...(opts.roleId && { hiringRoleId: opts.roleId }) },
       ...(opts.assignedTo && { assignments: { some: { userId: opts.assignedTo } } }),
     },
     orderBy: { updatedAt: "desc" },

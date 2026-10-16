@@ -16,13 +16,13 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
     prisma.memberInvitation.count({ where: { organizationId: org.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } } }),
     prisma.loopTemplate.count({ where: { organizationId: org.id, status: "PUBLISHED" } }),
     prisma.hiringRole.count({ where: { organizationId: org.id } }),
-    prisma.invite.count({ where: { campaign: { organizationId: org.id } } }),
+    prisma.invite.count({ where: { campaign: { organizationId: org.id, preview: false } } }),
     // Finished and not yet decided.
-    seesCandidates ? prisma.invite.count({ where: { campaign: { organizationId: org.id }, status: "COMPLETED", decision: null } }) : 0,
+    seesCandidates ? prisma.invite.count({ where: { campaign: { organizationId: org.id, preview: false }, status: "COMPLETED", decision: null } }) : 0,
     // Emails that bounced and rounds whose scoring didn't finish.
     seesCandidates
       ? prisma.invite.count({
-          where: { campaign: { organizationId: org.id }, OR: [{ status: "FAILED" }, { run: { rounds: { some: { status: "SCORING_FAILED" } } } }] },
+          where: { campaign: { organizationId: org.id, preview: false }, OR: [{ status: "FAILED" }, { run: { rounds: { some: { status: "SCORING_FAILED" } } } }] },
         })
       : 0,
   ]);
@@ -33,7 +33,7 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
   const base = `/hire/${org.slug}`;
   const myReviews = access.role
     ? await prisma.reviewerAssignment.count({
-        where: { userId: access.user.id, invite: { campaign: { organizationId: org.id }, status: { not: "REVOKED" }, reviews: { none: { authorId: access.user.id, kind: "RATING" } } } },
+        where: { userId: access.user.id, invite: { campaign: { organizationId: org.id, preview: false }, status: { not: "REVOKED" }, reviews: { none: { authorId: access.user.id, kind: "RATING" } } } },
       })
     : 0;
 

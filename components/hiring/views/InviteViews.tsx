@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import type { InviteStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { campaignSnapshot } from "@/lib/loopSnapshot";
 import { funnelFrom } from "@/lib/campaignStats";
 import { CATEGORY_LABELS } from "@/lib/questionBank";
 import { publishedRounds, totalMinutes } from "@/lib/loopTemplates";
@@ -57,11 +58,11 @@ function LegacyNote() {
 export async function InvitesView({ organizationId, paths, canSend }: Scope & { canSend: boolean }) {
   const [campaigns, counts] = await Promise.all([
     prisma.campaign.findMany({
-      where: { organizationId },
+      where: { organizationId, preview: false },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, createdAt: true, loopVersion: true, loopTemplate: { select: { name: true } } },
     }),
-    prisma.invite.groupBy({ by: ["campaignId", "status"], where: { campaign: { organizationId } }, _count: true }),
+    prisma.invite.groupBy({ by: ["campaignId", "status"], where: { campaign: { organizationId, preview: false } }, _count: true }),
   ]);
   const byCampaign = new Map<string, Partial<Record<InviteStatus, number>>>();
   for (const c of counts) byCampaign.set(c.campaignId, { ...byCampaign.get(c.campaignId), [c.status]: c._count });
@@ -241,7 +242,7 @@ export async function CandidateView({
   const invite = await prisma.invite.findFirst({
     where: { id: inviteId, ...(campaignId && { campaignId }), campaign: { organizationId } },
     include: {
-      campaign: { select: { id: true, name: true, loopTemplateId: true, loopVersion: true, hiringRole: { select: { id: true, title: true } } } },
+      campaign: { select: { id: true, name: true, loopTemplateId: true, loopVersion: true, preview: true, previewSnapshot: true, hiringRole: { select: { id: true, title: true } } } },
       run: {
         include: {
           rounds: {
@@ -256,11 +257,8 @@ export async function CandidateView({
     },
   });
   if (!invite) notFound();
-  const version = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: invite.campaign.loopTemplateId, version: invite.campaign.loopVersion } },
-    select: { snapshot: true },
-  });
-  const plan = publishedRounds(version?.snapshot);
+  const snapshot = await campaignSnapshot(invite.campaign);
+  const plan = publishedRounds(snapshot);
 
   return (
     <div className="space-y-6">
@@ -288,6 +286,9 @@ export async function CandidateView({
           </div>
         )}
       </header>
+      {invite.campaign.preview && (
+        <p className="panel p-3 text-sm text-text-muted">This was a preview: a teammate trying the loop as a candidate. It isn&apos;t listed with your candidates.</p>
+      )}
       <p className="text-xs text-text-dim">AI scores support your judgment; they don&apos;t replace it. Read the transcript before deciding.</p>
 
       <div className={review ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] items-start" : ""}>

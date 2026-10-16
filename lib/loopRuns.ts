@@ -6,6 +6,7 @@ import { poolWhere, publishedRounds, type LoopRoundConfig } from "./loopTemplate
 import { pickRandom, type FrozenQuestion } from "./loopRunEngine";
 import type { QuestionSnapshot } from "./questionBank";
 import { hardDeadline } from "./roundTiming";
+import { campaignSnapshot } from "./loopSnapshot";
 
 export const CATEGORY_TO_ANALYTICS: Record<QuestionCategory, Category> = {
   RECRUITER_SCREEN: "recruiter_screen",
@@ -17,6 +18,8 @@ export const CATEGORY_TO_ANALYTICS: Record<QuestionCategory, Category> = {
 
 export interface LoopContext {
   invite: Prisma.InviteGetPayload<{ include: { campaign: true; run: { include: { rounds: { orderBy: { roundIndex: "asc" } } } } } }>;
+  /** The frozen loop this candidate runs (published version, or the previewed draft). */
+  snapshot: unknown;
   loop: { name: string; description: string | null; roleTarget: string | null; level: string | null; rounds: LoopRoundConfig[] };
 }
 
@@ -35,19 +38,18 @@ export async function loadLoopContext(token: string): Promise<LoopContext> {
     include: { campaign: true, run: { include: { rounds: { orderBy: { roundIndex: "asc" } } } } },
   });
   if (!invite.consentedAt) throw new LoopAccessError("Agree to the interview terms first.", 409);
-  const version = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: invite.campaign.loopTemplateId, version: invite.campaign.loopVersion } },
-  });
-  const config = (version?.snapshot as { config?: Record<string, unknown> } | null)?.config;
+  const snapshot = await campaignSnapshot(invite.campaign);
+  const config = (snapshot as { config?: Record<string, unknown> } | null)?.config;
   if (!config) throw new LoopAccessError("This interview isn't available right now.", 410);
   return {
     invite,
+    snapshot,
     loop: {
       name: String(config.name ?? "Interview"),
       description: (config.description as string | null) ?? null,
       roleTarget: (config.roleTarget as string | null) ?? null,
       level: (config.level as string | null) ?? null,
-      rounds: publishedRounds(version?.snapshot),
+      rounds: publishedRounds(snapshot),
     },
   };
 }
@@ -169,11 +171,7 @@ export async function startRound(ctx: LoopContext, index: number) {
     });
   }
 
-  const versionRow = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: ctx.invite.campaign.loopTemplateId, version: ctx.invite.campaign.loopVersion } },
-    select: { snapshot: true },
-  });
-  const publishedRound = (versionRow?.snapshot as unknown as { config: { rounds: PublishedRound[] } } | undefined)?.config.rounds.find((r) => r.id === round.id);
+  const publishedRound = (ctx.snapshot as unknown as { config: { rounds: PublishedRound[] } } | undefined)?.config.rounds.find((r) => r.id === round.id);
   const asked = new Set(existingRuns.flatMap((r) => (r.questions as unknown as FrozenQuestion[]).map((q) => q.questionId)));
   // The campaign belongs to the same workspace as its loop.
   const questions = await frozenQuestions(round, publishedRound, asked, ctx.invite.campaign.organizationId);
