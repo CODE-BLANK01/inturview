@@ -15,7 +15,7 @@ import { createHash, createHmac, randomBytes, randomUUID } from "crypto";
 import { DeliveryState, InviteStatus } from "@prisma/client";
 import { prisma } from "./db";
 import { appUrl, sendEmailBatch, type BatchResult, type SendEmailParams } from "./email";
-import { inviteEmail, inviteExpiry } from "./invites";
+import { inviteEmail, inviteExpiry } from "./inviteEmail";
 
 export const MAX_ATTEMPTS = 3;
 /** A SENDING row whose worker vanished is retried after this long. */
