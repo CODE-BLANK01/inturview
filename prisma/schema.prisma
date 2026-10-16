@@ -743,22 +743,83 @@ enum RoundRunStatus {
   IN_PROGRESS
   SCORING
   COMPLETED
+  /// Every automatic scoring attempt failed; a person can re-score.
+  SCORING_FAILED
+}
+
+enum ScoringStatus {
+  SUCCEEDED
+  /// The grader replied, but the reply failed validation.
+  INVALID
+  /// The model call itself failed.
+  ERROR
+}
+
+/// Append-only record of every grading attempt. The latest SUCCEEDED attempt is
+/// the round's current scorecard (copied onto LoopRoundRun for reading).
+model ScoringAttempt {
+  id         String        @id @default(cuid())
+  roundRunId String
+  roundRun   LoopRoundRun  @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
+  attempt    Int
+  status     ScoringStatus
+  scorecard  Json?
+  score      Int?
+  assessed   Int?
+  total      Int?
+  model      String
+  error      String?       @db.Text
+  createdAt  DateTime      @default(now())
+
+  @@unique([roundRunId, attempt])
+}
+
+enum JobState {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Durable background work (scoring today). Claimed with a lease like
+/// Delivery; at most one QUEUED/RUNNING job per key (partial unique index).
+model Job {
+  id          String    @id @default(cuid())
+  kind        String
+  /// Deduplication key, e.g. "score:<roundRunId>".
+  key         String
+  payload     Json
+  state       JobState  @default(QUEUED)
+  runAfter    DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  claimId     String?
+  claimedAt   DateTime?
+  lastError   String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([state, runAfter])
+  @@index([key])
 }
 
 model LoopRun {
-  id             String         @id @default(cuid())
-  inviteId       String         @unique
-  invite         Invite         @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  id                String         @id @default(cuid())
+  inviteId          String         @unique
+  invite            Invite         @relation(fields: [inviteId], references: [id], onDelete: Cascade)
   /// Deprecated, no longer written (see Invite.userId).
-  userId         String?
-  loopTemplateId String
-  loopVersion    Int
-  status         LoopRunStatus  @default(IN_PROGRESS)
-  /// 0–100, the mean of the round scores, once every round is scored.
-  overallScore   Int?
-  startedAt      DateTime       @default(now())
-  completedAt    DateTime?
-  rounds         LoopRoundRun[]
+  userId            String?
+  loopTemplateId    String
+  loopVersion       Int
+  status            LoopRunStatus  @default(IN_PROGRESS)
+  /// 0–100, rounds weighted by length, once every round is scored.
+  overallScore      Int?
+  /// Coverage behind overallScore, e.g. 4 of 5 questions assessed.
+  assessedQuestions Int?
+  totalQuestions    Int?
+  startedAt         DateTime       @default(now())
+  completedAt       DateTime?
+  rounds            LoopRoundRun[]
 }
 
 model LoopRoundRun {
@@ -773,10 +834,11 @@ model LoopRoundRun {
   status      RoundRunStatus   @default(IN_PROGRESS)
   startedAt   DateTime         @default(now())
   completedAt DateTime?
-  /// Structured score from the grader; see lib/loopRuns.ts.
+  /// Current scorecard: a copy of the latest SUCCEEDED ScoringAttempt.
   scorecard   Json?
   score       Int?
   messages    LoopMessage[]
+  attempts    ScoringAttempt[]
 
   @@unique([runId, roundIndex])
 }

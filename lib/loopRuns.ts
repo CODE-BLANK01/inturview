@@ -1,11 +1,9 @@
-import { InviteStatus, LoopRunStatus, Prisma, QuestionCategory, RoundRunStatus } from "@prisma/client";
+import { InviteStatus, Prisma, QuestionCategory, RoundRunStatus } from "@prisma/client";
 import { prisma } from "./db";
-import { getAnthropic, MODEL } from "./anthropic";
-import { trackClaudeUsage, type ClaudeUsage } from "./aiCost";
 import type { Category } from "./analytics";
 import { findInviteByToken } from "./invites";
 import { poolWhere, publishedRounds, type LoopRoundConfig } from "./loopTemplates";
-import { overallScore, parseScorecard, pickRandom, scoringPrompt, type FrozenQuestion } from "./loopRunEngine";
+import { pickRandom, type FrozenQuestion } from "./loopRunEngine";
 import type { QuestionSnapshot } from "./questionBank";
 
 export const CATEGORY_TO_ANALYTICS: Record<QuestionCategory, Category> = {
@@ -137,78 +135,4 @@ export async function startRound(ctx: LoopContext, index: number) {
     }
     throw e;
   }
-}
-
-/** Scores a finished round. Safe to call twice: only one caller moves it to SCORING. */
-export async function finishRound(roundRunId: string) {
-  const claimed = await prisma.loopRoundRun.updateMany({
-    where: { id: roundRunId, status: RoundRunStatus.IN_PROGRESS },
-    data: { status: RoundRunStatus.SCORING, completedAt: new Date() },
-  });
-  if (claimed.count === 0) return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
-  return scoreRound(roundRunId);
-}
-
-/** Grades the transcript against each question's signals. A failure leaves the round in SCORING for a re-score. */
-export async function scoreRound(roundRunId: string) {
-  const rr = await prisma.loopRoundRun.findUniqueOrThrow({
-    where: { id: roundRunId },
-    include: {
-      messages: { orderBy: { createdAt: "asc" } },
-      run: { select: { inviteId: true, invite: { select: { campaign: { select: { organizationId: true } } } } } },
-    },
-  });
-  const questions = rr.questions as unknown as FrozenQuestion[];
-  const candidateSpoke = rr.messages.some((m) => m.role === "candidate" && m.content.trim().length > 0);
-  let scorecard = null;
-  if (candidateSpoke) {
-    try {
-      const { system, user } = scoringPrompt(questions, rr.messages);
-      const resp = await getAnthropic().messages.create({ model: MODEL, max_tokens: 2000, system, messages: [{ role: "user", content: user }] });
-      await trackClaudeUsage(applicantDistinctId(rr.run.inviteId), {
-        category: CATEGORY_TO_ANALYTICS[rr.category],
-        sessionId: rr.id,
-        model: MODEL,
-        purpose: "debrief",
-        usage: resp.usage as ClaudeUsage,
-        organizationId: rr.run.invite.campaign.organizationId,
-      });
-      scorecard = parseScorecard(resp.content.map((b) => (b.type === "text" ? b.text : "")).join(""), questions.map((q) => q.questionId));
-    } catch (e) {
-      console.error("[loop/score] grader failed:", e instanceof Error ? e.message : e);
-      return rr;
-    }
-    if (!scorecard) {
-      console.error("[loop/score] grader reply couldn't be parsed", { roundRunId });
-      return rr;
-    }
-  }
-  const updated = await prisma.loopRoundRun.update({
-    where: { id: roundRunId },
-    data: {
-      status: RoundRunStatus.COMPLETED,
-      scorecard: (scorecard ?? { questions: [], overall: 0, strengths: [], improvements: [], summary: "The candidate didn't answer any questions." }) as unknown as Prisma.InputJsonValue,
-      score: scorecard?.overall ?? 0,
-    },
-  });
-  await maybeCompleteRun(rr.runId);
-  return updated;
-}
-
-async function maybeCompleteRun(runId: string) {
-  const run = await prisma.loopRun.findUniqueOrThrow({
-    where: { id: runId },
-    include: { rounds: true, invite: { include: { campaign: { select: { loopTemplateId: true, loopVersion: true } } } } },
-  });
-  const version = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: run.loopTemplateId, version: run.loopVersion } },
-    select: { snapshot: true },
-  });
-  const total = ((version?.snapshot as { config?: { rounds?: unknown[] } } | null)?.config?.rounds ?? []).length;
-  if (run.rounds.length < total || run.rounds.some((r) => r.status !== RoundRunStatus.COMPLETED)) return;
-  const overall = overallScore(run.rounds.map((r) => r.score));
-  await prisma.$transaction([
-    prisma.loopRun.update({ where: { id: runId }, data: { status: LoopRunStatus.COMPLETED, completedAt: new Date(), overallScore: overall } }),
-    prisma.invite.update({ where: { id: run.inviteId }, data: { status: InviteStatus.COMPLETED, completedAt: new Date() } }),
-  ]);
 }

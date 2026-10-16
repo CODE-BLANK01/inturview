@@ -33,7 +33,7 @@ import {
 import { addRecipients, InviteActionError, resendInvite, revokeInvite } from "../invites";
 import { processDeliveries, queueCampaign, remainingFor } from "../delivery";
 import { RecipientsSchema } from "../recipients";
-import { scoreRound } from "../loopRuns";
+import { rescoreRound } from "../scoring";
 
 export interface HiringCtx {
   /** null: the platform library, managed by operators. */
@@ -364,7 +364,9 @@ export async function rescoreHandler(ctx: HiringCtx, id: string) {
   });
   if (!rr) return notFound("Round");
   if (rr.status === "IN_PROGRESS") return json({ error: "The candidate hasn't finished this round yet." }, 409);
-  const updated = await scoreRound(id);
+  const updated = await rescoreRound(id);
   await audit(ctx, "ROUND_RESCORED", "invite", id, { status: updated.status });
-  return updated.status === "COMPLETED" ? json({ ok: true, score: updated.score }) : json({ error: "Grading failed again. Try in a minute." }, 502);
+  return updated.status === "COMPLETED"
+    ? json({ ok: true, score: updated.score })
+    : json({ ok: true, pending: true, message: "Grading didn't finish yet. It retries automatically in the background." }, 202);
 }
