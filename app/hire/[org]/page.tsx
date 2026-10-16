@@ -64,7 +64,8 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
         </Link>
       )}
 
-      {steps.length > 0 && (
+      {/* Setup gives way to the real work once it's done. */}
+      {steps.some((s) => !s.done) && (
         <section className="panel p-5 space-y-3" aria-labelledby="setup-heading">
           <h2 id="setup-heading" className="text-sm font-semibold">Set up your workspace</h2>
           <ul className="space-y-2">

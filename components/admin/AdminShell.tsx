@@ -45,7 +45,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
           </span>
           <div className="leading-tight">
             <Link href="/dashboard" aria-label="Inturview home">
-              <Brand compact />
+              <Brand compact wordmarkOnly />
             </Link>
             <div className="text-[10px] uppercase tracking-[0.14em] text-hard/80">
               admin
@@ -96,7 +96,7 @@ export function AdminShell({ children, user }: AdminShellProps) {
           <ShieldCheck className="h-4 w-4 text-hard" />
           <span className="text-sm font-semibold">
             <Link href="/dashboard" aria-label="Inturview home">
-              <Brand compact />
+              <Brand compact wordmarkOnly />
             </Link>{" "}
             <span className="text-hard/80 text-xs">admin</span>
           </span>
