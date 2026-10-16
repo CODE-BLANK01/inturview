@@ -105,7 +105,8 @@ export function LoopRoundChat({
       const res = await fetch("/api/i/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, roundRunId, draft }),
+        // The device clock orders saves: a late-arriving older save can't overwrite a newer one.
+        body: JSON.stringify({ token, roundRunId, draft, seq: Date.now() }),
       }).catch(() => null);
       if (res?.ok) loadedDraft.current = draft;
       setDraftState(res?.ok ? "saved" : "idle");
@@ -124,11 +125,12 @@ export function LoopRoundChat({
       { id: replyId, role: "interviewer" as const, content: "" },
     ]);
     let complete = false;
+    let sawDone = false;
     try {
       const res = await fetch("/api/i/message", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, roundRunId, ...turn }),
+        body: JSON.stringify({ token, roundRunId, ...turn, draftSeq: Date.now() }),
       });
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}));
@@ -152,12 +154,19 @@ export function LoopRoundChat({
           const line = buf.slice(0, nl);
           buf = buf.slice(nl + 1);
           if (!line) continue;
-          const ev = JSON.parse(line) as { t?: string; done?: boolean; complete?: boolean; error?: string };
+          const ev = JSON.parse(line) as { t?: string; replace?: string; done?: boolean; complete?: boolean; error?: string };
           if (ev.t) setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: x.content + ev.t } : x)));
+          // The saved reply differs from what streamed (another writer won): show the saved one.
+          if (ev.replace !== undefined) setMessages((m) => m.map((x) => (x.id === replyId ? { ...x, content: ev.replace! } : x)));
           if (ev.error) throw new Error(ev.error);
-          if (ev.done) complete = !!ev.complete;
+          if (ev.done) {
+            complete = !!ev.complete;
+            sawDone = true;
+          }
         }
       }
+      // A connection that closed before "done" may have cut the reply short; fetch the saved one.
+      if (!sawDone) throw new Error("The reply was cut off.");
       setPhase("chat");
       if (complete) await finish(roundRunId);
     } catch (e) {
