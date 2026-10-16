@@ -479,6 +479,7 @@ model Organization {
   memberInvitations     MemberInvitation[]
   supportGrants         SupportAccessGrant[]
   campaigns             Campaign[]
+  hiringRoles           HiringRole[]
 }
 
 enum OrgRole {
@@ -615,6 +616,7 @@ model LoopTemplate {
   updatedAt      DateTime              @updatedAt
   versions       LoopTemplateVersion[]
   campaigns      Campaign[]
+  hiringRoles    HiringRole[]
 
   @@index([organizationId, status])
 }
@@ -661,12 +663,45 @@ model Campaign {
   message        String?       @db.Text
   /// Links stop working after this; null means 14 days after each invite is sent.
   deadline       DateTime?
+  /// The hiring role these candidates applied for. Campaigns are internal
+  /// batches; the hiring team sees roles and candidates.
+  hiringRoleId   String?
+  hiringRole     HiringRole?   @relation(fields: [hiringRoleId], references: [id], onDelete: SetNull)
   createdById    String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   invites        Invite[]
 
   @@index([organizationId])
+  @@index([hiringRoleId])
+}
+
+enum HiringRoleStatus {
+  OPEN
+  PAUSED
+  CLOSED
+}
+
+/// A job a workspace is hiring for. Candidates are invited against a role.
+model HiringRole {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  seniority      String?
+  location       String?
+  /// What the job is: shown to the hiring team, and used when drafting questions.
+  context        String?          @db.Text
+  status         HiringRoleStatus @default(OPEN)
+  /// The loop new invites for this role use unless someone picks another.
+  loopTemplateId String?
+  loopTemplate   LoopTemplate?    @relation(fields: [loopTemplateId], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  campaigns      Campaign[]
+
+  @@index([organizationId, status])
 }
 
 model Invite {

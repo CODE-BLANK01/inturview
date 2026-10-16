@@ -5,6 +5,9 @@ export interface HiringPaths {
   questions: string;
   loops: string;
   invites: string;
+  /** Workspaces only: hiring roles and the candidates pipeline. */
+  roles: string;
+  candidates: string;
   /** True inside a company workspace (the inturview library is read-only there). */
   workspace: boolean;
 }
@@ -14,6 +17,8 @@ export const ADMIN_PATHS: HiringPaths = {
   questions: "/admin/content/questions",
   loops: "/admin/content/loops",
   invites: "/admin/campaigns",
+  roles: "/admin/campaigns",
+  candidates: "/admin/campaigns",
   workspace: false,
 };
 
@@ -23,6 +28,8 @@ export function workspacePaths(slug: string): HiringPaths {
     questions: `/hire/${slug}/questions`,
     loops: `/hire/${slug}/loops`,
     invites: `/hire/${slug}/invites`,
+    roles: `/hire/${slug}/roles`,
+    candidates: `/hire/${slug}/candidates`,
     workspace: true,
   };
 }

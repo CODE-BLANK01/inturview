@@ -285,7 +285,9 @@ export async function poolPreviewHandler(ctx: HiringCtx, req: NextRequest) {
 
 const CreateCampaign = z.object({
   loopTemplateId: z.string().min(1),
-  name: z.string().trim().min(2, "Name the campaign.").max(120),
+  /** Workspaces invite against a role; the batch name is then made from it. */
+  hiringRoleId: z.string().min(1).nullable().default(null),
+  name: z.string().trim().max(120).default(""),
   message: z.string().trim().max(2000).nullable().default(null),
   deadline: z
     .string()
@@ -308,20 +310,80 @@ export async function createCampaignHandler(ctx: HiringCtx, req: NextRequest) {
   if (loop.status !== LoopStatus.PUBLISHED || loop.currentVersion === 0) {
     return json({ error: "Publish the loop before inviting candidates." }, 409);
   }
+  // Roles only exist in workspaces; the platform library has none.
+  const role =
+    d.hiringRoleId && ctx.organizationId
+      ? await prisma.hiringRole.findFirst({ where: { id: d.hiringRoleId, organizationId: ctx.organizationId }, select: { id: true, title: true, status: true } })
+      : null;
+  if (d.hiringRoleId && !role) return notFound("Role");
+  if (role && role.status !== "OPEN") return json({ error: "This role isn't open. Reopen it to invite candidates." }, 409);
+  const name = d.name || (role ? `${role.title} · ${new Date().toISOString().slice(0, 10)}` : "");
+  if (name.length < 2) return json({ error: "Name the campaign." }, 400);
+  // Someone already invited for this role (and not cancelled) isn't invited again.
+  let recipients = d.recipients;
+  let alreadyInvited = 0;
+  if (role) {
+    const existing = new Set(
+      (await prisma.invite.findMany({
+        where: { campaign: { hiringRoleId: role.id }, status: { not: "REVOKED" }, email: { in: recipients.map((r) => r.email.toLowerCase()) } },
+        select: { email: true },
+      })).map((i) => i.email),
+    );
+    recipients = recipients.filter((r) => !existing.has(r.email.toLowerCase()));
+    alreadyInvited = d.recipients.length - recipients.length;
+    if (recipients.length === 0) return json({ error: "Everyone on this list has already been invited for this role." }, 409);
+  }
   const campaign = await prisma.campaign.create({
     data: {
       organizationId: ctx.organizationId,
+      hiringRoleId: role?.id ?? null,
       loopTemplateId: d.loopTemplateId,
       loopVersion: loop.currentVersion,
-      name: d.name,
+      name,
       message: d.message,
       deadline: d.deadline ? new Date(`${d.deadline}T23:59:59Z`) : null,
       createdById: ctx.actorId,
     },
   });
-  const { added, skipped } = await addRecipients(campaign.id, d.recipients);
-  await audit(ctx, "CAMPAIGN_CREATED", "campaign", campaign.id, { loopVersion: loop.currentVersion, added });
-  return json({ id: campaign.id, added, skipped }, 201);
+  const { added, skipped } = await addRecipients(campaign.id, recipients);
+  await audit(ctx, "CAMPAIGN_CREATED", "campaign", campaign.id, { loopVersion: loop.currentVersion, added, hiringRoleId: role?.id ?? null });
+  return json({ id: campaign.id, added, skipped: skipped + alreadyInvited, alreadyInvited }, 201);
+}
+
+// ── Roles ───────────────────────────────────────────────────────────────────
+
+const RoleBody = z.object({
+  title: z.string().trim().min(2, "Name the role.").max(120),
+  seniority: z.string().trim().max(40).nullable().default(null).transform((v) => v || null),
+  location: z.string().trim().max(80).nullable().default(null).transform((v) => v || null),
+  context: z.string().trim().max(6000).nullable().default(null).transform((v) => v || null),
+  loopTemplateId: z.string().min(1).nullable().default(null),
+});
+
+async function ownLoopOrNull(ctx: HiringCtx, loopTemplateId: string | null) {
+  if (!loopTemplateId) return true;
+  return (await ownLoop(ctx, loopTemplateId)) > 0;
+}
+
+export async function createRoleHandler(ctx: HiringCtx, req: NextRequest) {
+  if (!ctx.organizationId) return json({ error: "Roles belong to a workspace." }, 400);
+  const parsed = RoleBody.safeParse(await body(req));
+  if (!parsed.success) return json({ error: firstIssue(parsed.error, "Invalid role") }, 400);
+  if (!(await ownLoopOrNull(ctx, parsed.data.loopTemplateId))) return notFound("Loop");
+  const role = await prisma.hiringRole.create({ data: { ...parsed.data, organizationId: ctx.organizationId, createdById: ctx.actorId } });
+  await audit(ctx, "ROLE_CREATED", "role", role.id, { title: role.title });
+  return json({ id: role.id }, 201);
+}
+
+export async function updateRoleHandler(ctx: HiringCtx, req: NextRequest, id: string) {
+  if (!ctx.organizationId) return notFound("Role");
+  const parsed = RoleBody.partial().extend({ status: z.enum(["OPEN", "PAUSED", "CLOSED"]).optional() }).safeParse(await body(req));
+  if (!parsed.success) return json({ error: firstIssue(parsed.error, "Invalid role") }, 400);
+  if (parsed.data.loopTemplateId !== undefined && !(await ownLoopOrNull(ctx, parsed.data.loopTemplateId))) return notFound("Loop");
+  const r = await prisma.hiringRole.updateMany({ where: { id, organizationId: ctx.organizationId }, data: parsed.data });
+  if (!r.count) return notFound("Role");
+  await audit(ctx, "ROLE_UPDATED", "role", id, { fields: Object.keys(parsed.data) });
+  return json({ ok: true });
 }
 
 export async function addRecipientsHandler(ctx: HiringCtx, req: NextRequest, id: string) {
