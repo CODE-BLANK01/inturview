@@ -41,6 +41,8 @@ export interface HiringCtx {
   /** null: the platform library, managed by operators. */
   organizationId: string | null;
   actorId: string;
+  /** May see every candidate in the workspace (reviewers see only their assignments). */
+  canViewAll?: boolean;
 }
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });

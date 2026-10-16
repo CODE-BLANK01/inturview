@@ -87,6 +87,8 @@ model User {
   memberships           OrganizationMember[]
   memberInvitesSent     MemberInvitation[]       @relation("MemberInvitationInviter")
   supportGrants         SupportAccessGrant[]
+  reviews               Review[]                 @relation("ReviewAuthor")
+  reviewAssignments     ReviewerAssignment[]     @relation("ReviewerAssignments")
 
   @@index([role])
   @@index([flagged])
@@ -705,15 +707,15 @@ model HiringRole {
 }
 
 model Invite {
-  id          String       @id @default(cuid())
+  id          String               @id @default(cuid())
   campaignId  String
-  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign    Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   email       String
   name        String?
   /// SHA-256 of the link token; resending rotates it so old links stop working.
-  tokenHash   String?      @unique
-  status      InviteStatus @default(PENDING)
-  sendCount   Int          @default(0)
+  tokenHash   String?              @unique
+  status      InviteStatus         @default(PENDING)
+  sendCount   Int                  @default(0)
   lastError   String?
   sentAt      DateTime?
   expiresAt   DateTime?
@@ -722,12 +724,19 @@ model Invite {
   startedAt   DateTime?
   completedAt DateTime?
   deliveries  Delivery[]
+  reviews     Review[]
+  assignments ReviewerAssignment[]
+  /// The current decision: a copy of the latest DECISION review. Also starts
+  /// the retention clock (transcripts and scores are deleted 12 months later).
+  decision    Decision?
+  decidedAt   DateTime?
+  decidedById String?
   /// Deprecated, no longer written: applicants don't get accounts. Older test
   /// rows may still hold a user ID; dropped in a later migration.
   userId      String?
   run         LoopRun?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
   @@unique([campaignId, email])
   @@index([campaignId, status])
@@ -736,6 +745,50 @@ model Invite {
 // ─── Loop runs ───────────────────────────────────────────────────────────────
 // One candidate going through a loop from an invite. Each round freezes the
 // exact questions asked, so scoring and review never depend on later edits.
+
+enum Decision {
+  ADVANCE
+  DECLINE
+}
+
+enum ReviewKind {
+  NOTE
+  RATING
+  DECISION
+}
+
+/// Append-only log of what the hiring team said about a candidate. A person's
+/// latest RATING is their current rating; the latest DECISION is the decision.
+model Review {
+  id        String     @id @default(cuid())
+  inviteId  String
+  invite    Invite     @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?      @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  kind      ReviewKind
+  body      String?    @db.Text
+  /// 1–5, for RATING.
+  rating    Int?
+  /// For DECISION.
+  decision  Decision?
+  createdAt DateTime   @default(now())
+
+  @@index([inviteId, createdAt])
+}
+
+/// Who should review a candidate. Reviewers only see candidates assigned to them.
+model ReviewerAssignment {
+  id           String   @id @default(cuid())
+  inviteId     String
+  invite       Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("ReviewerAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  assignedById String?
+  createdAt    DateTime @default(now())
+
+  @@unique([inviteId, userId])
+  @@index([userId])
+}
 
 enum DeliveryState {
   QUEUED
