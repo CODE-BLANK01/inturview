@@ -16,3 +16,12 @@ test("applicants are pointed at the company's contact email when there is one", 
   assert.deepEqual(contactFor({ ...base, contactEmail: null }), { label: "the email your invitation came from", href: null });
   assert.equal(contactFor(null).href, null);
 });
+
+test("deletion is due N months after the decision, or after the interview without one", async () => {
+  const { deletionDue } = await import("../lib/applicantData");
+  const base = { decidedAt: null, completedAt: null, expiresAt: null, createdAt: new Date("2026-01-10T00:00:00Z") };
+  assert.equal(deletionDue({ ...base, decidedAt: new Date("2026-03-01T00:00:00Z") }, 12).toISOString(), "2027-03-01T00:00:00.000Z");
+  assert.equal(deletionDue({ ...base, completedAt: new Date("2026-02-01T00:00:00Z") }, 6).toISOString(), "2026-08-01T00:00:00.000Z");
+  assert.equal(deletionDue(base, 99).toISOString(), "2027-01-10T00:00:00.000Z", "never more than 12 months");
+  assert.equal(deletionDue(base, 12, true).toISOString(), "2026-01-17T00:00:00.000Z", "previews: a week");
+});
