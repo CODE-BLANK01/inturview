@@ -20,3 +20,6 @@ SESSION_HANDOFF.md
 
 # TypeScript incremental build cache — changes on every build.
 tsconfig.tsbuildinfo
+tests/e2e/.fixtures.json
+test-results/
+playwright-report/
