@@ -119,3 +119,21 @@ npm run test:db
 ```
 
 CI runs the same thing in the "Database" job on every PR.
+
+## 9. Browser journeys on your machine — anyone, 10 min once
+
+`npm run test:e2e` drives the real app in a browser: sign-in landing, the loop
+builder, inviting from a role, an applicant's whole interview (including a
+dropped reply and a refresh), and reviewing. The app runs in dev mode against
+`TEST_DATABASE_URL` with the AI replaced by canned replies (`AI_FAKE=1`, never
+active in production builds) and emails logged instead of sent.
+
+```bash
+npx playwright install chromium     # once
+export TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/intervue_test
+DATABASE_URL=$TEST_DATABASE_URL DIRECT_URL=$TEST_DATABASE_URL npx prisma migrate deploy
+npm run test:e2e
+```
+
+Each run seeds fresh workspaces and people, so runs don't collide. CI runs the
+same suite in the "End-to-end" job and keeps the Playwright report when it fails.

@@ -79,10 +79,10 @@ NEXTAUTH_URL=http://localhost:3000
 ADMIN_EMAILS=you@example.com         # your own email → auto-promoted to ADMIN on signup
 ```
 
-Then push schema + seed problems:
+Then apply the migrations and seed problems:
 
 ```bash
-npm run db:push          # creates / updates tables (no destructive migration)
+npm run db:deploy        # applies every migration in prisma/migrations
 npm run db:seed          # inserts the seed problems from lib/problems.ts
 npm run dev              # http://localhost:3000
 ```
@@ -100,8 +100,10 @@ Sign up at `/signup` with the email you put in `ADMIN_EMAILS`. You'll land on `/
 | `npm run lint`      | Next's ESLint, zero warnings allowed                                     |
 | `npm run check:env` | Fails if code reads an env var missing from an `.env*.example` file      |
 | `npm run test:unit` | Unit tests in `tests/`                                                   |
-| `npm run db:push`   | Sync Prisma schema → DB (no migration files; fine for dev / solo work)   |
-| `npm run db:migrate`| Generate a versioned migration (use for shared / prod environments)      |
+| `npm run test:db`   | Access-control and reliability tests on a throwaway Postgres             |
+| `npm run test:e2e`  | Browser journeys (Hire, applicant, reviewer) with the AI faked           |
+| `npm run db:new-migration -- <name>` | Write a migration for your schema change (no database needed) |
+| `npm run db:deploy` | Apply pending migrations to the database in `.env.local`                |
 | `npm run db:seed`   | Re-seed problems (idempotent upsert)                                     |
 | `npm run db:studio` | Prisma Studio — visual DB browser at http://localhost:5555               |
 | `npm run db:generate` | Regenerate the Prisma client                                           |
@@ -256,17 +258,21 @@ If the user clicks "Skip ahead anyway" before `[READY]`, the client POSTs `/api/
 
 ## Working with the database
 
-### When to use `db:push` vs `db:migrate`
+### Changing the schema
 
-- **`db:push`** — for local dev and solo iteration. Syncs the schema directly, doesn't create migration files.
-- **`db:migrate`** — for shared environments. Generates a versioned migration in `prisma/migrations/` that's committed and applied via `prisma migrate deploy` in CI/prod.
+Every schema change ships as a migration, in a pull request:
 
-**We now share a database, so never run `db:push` against a database someone else uses.** It syncs from *your* branch's schema and will drop columns that exist only on a teammate's branch. Schema changes go through a pull request, where the schema guard posts the exact SQL and blocks anything destructive.
+1. Edit `prisma/schema.prisma`.
+2. `npm run db:new-migration -- <short_name>` writes `prisma/migrations/<timestamp>_<name>/migration.sql` by diffing against `origin/dev`.
+3. Read the SQL, commit it with the schema change, open a PR. The schema guard posts the SQL and blocks anything destructive.
+4. After the PR merges: `git checkout dev && git pull && npm run db:deploy`.
+
+**Don't use `prisma db push`** (the old `db:push` script) on the shared database. It syncs from *your* branch's schema and will drop tables and columns that exist only on a teammate's branch.
 
 ### Adding a new model
 
 1. Add it to `prisma/schema.prisma`. Index columns you'll query by.
-2. `npm run db:push`
+2. `npm run db:new-migration -- add_<model>` and `npm run db:deploy` against your local database
 3. `npm run db:generate` (also runs automatically on `npm install` via `postinstall`)
 4. Import from `@prisma/client` in your code — types appear immediately.
 
@@ -377,7 +383,7 @@ Before requesting review:
 - [ ] `npm run lint` passes (or you've justified the ignore in the PR)
 - [ ] `npm run build` succeeds
 - [ ] Manually verified the user flow your change affects
-- [ ] If you touched the schema: ran `npm run db:push` locally and tested
+- [ ] If you touched the schema: added a migration (`npm run db:new-migration`), applied it locally and tested
 - [ ] If you added an admin action: added it to `AuditAction` and verified the audit row appears at `/admin/audit`
 - [ ] No new dependencies without a one-line justification in the PR description
 - [ ] No hard-coded hex colors in components — used Tailwind tokens
