@@ -32,6 +32,8 @@ export interface LoopBuilderProps {
   initialProblems: string[];
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   version: number;
+  /** The revision this editor loaded; every save and status change sends it. */
+  revision: number;
 }
 
 const newRound = (category: Category = "BEHAVIORAL"): LoopRoundConfig => ({
@@ -58,6 +60,9 @@ export function LoopBuilder(props: LoopBuilderProps) {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState<"save" | "publish" | "archive" | "restore" | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [revision, setRevision] = useState(props.revision);
+  /** Someone else changed the loop; saving would overwrite them, so only reloading is offered. */
+  const [conflict, setConflict] = useState(false);
 
   const touch = () => {
     setDirty(true);
@@ -93,10 +98,13 @@ export function LoopBuilder(props: LoopBuilderProps) {
           roleTarget: roleTarget || null,
           level: level || null,
           rounds,
+          revision,
         }),
       });
       const body = await res.json().catch(() => ({}));
+      if (body.conflict) setConflict(true);
       if (!res.ok) throw new Error(body.error || `Save failed (${res.status})`);
+      setRevision(body.revision);
       setProblems(body.problems ?? []);
       setDirty(false);
       setMessage({ tone: "ok", text: "Saved." });
@@ -118,13 +126,15 @@ export function LoopBuilder(props: LoopBuilderProps) {
       const res = await fetch(`${paths.api}/loops/${props.loopId}/status`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, revision }),
       });
       const body = await res.json().catch(() => ({}));
+      if (body.conflict) setConflict(true);
       if (!res.ok) {
         if (body.problems) setProblems(body.problems);
         throw new Error(body.error || `Failed (${res.status})`);
       }
+      setRevision(body.revision);
       setMessage({ tone: "ok", text: action === "publish" ? `Published as version ${body.version}.` : action === "archive" ? "Archived." : "Restored." });
       router.refresh();
     } catch (e) {
@@ -222,21 +232,26 @@ export function LoopBuilder(props: LoopBuilderProps) {
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn text-sm" onClick={save} disabled={!!busy || !dirty}>
+            <button type="button" className="btn text-sm" onClick={save} disabled={!!busy || !dirty || conflict}>
               {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
             </button>
             {props.status !== "ARCHIVED" && (
-              <button type="button" className="btn btn-primary text-sm" onClick={() => status("publish")} disabled={!!busy}>
+              <button type="button" className="btn btn-primary text-sm" onClick={() => status("publish")} disabled={!!busy || conflict}>
                 {busy === "publish" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {props.version === 0 ? "Publish" : "Publish changes"}
               </button>
             )}
-            <button type="button" className="btn text-sm" onClick={() => status(props.status === "ARCHIVED" ? "restore" : "archive")} disabled={!!busy}>
+            <button type="button" className="btn text-sm" onClick={() => status(props.status === "ARCHIVED" ? "restore" : "archive")} disabled={!!busy || conflict}>
               {props.status === "ARCHIVED" ? "Restore" : "Archive"}
             </button>
           </div>
           {dirty && <p className="text-xs text-text-dim">Unsaved changes.</p>}
           {message && <p className={`text-sm ${message.tone === "error" ? "text-hard" : "text-text-muted"}`} role="status">{message.text}</p>}
+          {conflict && (
+            <button type="button" className="btn btn-primary text-sm w-full justify-center" onClick={() => window.location.reload()}>
+              Reload the latest version{dirty ? " (your unsaved edits will be lost)" : ""}
+            </button>
+          )}
         </div>
       </aside>
     </div>

@@ -107,13 +107,13 @@ describe("loops", () => {
   test("a loop can use library questions but not another workspace's", async () => {
     const created = await json(await h.createLoopHandler(A, req({ name: "A loop" })));
     ids.aLoop = String(created.body.id);
-    const withB = await json(await h.updateLoopHandler(A, req(fixedRound([ids.bQ])), ids.aLoop));
+    const withB = await json(await h.updateLoopHandler(A, req({ ...fixedRound([ids.bQ]), revision: 0 }), ids.aLoop));
     assert.match(String((withB.body.problems as string[])[0]), /no longer exists/);
-    assert.equal((await h.loopStatusHandler(A, req({ action: "publish" }), ids.aLoop)).status, 409);
+    assert.equal((await h.loopStatusHandler(A, req({ action: "publish", revision: 1 }), ids.aLoop)).status, 409);
 
-    const ok = await json(await h.updateLoopHandler(A, req(fixedRound([ids.platformQ, ids.aQ])), ids.aLoop));
+    const ok = await json(await h.updateLoopHandler(A, req({ ...fixedRound([ids.platformQ, ids.aQ]), revision: 1 }), ids.aLoop));
     assert.deepEqual(ok.body.problems, []);
-    assert.equal((await h.loopStatusHandler(A, req({ action: "publish" }), ids.aLoop)).status, 200);
+    assert.equal((await h.loopStatusHandler(A, req({ action: "publish", revision: 2 }), ids.aLoop)).status, 200);
   });
 
   test("pools count own + library questions only", async () => {
@@ -124,8 +124,8 @@ describe("loops", () => {
   });
 
   test("B can't edit, publish or archive A's loop", async () => {
-    assert.equal((await h.updateLoopHandler(B, req(fixedRound([ids.bQ])), ids.aLoop)).status, 404);
-    assert.equal((await h.loopStatusHandler(B, req({ action: "archive" }), ids.aLoop)).status, 404);
+    assert.equal((await h.updateLoopHandler(B, req({ ...fixedRound([ids.bQ]), revision: 3 }), ids.aLoop)).status, 404);
+    assert.equal((await h.loopStatusHandler(B, req({ action: "archive", revision: 3 }), ids.aLoop)).status, 404);
   });
 
   test("templates copy into a workspace; another workspace's loop isn't a template", async () => {

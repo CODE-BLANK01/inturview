@@ -607,6 +607,9 @@ model LoopTemplate {
   rounds         Json                  @default("[]")
   status         LoopStatus            @default(DRAFT)
   currentVersion Int                   @default(0)
+  /// Bumped on every save and status change. Saves and publishes name the
+  /// revision they started from; a mismatch means someone else changed it.
+  revision       Int                   @default(0)
   createdById    String?
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
@@ -621,7 +624,8 @@ model LoopTemplateVersion {
   loopTemplateId String
   loopTemplate   LoopTemplate @relation(fields: [loopTemplateId], references: [id], onDelete: Cascade)
   version        Int
-  /// Frozen loop with resolved question versions.
+  /// Frozen loop. Format 2 stores full copies of every fixed question and of
+  /// each pool's eligible questions, so candidates never see later edits.
   snapshot       Json
   publishedById  String?
   publishedAt    DateTime     @default(now())

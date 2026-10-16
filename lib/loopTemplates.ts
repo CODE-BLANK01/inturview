@@ -40,7 +40,10 @@ export const LoopEditSchema = z.object({
   description: z.string().trim().max(2000).nullable().default(null),
   roleTarget: z.string().trim().max(80).nullable().default(null),
   level: z.enum(LEVELS).nullable().default(null),
-  rounds: z.array(RoundSchema).max(MAX_ROUNDS, `A loop can have at most ${MAX_ROUNDS} rounds.`),
+  rounds: z
+    .array(RoundSchema)
+    .max(MAX_ROUNDS, `A loop can have at most ${MAX_ROUNDS} rounds.`)
+    .refine((rs) => new Set(rs.map((r) => r.id)).size === rs.length, "Two rounds share an id. Reload the builder and try again."),
 });
 export type LoopEdit = z.infer<typeof LoopEditSchema>;
 
@@ -156,57 +159,102 @@ export class LoopNotReadyError extends Error {
   }
 }
 
+/** Someone saved or published since the caller loaded the loop. */
+export class LoopChangedError extends Error {
+  constructor(public revision: number) {
+    super("This loop changed since you opened it, in another tab or by a teammate. Reload to see the latest.");
+  }
+}
+
+/** A status change that isn't allowed from the current status. */
+export class LoopTransitionError extends Error {}
+
+/** A full question copy as it was at publish time. Candidates are served from these. */
+export interface FrozenLoopQuestion {
+  questionId: string;
+  version: number;
+  title: string;
+  prompt: string;
+  followUps: string[];
+  signals: string[];
+  details: unknown;
+  difficulty: string | null;
+}
+
+async function freezeVersions(db: Prisma.TransactionClient, refs: { id: string; currentVersion: number }[]): Promise<FrozenLoopQuestion[]> {
+  if (refs.length === 0) return [];
+  const rows = await db.questionVersion.findMany({
+    where: { OR: refs.map((r) => ({ questionId: r.id, version: r.currentVersion })) },
+    select: { questionId: true, version: true, snapshot: true },
+  });
+  return refs.flatMap((r) => {
+    const v = rows.find((x) => x.questionId === r.id && x.version === r.currentVersion);
+    if (!v) return [];
+    const s = v.snapshot as { title: string; prompt: string; followUps: string[]; signals: string[]; details?: unknown; difficulty?: string | null };
+    return [{ questionId: r.id, version: v.version, title: s.title, prompt: s.prompt, followUps: s.followUps ?? [], signals: s.signals ?? [], details: s.details ?? null, difficulty: s.difficulty ?? null }];
+  });
+}
+
 /**
- * Freezes the loop with the current version of each fixed question. Re-publishing
- * an unchanged loop is a no-op, like questions.
+ * Freezes the loop: full copies of each fixed question, and of every question
+ * each pool may draw from, at their current versions. `expectedRevision` is the
+ * revision the publisher was looking at; publishing fails if it moved.
+ * Re-publishing unchanged content is a no-op, like questions.
  */
-export async function publishLoop(id: string, publishedById: string | null) {
+export async function publishLoop(id: string, publishedById: string | null, expectedRevision?: number) {
   return prisma.$transaction(async (tx) => {
     const loop = await tx.loopTemplate.findUniqueOrThrow({ where: { id } });
+    if (expectedRevision !== undefined && loop.revision !== expectedRevision) throw new LoopChangedError(loop.revision);
     if (loop.status === LoopStatus.ARCHIVED) throw new LoopNotReadyError(["Restore this loop before publishing it."]);
     const rounds = parseRounds(loop.rounds);
     const facts = await gatherFacts(rounds, loop.organizationId, tx);
     const problems = readinessProblems(rounds, facts);
     if (problems.length) throw new LoopNotReadyError(problems);
 
-    const fixedIds = rounds.flatMap((r) => (r.questions.mode === "fixed" ? r.questions.questionIds : []));
-    const versions = new Map(
-      (await tx.question.findMany({ where: { id: { in: fixedIds } }, select: { id: true, currentVersion: true } })).map((q) => [q.id, q.currentVersion]),
-    );
-    const config = {
-      name: loop.name,
-      description: loop.description,
-      roleTarget: loop.roleTarget,
-      level: loop.level,
-      rounds: rounds.map((r) => ({
-        ...r,
-        questions:
-          r.questions.mode === "fixed"
-            ? { mode: "fixed" as const, pinned: r.questions.questionIds.map((qid) => ({ questionId: qid, version: versions.get(qid)! })) }
-            : r.questions,
-      })),
-    };
+    const frozenRounds = [];
+    for (const r of rounds) {
+      if (r.questions.mode === "fixed") {
+        const refs = await tx.question.findMany({ where: { id: { in: r.questions.questionIds } }, select: { id: true, currentVersion: true } });
+        const ordered = r.questions.questionIds.map((qid) => refs.find((q) => q.id === qid)!);
+        const frozen = await freezeVersions(tx, ordered);
+        frozenRounds.push({ ...r, questions: { mode: "fixed" as const, pinned: frozen.map((q) => ({ questionId: q.questionId, version: q.version })), frozen } });
+      } else {
+        // Every candidate draws from exactly this set, whatever is published later.
+        const eligible = await tx.question.findMany({ where: poolWhere(r.category, r.questions, loop.organizationId), select: { id: true, currentVersion: true }, orderBy: { id: "asc" } });
+        frozenRounds.push({ ...r, questions: { ...r.questions, frozenPool: await freezeVersions(tx, eligible) } });
+      }
+    }
+    const config = { name: loop.name, description: loop.description, roleTarget: loop.roleTarget, level: loop.level, rounds: frozenRounds };
     const latest = await tx.loopTemplateVersion.findFirst({ where: { loopTemplateId: id }, orderBy: { version: "desc" } });
     if (latest && stableStringify((latest.snapshot as { config?: unknown }).config) === stableStringify(config)) {
-      return loop.status === LoopStatus.PUBLISHED ? loop : tx.loopTemplate.update({ where: { id }, data: { status: LoopStatus.PUBLISHED } });
+      return loop.status === LoopStatus.PUBLISHED
+        ? loop
+        : tx.loopTemplate.update({ where: { id }, data: { status: LoopStatus.PUBLISHED, revision: { increment: 1 } } });
     }
     const version = loop.currentVersion + 1;
     await tx.loopTemplateVersion.create({
       data: {
         loopTemplateId: id,
         version,
-        snapshot: { config, totalMinutes: totalMinutes(rounds), estimate: estimateLoopCost(rounds) } as unknown as Prisma.InputJsonValue,
+        snapshot: { format: 2, config, totalMinutes: totalMinutes(rounds), estimate: estimateLoopCost(rounds) } as unknown as Prisma.InputJsonValue,
         publishedById,
       },
     });
-    return tx.loopTemplate.update({ where: { id }, data: { status: LoopStatus.PUBLISHED, currentVersion: version } });
+    return tx.loopTemplate.update({ where: { id }, data: { status: LoopStatus.PUBLISHED, currentVersion: version, revision: { increment: 1 } } });
   });
 }
 
-export async function setLoopArchived(id: string, archived: boolean) {
-  const loop = await prisma.loopTemplate.findUniqueOrThrow({ where: { id }, select: { currentVersion: true } });
-  return prisma.loopTemplate.update({
-    where: { id },
-    data: { status: archived ? LoopStatus.ARCHIVED : loop.currentVersion > 0 ? LoopStatus.PUBLISHED : LoopStatus.DRAFT },
-  });
+/**
+ * Draft and published loops can be archived; only archived loops can be
+ * restored (to published if they ever were, else draft).
+ */
+export async function setLoopArchived(id: string, archived: boolean, expectedRevision?: number) {
+  const loop = await prisma.loopTemplate.findUniqueOrThrow({ where: { id }, select: { currentVersion: true, status: true, revision: true } });
+  if (expectedRevision !== undefined && loop.revision !== expectedRevision) throw new LoopChangedError(loop.revision);
+  if (archived && loop.status === LoopStatus.ARCHIVED) throw new LoopTransitionError("This loop is already archived.");
+  if (!archived && loop.status !== LoopStatus.ARCHIVED) throw new LoopTransitionError("Only an archived loop can be restored.");
+  const next = archived ? LoopStatus.ARCHIVED : loop.currentVersion > 0 ? LoopStatus.PUBLISHED : LoopStatus.DRAFT;
+  const r = await prisma.loopTemplate.updateMany({ where: { id, revision: loop.revision }, data: { status: next, revision: { increment: 1 } } });
+  if (r.count === 0) throw new LoopChangedError(loop.revision + 1);
+  return prisma.loopTemplate.findUniqueOrThrow({ where: { id } });
 }

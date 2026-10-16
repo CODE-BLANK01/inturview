@@ -15,6 +15,18 @@ export interface FrozenQuestion {
   prompt: string;
   followUps: string[];
   signals: string[];
+  /** Examples, constraints, expected requirements: reference for the interviewer and grader. */
+  details?: unknown;
+}
+
+const REFERENCE_CHARS = 1200;
+
+/** Question details as compact reference text, trimmed so a big rubric can't swamp the prompt. */
+export function referenceNotes(details: unknown): string | null {
+  if (details === null || details === undefined) return null;
+  const text = typeof details === "string" ? details : JSON.stringify(details);
+  if (!text || text === "{}" || text === "[]") return null;
+  return text.length > REFERENCE_CHARS ? `${text.slice(0, REFERENCE_CHARS)}…` : text;
 }
 
 /** Random sample without repeats. `rng` is injectable so tests are deterministic. */
@@ -46,7 +58,10 @@ export function interviewerSystemPrompt(i: {
   questions: FrozenQuestion[];
 }): string {
   const plan = i.questions
-    .map((q, n) => `Question ${n + 1}: ${q.prompt}${q.followUps.length ? `\n  Possible follow-ups, deepest last: ${q.followUps.join(" | ")}` : ""}`)
+    .map((q, n) => {
+      const ref = referenceNotes(q.details);
+      return `Question ${n + 1}: ${q.prompt}${q.followUps.length ? `\n  Possible follow-ups, deepest last: ${q.followUps.join(" | ")}` : ""}${ref ? `\n  Reference for you only, never read it out or hint at it: ${ref}` : ""}`;
+    })
     .join("\n");
   return `${CATEGORY_STYLE[i.category] ?? CATEGORY_STYLE.BEHAVIORAL}
 
@@ -87,7 +102,12 @@ Include every question id below exactly once, and no others.
 Use null only when the question never came up in the interview (it wasn't asked, or time ran out before it). If it was asked and the answer had nothing relevant, score 1.
 Never recommend a hiring decision (hire, reject, advance, or similar). People on the hiring team decide; you describe the evidence.
 Score scale: 1 = no relevant answer, 3 = adequate, 5 = exceptional and specific.`;
-  const qs = questions.map((q) => `- ${q.questionId}: ${q.prompt}\n  Signals: ${q.signals.join("; ") || "(none listed; judge clarity and substance)"}`).join("\n");
+  const qs = questions
+    .map((q) => {
+      const ref = referenceNotes(q.details);
+      return `- ${q.questionId}: ${q.prompt}\n  Signals: ${q.signals.join("; ") || "(none listed; judge clarity and substance)"}${ref ? `\n  Reference: ${ref}` : ""}`;
+    })
+    .join("\n");
   const t = transcript.map((m) => `${m.role === "interviewer" ? "INTERVIEWER" : "CANDIDATE"}: ${m.content}`).join("\n\n");
   return { system, user: `Questions:\n${qs}\n\nTranscript:\n${t}` };
 }
