@@ -23,8 +23,10 @@ import {
 import { DRAFT_MODEL, generateDrafts } from "../questionDrafts";
 import {
   checkReadiness,
+  LoopChangedError,
   LoopEditSchema,
   LoopNotReadyError,
+  LoopTransitionError,
   poolWhere,
   publishedRounds,
   publishLoop,
@@ -216,38 +218,52 @@ export async function createLoopHandler(ctx: HiringCtx, req: NextRequest) {
   return json({ id: loop.id }, 201);
 }
 
+/** The revision the editor loaded; saves and status changes must match it. */
+const Revision = z.number().int().min(0);
+const changed = (e: LoopChangedError) => json({ error: e.message, conflict: true, revision: e.revision }, 409);
+
 export async function updateLoopHandler(ctx: HiringCtx, req: NextRequest, id: string) {
-  const parsed = LoopEditSchema.safeParse(await body(req));
+  const parsed = LoopEditSchema.extend({ revision: Revision }).safeParse(await body(req));
   if (!parsed.success) return json({ error: firstIssue(parsed.error, "Invalid loop") }, 400);
-  if (!(await ownLoop(ctx, id))) return notFound("Loop");
-  const { rounds, ...meta } = parsed.data;
-  await prisma.loopTemplate.update({ where: { id }, data: { ...meta, rounds: rounds as unknown as Prisma.InputJsonValue } });
-  await audit(ctx, "LOOP_UPDATED", "loop", id, { rounds: rounds.length });
+  const { rounds, revision, ...meta } = parsed.data;
+  // Conditional on the revision: a save from a stale tab can't overwrite a newer one.
+  const r = await prisma.loopTemplate.updateMany({
+    where: { id, organizationId: ctx.organizationId, revision },
+    data: { ...meta, rounds: rounds as unknown as Prisma.InputJsonValue, revision: { increment: 1 } },
+  });
+  if (r.count === 0) {
+    const current = await prisma.loopTemplate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { revision: true } });
+    return current ? changed(new LoopChangedError(current.revision)) : notFound("Loop");
+  }
+  await audit(ctx, "LOOP_UPDATED", "loop", id, { rounds: rounds.length, revision: revision + 1 });
   // Tell the editor right away what still blocks publishing.
-  return json({ ok: true, ...(await checkReadiness(rounds, ctx.organizationId)) });
+  return json({ ok: true, revision: revision + 1, ...(await checkReadiness(rounds, ctx.organizationId)) });
 }
 
-const LoopAction = z.object({ action: z.enum(["publish", "archive", "restore"]) });
+const LoopAction = z.object({ action: z.enum(["publish", "archive", "restore"]), revision: Revision });
 
 export async function loopStatusHandler(ctx: HiringCtx, req: NextRequest, id: string) {
   const parsed = LoopAction.safeParse(await body(req));
   if (!parsed.success) return json({ error: "Unknown action" }, 400);
   if (!(await ownLoop(ctx, id))) return notFound("Loop");
-  if (parsed.data.action === "publish") {
-    try {
-      const loop = await publishLoop(id, ctx.actorId);
+  const { action, revision } = parsed.data;
+  try {
+    if (action === "publish") {
+      const loop = await publishLoop(id, ctx.actorId, revision);
       await audit(ctx, "LOOP_PUBLISHED", "loop", id, { version: loop.currentVersion });
-      return json({ status: loop.status, version: loop.currentVersion });
-    } catch (e) {
-      if (e instanceof LoopNotReadyError) return json({ error: e.message, problems: e.problems }, 409);
-      if ((e as { code?: string }).code === "P2002") return json({ error: "Already published. Refresh to see the latest version." }, 409);
-      throw e;
+      return json({ status: loop.status, version: loop.currentVersion, revision: loop.revision });
     }
+    const archived = action === "archive";
+    const loop = await setLoopArchived(id, archived, revision);
+    await audit(ctx, archived ? "LOOP_ARCHIVED" : "LOOP_RESTORED", "loop", id);
+    return json({ status: loop.status, version: loop.currentVersion, revision: loop.revision });
+  } catch (e) {
+    if (e instanceof LoopChangedError) return changed(e);
+    if (e instanceof LoopNotReadyError) return json({ error: e.message, problems: e.problems }, 409);
+    if (e instanceof LoopTransitionError) return json({ error: e.message }, 409);
+    if ((e as { code?: string }).code === "P2002") return json({ error: "Already published. Refresh to see the latest version." }, 409);
+    throw e;
   }
-  const archived = parsed.data.action === "archive";
-  const loop = await setLoopArchived(id, archived);
-  await audit(ctx, archived ? "LOOP_ARCHIVED" : "LOOP_RESTORED", "loop", id);
-  return json({ status: loop.status, version: loop.currentVersion });
 }
 
 const tags = z.array(z.string().trim().toLowerCase().min(1).max(40)).max(10).default([]);

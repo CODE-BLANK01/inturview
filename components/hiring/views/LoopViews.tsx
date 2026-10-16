@@ -194,6 +194,7 @@ export async function LoopDetailView({ organizationId, paths, id, canInvite }: S
         initialProblems={readiness.problems}
         status={loop.status}
         version={loop.currentVersion}
+        revision={loop.revision}
       />
     </div>
   );
