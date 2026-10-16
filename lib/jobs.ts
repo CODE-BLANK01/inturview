@@ -15,10 +15,15 @@ export interface JobHandler {
 }
 
 /** Queues a job unless one with the same key is already queued or running. Returns whether it was added. */
-export async function enqueueJob(kind: string, key: string, payload: Prisma.InputJsonValue, opts: { maxAttempts?: number } = {}) {
+export async function enqueueJob(
+  kind: string,
+  key: string,
+  payload: Prisma.InputJsonValue,
+  opts: { maxAttempts?: number; db?: Prisma.TransactionClient } = {},
+) {
   // runAfter from the app clock: the column default is rounded to the millisecond
   // and can land just after an immediate claim's "now", making the job look not yet due.
-  const r = await prisma.job.createMany({ data: [{ kind, key, payload, maxAttempts: opts.maxAttempts ?? 5, runAfter: new Date() }], skipDuplicates: true });
+  const r = await (opts.db ?? prisma).job.createMany({ data: [{ kind, key, payload, maxAttempts: opts.maxAttempts ?? 5, runAfter: new Date() }], skipDuplicates: true });
   return r.count === 1;
 }
 
