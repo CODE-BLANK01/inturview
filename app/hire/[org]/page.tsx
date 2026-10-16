@@ -11,10 +11,11 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
   const { org } = access;
   const now = new Date();
   const seesCandidates = accessAllows(access, "applications.viewAll");
-  const [members, pending, publishedLoops, invited, finished, needsAttention] = await Promise.all([
+  const [members, pending, publishedLoops, roles, invited, finished, needsAttention] = await Promise.all([
     prisma.organizationMember.count({ where: { organizationId: org.id } }),
     prisma.memberInvitation.count({ where: { organizationId: org.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } } }),
     prisma.loopTemplate.count({ where: { organizationId: org.id, status: "PUBLISHED" } }),
+    prisma.hiringRole.count({ where: { organizationId: org.id } }),
     prisma.invite.count({ where: { campaign: { organizationId: org.id } } }),
     seesCandidates ? prisma.invite.count({ where: { campaign: { organizationId: org.id }, status: "COMPLETED" } }) : 0,
     // Emails that bounced and rounds whose scoring didn't finish.
@@ -35,7 +36,8 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
     { done: !!org.contactEmail && org.timezone !== "UTC", label: "Add a contact email and your timezone", href: `${base}/settings`, show: canEdit },
     { done: members > 1 || pending > 0, label: "Invite a teammate", href: `${base}/team`, show: canInvite },
     { done: publishedLoops > 0, label: "Publish an interview loop", href: `${base}/loops`, show: canBuild },
-    { done: invited > 0, label: "Invite your first candidates", href: `${base}/invites/new`, show: canSend && publishedLoops > 0 },
+    { done: roles > 0, label: "Create a role for the job you're hiring", href: `${base}/roles`, show: accessAllows(access, "roles.edit") },
+    { done: invited > 0, label: "Invite your first candidates from the role", href: `${base}/roles`, show: canSend && publishedLoops > 0 && roles > 0 },
   ].filter((s) => s.show);
 
   return (
@@ -69,9 +71,9 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
       {seesCandidates && (
         <section className="grid grid-cols-2 sm:grid-cols-3 gap-3" aria-label="Candidates">
           {[
-            { n: invited, label: "Candidates invited", href: `${base}/invites` },
-            { n: finished, label: "Finished interviews", href: `${base}/invites` },
-            { n: needsAttention, label: "Need attention", href: `${base}/invites`, warn: needsAttention > 0 },
+            { n: invited, label: "Candidates invited", href: `${base}/candidates` },
+            { n: finished, label: "Ready for review", href: `${base}/candidates?stage=ready` },
+            { n: needsAttention, label: "Need attention", href: `${base}/candidates?stage=needs_attention`, warn: needsAttention > 0 },
           ].map((c) => (
             <Link key={c.label} href={c.href} className="panel p-4 hover:border-accent/40">
               <div className={`text-2xl font-semibold tabular-nums ${c.warn ? "text-hard" : ""}`}>{c.n}</div>

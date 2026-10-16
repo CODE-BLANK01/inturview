@@ -15,7 +15,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
   const workspaces = await prisma.organizationMember.count({ where: { userId: access.user.id } });
   const nav: HireNavKey[] = [
     "overview",
-    ...(accessAllows(access, "applications.viewAll") ? (["invites"] as const) : []),
+    ...(accessAllows(access, "applications.viewAll") ? (["roles", "candidates"] as const) : []),
     ...(accessAllows(access, "loops.edit") ? (["loops"] as const) : []),
     ...(accessAllows(access, "questions.edit") ? (["questions"] as const) : []),
     "team",

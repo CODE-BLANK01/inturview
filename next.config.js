@@ -17,6 +17,10 @@ const nextConfig = {
     return [
       { source: "/admin/questions/:path*", destination: "/admin/content/questions/:path*", permanent: false },
       { source: "/admin/loops/:path*", destination: "/admin/content/loops/:path*", permanent: false },
+      // Workspaces work by role and candidate now; batches ("invites") aren't a page anymore.
+      { source: "/hire/:org/invites/:id/candidates/:inviteId", destination: "/hire/:org/candidates/:inviteId", permanent: false },
+      { source: "/hire/:org/invites/new", destination: "/hire/:org/roles", permanent: false },
+      { source: "/hire/:org/invites/:path*", destination: "/hire/:org/candidates", permanent: false },
     ];
   },
 };

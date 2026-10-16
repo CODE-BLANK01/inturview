@@ -222,11 +222,11 @@ export async function CampaignView({ organizationId, paths, id, canSend }: Scope
   );
 }
 
-export async function CandidateView({ organizationId, paths, campaignId, inviteId, canRescore }: Scope & { campaignId: string; inviteId: string; canRescore: boolean }) {
+export async function CandidateView({ organizationId, paths, campaignId, inviteId, canRescore }: Scope & { campaignId?: string; inviteId: string; canRescore: boolean }) {
   const invite = await prisma.invite.findFirst({
-    where: { id: inviteId, campaignId, campaign: { organizationId } },
+    where: { id: inviteId, ...(campaignId && { campaignId }), campaign: { organizationId } },
     include: {
-      campaign: { select: { id: true, name: true, loopTemplateId: true, loopVersion: true } },
+      campaign: { select: { id: true, name: true, loopTemplateId: true, loopVersion: true, hiringRole: { select: { id: true, title: true } } } },
       run: {
         include: {
           rounds: {
@@ -249,7 +249,15 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
 
   return (
     <div className="space-y-6">
-      <BackLink href={`${paths.invites}/${invite.campaign.id}`} label={invite.campaign.name} />
+      {paths.workspace ? (
+        invite.campaign.hiringRole ? (
+          <BackLink href={`${paths.roles}/${invite.campaign.hiringRole.id}`} label={invite.campaign.hiringRole.title} />
+        ) : (
+          <BackLink href={paths.candidates} label="Candidates" />
+        )
+      ) : (
+        <BackLink href={`${paths.invites}/${invite.campaign.id}`} label={invite.campaign.name} />
+      )}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{invite.name ?? invite.email}</h1>
