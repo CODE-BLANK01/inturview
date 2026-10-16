@@ -151,6 +151,13 @@ export async function LoopDetailView({ organizationId, paths, id, canInvite }: S
     include: { versions: { orderBy: { version: "desc" }, take: 10, select: { id: true, version: true, publishedAt: true } } },
   });
   if (!loop) notFound();
+  const latest = loop.currentVersion
+    ? await prisma.loopTemplateVersion.findUnique({ where: { loopTemplateId_version: { loopTemplateId: loop.id, version: loop.currentVersion } }, select: { snapshot: true } })
+    : null;
+  const latestConfig = (latest?.snapshot as { config?: { name: string; description: string | null; roleTarget: string | null; level: string | null } } | undefined)?.config;
+  const published = latestConfig
+    ? { name: latestConfig.name, description: latestConfig.description, roleTarget: latestConfig.roleTarget, level: latestConfig.level, rounds: publishedRounds(latest?.snapshot) }
+    : null;
 
   const rounds = parseRounds(loop.rounds);
   const fixedIds = rounds.flatMap((r) => (r.questions.mode === "fixed" ? r.questions.questionIds : []));
@@ -195,6 +202,7 @@ export async function LoopDetailView({ organizationId, paths, id, canInvite }: S
         status={loop.status}
         version={loop.currentVersion}
         revision={loop.revision}
+        published={published}
       />
     </div>
   );
