@@ -231,28 +231,38 @@ export async function freezeLoop(tx: Prisma.TransactionClient, loop: FreezableLo
  * revision the publisher was looking at; publishing fails if it moved.
  * Re-publishing unchanged content is a no-op, like questions.
  */
-export async function publishLoop(id: string, publishedById: string | null, expectedRevision?: number) {
+export async function publishLoop(
+  id: string,
+  publishedById: string | null,
+  expectedRevision?: number,
+  /** Tests only: runs after the loop is read and frozen, before anything is written. */
+  hooks: { beforeWrite?: () => Promise<void> } = {},
+) {
   return prisma.$transaction(async (tx) => {
     const loop = await tx.loopTemplate.findUniqueOrThrow({ where: { id } });
     if (expectedRevision !== undefined && loop.revision !== expectedRevision) throw new LoopChangedError(loop.revision);
     if (loop.status === LoopStatus.ARCHIVED) throw new LoopNotReadyError(["Restore this loop before publishing it."]);
     const { config, snapshot } = await freezeLoop(tx, loop);
+    await hooks.beforeWrite?.();
+    // The final write only lands if nobody saved, archived or published since we
+    // read the loop; otherwise the whole publish rolls back.
+    const claim = async (data: { status: LoopStatus; currentVersion?: number }) => {
+      const r = await tx.loopTemplate.updateMany({ where: { id, revision: loop.revision }, data: { ...data, revision: { increment: 1 } } });
+      if (r.count !== 1) {
+        const now = await tx.loopTemplate.findUnique({ where: { id }, select: { revision: true } });
+        throw new LoopChangedError(now?.revision ?? loop.revision + 1);
+      }
+      return tx.loopTemplate.findUniqueOrThrow({ where: { id } });
+    };
     const latest = await tx.loopTemplateVersion.findFirst({ where: { loopTemplateId: id }, orderBy: { version: "desc" } });
     if (latest && stableStringify((latest.snapshot as { config?: unknown }).config) === stableStringify(config)) {
-      return loop.status === LoopStatus.PUBLISHED
-        ? loop
-        : tx.loopTemplate.update({ where: { id }, data: { status: LoopStatus.PUBLISHED, revision: { increment: 1 } } });
+      return loop.status === LoopStatus.PUBLISHED ? loop : claim({ status: LoopStatus.PUBLISHED });
     }
     const version = loop.currentVersion + 1;
     await tx.loopTemplateVersion.create({
-      data: {
-        loopTemplateId: id,
-        version,
-        snapshot: snapshot as unknown as Prisma.InputJsonValue,
-        publishedById,
-      },
+      data: { loopTemplateId: id, version, snapshot: snapshot as unknown as Prisma.InputJsonValue, publishedById },
     });
-    return tx.loopTemplate.update({ where: { id }, data: { status: LoopStatus.PUBLISHED, currentVersion: version, revision: { increment: 1 } } });
+    return claim({ status: LoopStatus.PUBLISHED, currentVersion: version });
   });
 }
 
