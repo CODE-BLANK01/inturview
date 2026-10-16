@@ -7,6 +7,9 @@ import { checkRateLimit, clientKey } from "@/lib/rateLimit";
 import { applicantDistinctId, CATEGORY_TO_ANALYTICS, LoopAccessError, loadLoopContext } from "@/lib/loopRuns";
 import { COMPLETE_MARKER, interviewerSystemPrompt, MAX_CANDIDATE_TURNS, splitMarker, type FrozenQuestion } from "@/lib/loopRunEngine";
 import { toTurns } from "@/lib/loopRoundTurns";
+import { CLIENT_TURN_ID, historyThrough, recordAnswer, replyTo, saveReply } from "@/lib/roundAnswers";
+import { interviewerTimeNote, roundClock } from "@/lib/roundTiming";
+import { finishRound } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,12 +18,18 @@ export const maxDuration = 60;
 const Body = z.object({
   token: z.string().min(20).max(100),
   roundRunId: z.string().min(1),
+  /** Made by the browser once per answer; a retry sends the same one. */
+  clientTurnId: z.string().regex(CLIENT_TURN_ID),
   content: z.string().trim().min(1, "Write an answer first.").max(6000, "That answer is too long. Split it into two messages."),
 });
 
+const NDJSON = { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" };
+
 /**
- * Saves the candidate's answer and streams the interviewer's reply as
- * newline-delimited JSON: {"t": text} chunks, then {"done": true, "complete": bool}.
+ * Saves the candidate's answer (once per clientTurnId) and streams the
+ * interviewer's reply as newline-delimited JSON: {"t": text} chunks, then
+ * {"done": true, "complete": bool}. A retry of an answer whose reply was
+ * already saved gets that reply back without another model call.
  */
 export async function POST(req: NextRequest) {
   const rl = checkRateLimit({ key: `loop-msg:${clientKey(req.headers)}`, limit: 40, windowMs: 60_000 });
@@ -40,19 +49,38 @@ export async function POST(req: NextRequest) {
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
   if (!rr) return Response.json({ error: "Round not found" }, { status: 404 });
-  if (rr.status !== "IN_PROGRESS") return Response.json({ error: "This round is finished." }, { status: 409 });
-  if (rr.messages.filter((m) => m.role === "candidate").length >= MAX_CANDIDATE_TURNS) {
+  const round = ctx.loop.rounds[rr.roundIndex]!;
+  const { clientTurnId, content } = parsed.data;
+
+  // Already answered and replied to: replay the stored reply (a retry after a dropped connection).
+  const prior = rr.messages.find((m) => m.clientTurnId === clientTurnId);
+  const priorReply = prior && rr.messages.find((m) => m.replyToId === prior.id);
+  if (priorReply) {
+    return new Response(`${JSON.stringify({ t: priorReply.content })}\n${JSON.stringify({ done: true, complete: priorReply.endsRound })}\n`, { headers: NDJSON });
+  }
+  if (rr.status !== "IN_PROGRESS") return Response.json({ error: "This round is finished.", ended: true }, { status: 409 });
+  const clock = roundClock(rr.startedAt, round.durationMinutes, rr.deadlineAt);
+  if (clock.pastDeadline) {
+    await finishRound(rr.id);
+    return Response.json({ error: "Time's up for this round. Everything you sent before now is saved.", ended: true }, { status: 409 });
+  }
+  if (!prior && rr.messages.filter((m) => m.role === "candidate").length >= MAX_CANDIDATE_TURNS) {
     return Response.json({ error: "This round has reached its length limit. Finish the round to continue.", limit: true }, { status: 409 });
   }
 
-  await prisma.loopMessage.create({ data: { roundRunId: rr.id, role: "candidate", content: parsed.data.content } });
-  const round = ctx.loop.rounds[rr.roundIndex]!;
+  const { answer } = await recordAnswer(rr.id, clientTurnId, content);
+  // A reply may have been saved by a concurrent retry since we loaded the round.
+  const raced = await replyTo(answer.id);
+  if (raced) return new Response(`${JSON.stringify({ t: raced.content })}\n${JSON.stringify({ done: true, complete: raced.endsRound })}\n`, { headers: NDJSON });
   const system = interviewerSystemPrompt({
     loopName: ctx.loop.name, roleTarget: ctx.loop.roleTarget, level: ctx.loop.level, roundTitle: round.title,
     category: round.category, durationMinutes: round.durationMinutes, candidateName: ctx.invite.name,
     questions: rr.questions as unknown as FrozenQuestion[],
   });
-  const turns = toTurns([...rr.messages, { role: "candidate", content: parsed.data.content }]);
+  const all = rr.messages.some((m) => m.id === answer.id) ? rr.messages : [...rr.messages, answer];
+  const history = historyThrough(all, answer.id);
+  const note = interviewerTimeNote(clock);
+  const turns = toTurns(note ? [...history, { role: "candidate", content: note }] : history);
   const distinctId = applicantDistinctId(ctx.invite.id);
 
   const enc = new TextEncoder();
@@ -83,7 +111,7 @@ export async function POST(req: NextRequest) {
         const final = await upstream.finalMessage();
         const { text, complete } = splitMarker(full);
         if (text.length > emitted) send({ t: text.slice(emitted) });
-        await prisma.loopMessage.create({ data: { roundRunId: rr.id, role: "interviewer", content: text } });
+        await saveReply(rr.id, answer.id, text, complete);
         await trackClaudeUsage(distinctId, { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "interview_turn", usage: final.usage as ClaudeUsage, organizationId: ctx.invite.campaign.organizationId });
         send({ done: true, complete });
       } catch (e) {
@@ -96,5 +124,5 @@ export async function POST(req: NextRequest) {
       }
     },
   });
-  return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });
+  return new Response(stream, { headers: NDJSON });
 }

@@ -61,6 +61,24 @@ test("an unassessed question must say why, and doesn't count toward the score", 
   assert.deepEqual([r.scorecard.score, r.scorecard.assessed, r.scorecard.total], [75, 1, 2]);
 });
 
+test("null for fields that don't apply is fine (the live grader writes it); a missing reason is not", () => {
+  const nully = JSON.stringify({
+    questions: [
+      { questionId: "q1", score: 4, evidence: "Specific", missing: null, notAssessedReason: null },
+      { questionId: "q2", score: null, evidence: null, missing: null, notAssessedReason: "Not asked." },
+    ],
+    strengths: null,
+    improvements: ["More detail"],
+    summary: "Ok.",
+  });
+  const r = validateGrade(nully, ["q1", "q2"]);
+  assert.ok(r.ok, r.ok ? "" : r.problems.join(" "));
+  assert.equal(r.scorecard.questions[1]!.evidence, "");
+  assert.deepEqual(r.scorecard.strengths, []);
+  const noReason = JSON.stringify({ questions: [{ questionId: "q1", score: null, evidence: null, missing: null, notAssessedReason: null }], summary: "s" });
+  assert.equal(validateGrade(noReason, ["q1"]).ok, false);
+});
+
 test("a silent round has no score, every question explained", () => {
   const sc = unansweredScorecard(["q1", "q2"]);
   assert.equal(sc.score, null);
@@ -131,4 +149,24 @@ test("the grader describes evidence and never recommends a hiring decision", () 
   const { system } = scoringPrompt([q1], [{ role: "candidate", content: "x" }]);
   assert.match(system, /Never recommend a hiring decision/);
   assert.doesNotMatch(system, /hiring manager can act on/);
+});
+
+test("round deadline: planned time plus half, and at least ten extra minutes", async () => {
+  const { hardDeadline, roundClock, interviewerTimeNote } = await import("../lib/roundTiming");
+  const t0 = new Date("2026-10-14T12:00:00Z");
+  assert.equal(hardDeadline(t0, 20).toISOString(), "2026-10-14T12:30:00.000Z");
+  assert.equal(hardDeadline(t0, 60).toISOString(), "2026-10-14T13:30:00.000Z");
+  const at = (min: number) => new Date(t0.getTime() + min * 60_000);
+  assert.equal(interviewerTimeNote(roundClock(t0, 20, null, at(5))), null);
+  assert.match(interviewerTimeNote(roundClock(t0, 20, null, at(18)))!, /about 2 minutes left/);
+  assert.match(interviewerTimeNote(roundClock(t0, 20, null, at(21)))!, /planned time for this round is up/);
+  assert.equal(roundClock(t0, 20, null, at(29)).pastDeadline, false);
+  assert.equal(roundClock(t0, 20, null, at(30)).pastDeadline, true);
+  assert.equal(roundClock(t0, 20, at(25), at(26)).pastDeadline, true, "a stored deadline wins");
+});
+
+test("the model replies to the conversation up to the answer, not past it", async () => {
+  const { historyThrough } = await import("../lib/roundAnswers");
+  const m = (id: string) => ({ id, createdAt: new Date() });
+  assert.deepEqual(historyThrough([m("a"), m("b"), m("c")], "b").map((x) => x.id), ["a", "b"]);
 });

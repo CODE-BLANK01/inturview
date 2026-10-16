@@ -96,17 +96,18 @@ const GradedQuestion = z
   .object({
     questionId: z.string(),
     score: z.number().int().min(1).max(5).nullable(),
-    evidence: z.string().max(400).default(""),
-    missing: z.string().max(300).default(""),
-    notAssessedReason: z.string().max(300).optional(),
+    // Models write null for fields that don't apply; treat it as "none".
+    evidence: z.string().max(400).nullish().transform((v) => v ?? ""),
+    missing: z.string().max(300).nullish().transform((v) => v ?? ""),
+    notAssessedReason: z.string().max(300).nullish().transform((v) => v ?? undefined),
   })
   .refine((q) => q.score !== null || !!q.notAssessedReason?.trim(), { message: "a question without a score needs a reason" });
 
 /** What the grader must return. Its own "overall", if any, is ignored: we compute scores. */
 const GradeReplySchema = z.object({
   questions: z.array(GradedQuestion).min(1),
-  strengths: z.array(z.string().max(200)).max(3).default([]),
-  improvements: z.array(z.string().max(200)).max(3).default([]),
+  strengths: z.array(z.string().max(200)).max(3).nullish().transform((v) => v ?? []),
+  improvements: z.array(z.string().max(200)).max(3).nullish().transform((v) => v ?? []),
   summary: z.string().max(600),
 });
 

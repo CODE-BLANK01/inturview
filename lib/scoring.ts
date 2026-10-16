@@ -115,14 +115,33 @@ async function queueAndTry(roundRunId: string, grade?: Grader) {
   return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
 }
 
-/** The candidate finished a round. Safe to call twice: only one call moves it to SCORING. */
-export async function finishRound(roundRunId: string, grade?: Grader) {
+/**
+ * The candidate finished a round (or its time ran out). Safe to call twice:
+ * only one call moves it to SCORING. `inline: false` just queues the scoring,
+ * for sweeps that shouldn't wait on the model.
+ */
+export async function finishRound(roundRunId: string, grade?: Grader, opts: { inline?: boolean } = {}) {
   const claimed = await prisma.loopRoundRun.updateMany({
     where: { id: roundRunId, status: RoundRunStatus.IN_PROGRESS },
-    data: { status: RoundRunStatus.SCORING, completedAt: new Date() },
+    data: { status: RoundRunStatus.SCORING, completedAt: new Date(), draft: null },
   });
   if (claimed.count === 0) return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
+  if (opts.inline === false) {
+    await enqueueJob(SCORE_JOB, jobKey(roundRunId), { roundRunId });
+    return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
+  }
   return queueAndTry(roundRunId, grade);
+}
+
+/** Rounds left open past their hard deadline (the candidate walked away) get finished and scored. */
+export async function finishOverdueRounds(limit = 20) {
+  const overdue = await prisma.loopRoundRun.findMany({
+    where: { status: RoundRunStatus.IN_PROGRESS, deadlineAt: { lt: new Date() } },
+    take: limit,
+    select: { id: true },
+  });
+  for (const r of overdue) await finishRound(r.id, undefined, { inline: false });
+  return overdue.length;
 }
 
 /**
