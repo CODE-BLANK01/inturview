@@ -1,5 +1,6 @@
 import { AuthShell } from "@/components/AuthShell";
 import { redirect } from "next/navigation";
+import { defaultDestination } from "@/lib/landing";
 import { afterVerify } from "@/lib/nextPath";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -32,7 +33,7 @@ export default async function VerifyEmailPage({
   if (!profile) redirect("/signin");
 
   // An explicit destination (e.g. a teammate invitation) wins over practice onboarding.
-  const next = intended ?? (profile.onboardingCompletedAt ? "/dashboard" : "/onboarding");
+  const next = intended ?? (await defaultDestination(user.id, profile.onboardingCompletedAt));
 
   // If they're already verified and visit this page (with or without token),
   // bounce them forward.

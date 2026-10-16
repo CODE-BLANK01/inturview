@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { defaultDestination } from "@/lib/landing";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PracticeActivity } from "@/components/dashboard/PracticeActivity";
 import { Greeting } from "@/components/dashboard/Greeting";
@@ -35,7 +36,8 @@ export default async function DashboardPage() {
   });
   if (!profile) redirect("/signin");
   if (!profile.emailVerifiedAt) redirect("/verify-email");
-  if (!profile.onboardingCompletedAt) redirect("/onboarding");
+  // Practice onboarding, unless they're here for a hiring workspace.
+  if (!profile.onboardingCompletedAt) redirect(await defaultDestination(user.id, null));
 
   // First authenticated dashboard visit on a later day, within the first week.
   // An atomic stamp prevents duplicate retention events on concurrent page loads.
