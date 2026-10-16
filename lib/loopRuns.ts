@@ -168,7 +168,7 @@ export async function startRound(ctx: LoopContext, index: number) {
     await prisma.invite.updateMany({
       // Never over a cancel that happened after the link was loaded.
       where: { id: ctx.invite.id, startedAt: null, status: { not: InviteStatus.REVOKED } },
-      data: { status: InviteStatus.STARTED, startedAt: new Date() },
+      data: { status: InviteStatus.STARTED, startedAt: new Date(), lastActivityAt: new Date() },
     });
   }
 

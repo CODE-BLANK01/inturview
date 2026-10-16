@@ -14,6 +14,8 @@ export interface CandidateRow {
   coverage: { assessed: number; total: number } | null;
   inviteStatus: string;
   lastActivity: Date;
+  /** The applicant's data was deleted (retention or a request). */
+  redacted: boolean;
 }
 
 /**
@@ -27,14 +29,16 @@ export async function listCandidates(organizationId: string, opts: { roleId?: st
       campaign: { organizationId, preview: false, ...(opts.roleId && { hiringRoleId: opts.roleId }) },
       ...(opts.assignedTo && { assignments: { some: { userId: opts.assignedTo } } }),
     },
-    orderBy: { updatedAt: "desc" },
-    take: 1000,
+    // Every candidate: counts and stage tabs must cover all of them. Rows are small;
+    // the page renders a slice (see CandidatesView).
     select: {
       id: true,
       name: true,
       email: true,
       status: true,
       updatedAt: true,
+      lastActivityAt: true,
+      redactedAt: true,
       decision: true,
       campaign: { select: { loopTemplateId: true, loopVersion: true, hiringRole: { select: { id: true, title: true } } } },
       run: { select: { overallScore: true, assessedQuestions: true, totalQuestions: true, rounds: { select: { status: true } } } },
@@ -63,7 +67,8 @@ export async function listCandidates(organizationId: string, opts: { roleId?: st
       score: i.run?.overallScore ?? null,
       coverage: i.run?.totalQuestions ? { assessed: i.run.assessedQuestions ?? 0, total: i.run.totalQuestions } : null,
       inviteStatus: i.status,
-      lastActivity: i.updatedAt,
+      lastActivity: i.lastActivityAt ?? i.updatedAt,
+      redacted: !!i.redactedAt,
     };
-  });
+  }).sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
 }

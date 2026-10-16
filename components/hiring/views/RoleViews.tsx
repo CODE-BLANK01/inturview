@@ -16,6 +16,8 @@ interface Scope {
   paths: HiringPaths;
 }
 
+/** The role page shows the latest few; the Candidates page pages through all. */
+const ROLE_PAGE = 25;
 const ROLE_STATUS: Record<string, string> = { OPEN: "Open", PAUSED: "Paused", CLOSED: "Closed" };
 const ago = (d: Date) => {
   const mins = Math.round((Date.now() - d.getTime()) / 60_000);
@@ -58,8 +60,8 @@ export function CandidatesTable({ rows, paths, showRole, canSend }: { rows: Cand
             {rows.map((c) => (
               <tr key={c.id} className="border-b border-border last:border-0 align-top">
                 <td className="px-4 py-3">
-                  <Link href={`${paths.candidates}/${c.id}`} className="font-medium hover:underline underline-offset-2">{c.name ?? c.email}</Link>
-                  {c.name && <div className="text-xs text-text-dim">{c.email}</div>}
+                  <Link href={`${paths.candidates}/${c.id}`} className="font-medium hover:underline underline-offset-2">{c.redacted ? "Deleted applicant" : c.name ?? c.email}</Link>
+                  {c.name && !c.redacted && <div className="text-xs text-text-dim break-all">{c.email}</div>}
                   {c.attention && <div className="text-xs text-hard mt-0.5">{c.attention}</div>}
                 </td>
                 {showRole && (
@@ -191,8 +193,13 @@ export async function RoleDetailView({ organizationId, paths, id, canEdit, canSe
       {role.status !== "OPEN" && <p className="panel p-3 text-sm text-text-muted">This role is {ROLE_STATUS[role.status]!.toLowerCase()}. Reopen it to invite more candidates; existing invites keep working.</p>}
 
       <section className="space-y-3" aria-labelledby="candidates-heading">
-        <h2 id="candidates-heading" className="text-sm font-semibold">Candidates</h2>
-        <CandidatesTable rows={candidates} paths={paths} showRole={false} canSend={canSend} />
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="candidates-heading" className="text-sm font-semibold">Candidates</h2>
+          {candidates.length > ROLE_PAGE && (
+            <Link href={`${paths.candidates}?role=${role.id}`} className="text-sm underline underline-offset-2">See all {candidates.length}</Link>
+          )}
+        </div>
+        <CandidatesTable rows={candidates.slice(0, ROLE_PAGE)} paths={paths} showRole={false} canSend={canSend} />
       </section>
     </div>
   );
@@ -212,7 +219,9 @@ function RoleHeading({ role, loopName }: { role: { title: string; seniority: str
   );
 }
 
-export async function CandidatesView({ organizationId, paths, canSend, stage, roleId }: Scope & { canSend: boolean; stage?: string; roleId?: string }) {
+const PAGE_SIZE = 50;
+
+export async function CandidatesView({ organizationId, paths, canSend, stage, roleId, page = 1 }: Scope & { canSend: boolean; stage?: string; roleId?: string; page?: number }) {
   const [all, roles] = await Promise.all([
     listCandidates(organizationId, { roleId }),
     prisma.hiringRole.findMany({ where: { organizationId }, orderBy: { title: "asc" }, select: { id: true, title: true } }),
@@ -224,10 +233,14 @@ export async function CandidatesView({ organizationId, paths, canSend, stage, ro
   // "All active": still in play, so not cancelled and not yet decided.
   const settled: Stage[] = ["cancelled", "advanced", "declined"];
   const rows = active ? all.filter((c) => (active === "invited" ? notStarted.includes(c.stage) : c.stage === active)) : all.filter((c) => !settled.includes(c.stage));
-  const href = (s: string | null) => {
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), pages);
+  const shown = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const href = (s: string | null, p = 1) => {
     const q = new URLSearchParams();
     if (roleId) q.set("role", roleId);
     if (s) q.set("stage", s);
+    if (p > 1) q.set("page", String(p));
     const qs = q.toString();
     return qs ? `${paths.candidates}?${qs}` : paths.candidates;
   };
@@ -269,7 +282,18 @@ export async function CandidatesView({ organizationId, paths, canSend, stage, ro
           );
         })}
       </nav>
-      <CandidatesTable rows={rows} paths={paths} showRole={!roleId} canSend={canSend} />
+      <CandidatesTable rows={shown} paths={paths} showRole={!roleId} canSend={canSend} />
+      {pages > 1 && (
+        <nav className="flex items-center justify-between text-sm" aria-label="Pages">
+          <span className="text-text-dim">
+            {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <span className="flex gap-2">
+            {current > 1 && <Link className="btn text-sm" href={href(active, current - 1)}>Previous</Link>}
+            {current < pages && <Link className="btn text-sm" href={href(active, current + 1)}>Next</Link>}
+          </span>
+        </nav>
+      )}
     </div>
   );
 }

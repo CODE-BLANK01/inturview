@@ -135,7 +135,10 @@ export async function finishRound(roundRunId: string, grade?: Grader, opts: { in
       where: { id: roundRunId, status: RoundRunStatus.IN_PROGRESS },
       data: { status: RoundRunStatus.SCORING, completedAt: new Date(), draft: null },
     });
-    if (claimed.count) await enqueueJob(SCORE_JOB, jobKey(roundRunId), { roundRunId }, { db: tx });
+    if (claimed.count) {
+      await enqueueJob(SCORE_JOB, jobKey(roundRunId), { roundRunId }, { db: tx });
+      await tx.invite.updateMany({ where: { run: { rounds: { some: { id: roundRunId } } } }, data: { lastActivityAt: new Date() } });
+    }
   });
   const rr = await prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
   if (rr.status !== RoundRunStatus.SCORING) return rr;
@@ -200,7 +203,7 @@ async function refreshRun(runId: string) {
     // A cancelled invite stays cancelled, even if its last grade lands afterwards.
     prisma.invite.updateMany({
       where: { id: run.inviteId, completedAt: null, status: { not: InviteStatus.REVOKED } },
-      data: { status: InviteStatus.COMPLETED, completedAt: new Date() },
+      data: { status: InviteStatus.COMPLETED, completedAt: new Date(), lastActivityAt: new Date() },
     }),
   ]);
 }
