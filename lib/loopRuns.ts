@@ -166,7 +166,8 @@ export async function startRound(ctx: LoopContext, index: number) {
       run = await prisma.loopRun.findUniqueOrThrow({ where: { inviteId: ctx.invite.id }, include: { rounds: { orderBy: { roundIndex: "asc" } } } });
     }
     await prisma.invite.updateMany({
-      where: { id: ctx.invite.id, startedAt: null },
+      // Never over a cancel that happened after the link was loaded.
+      where: { id: ctx.invite.id, startedAt: null, status: { not: InviteStatus.REVOKED } },
       data: { status: InviteStatus.STARTED, startedAt: new Date() },
     });
   }

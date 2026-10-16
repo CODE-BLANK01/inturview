@@ -173,7 +173,11 @@ async function refreshRun(runId: string) {
       where: { id: runId },
       data: { status: LoopRunStatus.COMPLETED, completedAt: run.completedAt ?? new Date(), overallScore: overall.score, assessedQuestions: overall.assessed, totalQuestions: overall.total },
     }),
-    prisma.invite.updateMany({ where: { id: run.inviteId, completedAt: null }, data: { status: InviteStatus.COMPLETED, completedAt: new Date() } }),
+    // A cancelled invite stays cancelled, even if its last grade lands afterwards.
+    prisma.invite.updateMany({
+      where: { id: run.inviteId, completedAt: null, status: { not: InviteStatus.REVOKED } },
+      data: { status: InviteStatus.COMPLETED, completedAt: new Date() },
+    }),
   ]);
 }
 
