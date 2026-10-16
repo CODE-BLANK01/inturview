@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpLeft, Briefcase, Building2, LayoutDashboard, Library, LifeBuoy, Route, Settings, UserCheck, Users } from "lucide-react";
+import { ArrowUpLeft, Briefcase, ClipboardCheck, Building2, LayoutDashboard, Library, LifeBuoy, Route, Settings, UserCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Brand } from "@/components/Brand";
 
@@ -19,10 +19,11 @@ interface HireShellProps {
   nav: HireNavKey[];
 }
 
-export type HireNavKey = "overview" | "roles" | "candidates" | "loops" | "questions" | "team" | "settings";
+export type HireNavKey = "overview" | "reviews" | "roles" | "candidates" | "loops" | "questions" | "team" | "settings";
 
 const NAV: Record<HireNavKey, { label: string; path: string; icon: LucideIcon }> = {
   overview: { label: "Overview", path: "", icon: LayoutDashboard },
+  reviews: { label: "My reviews", path: "/reviews", icon: ClipboardCheck },
   roles: { label: "Roles", path: "/roles", icon: Briefcase },
   candidates: { label: "Candidates", path: "/candidates", icon: UserCheck },
   loops: { label: "Loops", path: "/loops", icon: Route },

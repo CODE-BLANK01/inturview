@@ -221,7 +221,9 @@ export async function CandidatesView({ organizationId, paths, canSend, stage, ro
   const active = (STAGES as readonly string[]).includes(stage ?? "") ? (stage as Stage) : null;
   // "Invited" groups everyone who hasn't started yet.
   const notStarted: Stage[] = ["invited", "opened", "queued"];
-  const rows = active ? all.filter((c) => (active === "invited" ? notStarted.includes(c.stage) : c.stage === active)) : all.filter((c) => c.stage !== "cancelled");
+  // "All active": still in play, so not cancelled and not yet decided.
+  const settled: Stage[] = ["cancelled", "advanced", "declined"];
+  const rows = active ? all.filter((c) => (active === "invited" ? notStarted.includes(c.stage) : c.stage === active)) : all.filter((c) => !settled.includes(c.stage));
   const href = (s: string | null) => {
     const q = new URLSearchParams();
     if (roleId) q.set("role", roleId);
@@ -230,12 +232,14 @@ export async function CandidatesView({ organizationId, paths, canSend, stage, ro
     return qs ? `${paths.candidates}?${qs}` : paths.candidates;
   };
   const tabs: { key: string | null; label: string; n: number }[] = [
-    { key: null, label: "All active", n: all.filter((c) => c.stage !== "cancelled").length },
+    { key: null, label: "All active", n: all.filter((c) => !settled.includes(c.stage)).length },
     { key: "ready", label: STAGE_LABEL.ready, n: counts.ready ?? 0 },
     { key: "needs_attention", label: STAGE_LABEL.needs_attention, n: counts.needs_attention ?? 0 },
     { key: "scoring", label: STAGE_LABEL.scoring, n: counts.scoring ?? 0 },
     { key: "in_progress", label: STAGE_LABEL.in_progress, n: counts.in_progress ?? 0 },
     { key: "invited", label: "Not started", n: notStarted.reduce((a, s) => a + (counts[s] ?? 0), 0) },
+    { key: "advanced", label: STAGE_LABEL.advanced, n: counts.advanced ?? 0 },
+    { key: "declined", label: STAGE_LABEL.declined, n: counts.declined ?? 0 },
     { key: "cancelled", label: STAGE_LABEL.cancelled, n: counts.cancelled ?? 0 },
   ];
 

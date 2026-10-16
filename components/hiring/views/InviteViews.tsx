@@ -13,6 +13,8 @@ import type { HiringPaths } from "@/lib/hiring/paths";
 import { AddCandidates, CampaignSendButtons, InviteRowActions } from "../CampaignActions";
 import { NewCampaignForm } from "../NewCampaignForm";
 import { RescoreButton } from "../RescoreButton";
+import { ReviewPanel } from "../ReviewPanel";
+import type { ReviewPanelData } from "@/lib/hiring/reviews";
 
 interface Scope {
   organizationId: string | null;
@@ -222,7 +224,20 @@ export async function CampaignView({ organizationId, paths, id, canSend }: Scope
   );
 }
 
-export async function CandidateView({ organizationId, paths, campaignId, inviteId, canRescore }: Scope & { campaignId?: string; inviteId: string; canRescore: boolean }) {
+export async function CandidateView({
+  organizationId,
+  paths,
+  campaignId,
+  inviteId,
+  canRescore,
+  review,
+}: Scope & {
+  campaignId?: string;
+  inviteId: string;
+  canRescore: boolean;
+  /** Workspaces: the review panel and what this viewer may do in it. */
+  review?: { data: ReviewPanelData; canReview: boolean; canDecide: boolean; canAssign: boolean };
+}) {
   const invite = await prisma.invite.findFirst({
     where: { id: inviteId, ...(campaignId && { campaignId }), campaign: { organizationId } },
     include: {
@@ -275,6 +290,8 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
       </header>
       <p className="text-xs text-text-dim">AI scores support your judgment; they don&apos;t replace it. Read the transcript before deciding.</p>
 
+      <div className={review ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] items-start" : ""}>
+      <div className="space-y-6 min-w-0">
       {plan.map((round, i) => {
         const rr = invite.run?.rounds.find((r) => r.roundIndex === i);
         const sc = rr?.scorecard as (Scorecard | LegacyScorecard) | null | undefined;
@@ -376,6 +393,13 @@ export async function CandidateView({ organizationId, paths, campaignId, inviteI
           </section>
         );
       })}
+      </div>
+      {review && (
+        <aside className="lg:sticky lg:top-6">
+          <ReviewPanel inviteId={invite.id} data={review.data} canReview={review.canReview} canDecide={review.canDecide} canAssign={review.canAssign} />
+        </aside>
+      )}
+      </div>
     </div>
   );
 }
