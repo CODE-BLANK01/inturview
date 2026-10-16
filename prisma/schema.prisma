@@ -471,6 +471,8 @@ model Organization {
   contactEmail          String?
   /// Created by an operator for a design partner; billing is handled by hand.
   designPartner         Boolean              @default(false)
+  /// Months applicant transcripts and scores are kept after a decision (D4: at most 12).
+  retentionMonths       Int                  @default(12)
   onboardingStep        String?
   onboardingCompletedAt DateTime?
   createdAt             DateTime             @default(now())
@@ -713,36 +715,40 @@ model HiringRole {
 }
 
 model Invite {
-  id          String               @id @default(cuid())
-  campaignId  String
-  campaign    Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  email       String
-  name        String?
+  id             String               @id @default(cuid())
+  campaignId     String
+  campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email          String
+  name           String?
   /// SHA-256 of the link token; resending rotates it so old links stop working.
-  tokenHash   String?              @unique
-  status      InviteStatus         @default(PENDING)
-  sendCount   Int                  @default(0)
-  lastError   String?
-  sentAt      DateTime?
-  expiresAt   DateTime?
-  openedAt    DateTime?
-  consentedAt DateTime?
-  startedAt   DateTime?
-  completedAt DateTime?
-  deliveries  Delivery[]
-  reviews     Review[]
-  assignments ReviewerAssignment[]
+  tokenHash      String?              @unique
+  status         InviteStatus         @default(PENDING)
+  sendCount      Int                  @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  expiresAt      DateTime?
+  openedAt       DateTime?
+  consentedAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  deliveries     Delivery[]
+  reviews        Review[]
+  assignments    ReviewerAssignment[]
   /// The current decision: a copy of the latest DECISION review. Also starts
   /// the retention clock (transcripts and scores are deleted 12 months later).
-  decision    Decision?
-  decidedAt   DateTime?
-  decidedById String?
+  decision       Decision?
+  decidedAt      DateTime?
+  decidedById    String?
+  /// The last thing that happened: sent, opened, an answer, a round, a note or rating.
+  lastActivityAt DateTime?
+  /// Applicant data (transcript, scores, notes, name and email) was deleted.
+  redactedAt     DateTime?
   /// Deprecated, no longer written: applicants don't get accounts. Older test
   /// rows may still hold a user ID; dropped in a later migration.
-  userId      String?
-  run         LoopRun?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  userId         String?
+  run            LoopRun?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   @@unique([campaignId, email])
   @@index([campaignId, status])

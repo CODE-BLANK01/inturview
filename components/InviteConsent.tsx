@@ -10,12 +10,15 @@ export function InviteConsent({
   consented,
   company,
   contact,
+  retention,
 }: {
   token: string;
   consented: boolean;
   /** The hiring company; null only for old test invites. */
   company: string | null;
   contact: { label: string; href: string | null };
+  /** From retentionText(): how long answers are kept. */
+  retention: string;
 }) {
   const who = company ?? "the hiring team";
   const reach = contact.href ? <a className="underline underline-offset-2" href={contact.href}>{contact.label}</a> : <>{contact.label}</>;
@@ -58,7 +61,7 @@ export function InviteConsent({
         <li>An AI interviewer asks the questions and follow-ups. Your answers are recorded and assessed against what the role needs.</li>
         <li>People at {who} review your answers and make every decision. The AI doesn&apos;t decide.</li>
         <li>{company ?? "The hiring team"} sees only this interview. You don&apos;t need an inturview account, and nothing here is linked to one.</li>
-        <li>Your answers are kept for up to 12 months after a decision, then deleted. To have them deleted sooner, contact {reach}.</li>
+        <li>Your answers are kept {retention}. To have them deleted sooner, contact {reach}.</li>
         <li>Need more time, captions, a text-only format or another adjustment? Contact {reach} before you start.</li>
       </ul>
       <label className="flex items-start gap-3 text-sm">

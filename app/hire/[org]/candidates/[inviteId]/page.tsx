@@ -23,6 +23,7 @@ export default async function Page({ params }: { params: { org: string; inviteId
       paths={workspacePaths(access.org.slug)}
       inviteId={params.inviteId}
       canRescore={can("applications.rescore")}
+      data={{ canManage: can("applicantData.exportOrDelete"), retentionMonths: access.org.retentionMonths }}
       review={isPreview ? undefined : {
         data: await reviewPanel(access.org.id, params.inviteId, access.user.id, can("applications.decide")),
         canReview: can("applications.review"),

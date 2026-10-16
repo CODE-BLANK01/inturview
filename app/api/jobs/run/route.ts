@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { processDeliveries } from "@/lib/delivery";
 import { processJobs } from "@/lib/jobs";
+import { purgeExpiredApplicants } from "@/lib/applicantData";
 import { finishOverdueRounds, recoverOrphanedScoring, scoringHandlers } from "@/lib/scoring";
 
 export const runtime = "nodejs";
@@ -29,6 +30,8 @@ export async function POST(req: Request) {
   const handlers = scoringHandlers();
   const roundsClosed = await finishOverdueRounds();
   const scoringRecovered = await recoverOrphanedScoring();
+  // Keep the retention promise made to applicants.
+  const applicantsDeleted = await purgeExpiredApplicants();
   while (Date.now() - started < BUDGET_MS) {
     const d = await processDeliveries({ limit: 50 });
     const j = await processJobs(handlers, { limit: 5 });
@@ -36,5 +39,5 @@ export async function POST(req: Request) {
     for (const k of Object.keys(jobs) as (keyof typeof jobs)[]) jobs[k] += j[k];
     if (d.sent + d.failed + d.retrying + j.done + j.failed + j.retrying === 0) break;
   }
-  return Response.json({ emails, jobs, roundsClosed, scoringRecovered });
+  return Response.json({ emails, jobs, roundsClosed, scoringRecovered, applicantsDeleted });
 }

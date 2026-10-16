@@ -5,6 +5,8 @@ import { z } from "zod";
 import { Decision, ReviewKind } from "@prisma/client";
 import { prisma } from "../db";
 import { writeAudit } from "../audit";
+import { exportApplicant, redactApplicant } from "../applicantData";
+import { touchInvite } from "../activity";
 import type { HiringCtx } from "./handlers";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -28,8 +30,11 @@ async function guard(ctx: HiringCtx, inviteId: string) {
   return visibleCandidate(ctx.organizationId, inviteId, { userId: ctx.actorId, canViewAll: !!ctx.canViewAll });
 }
 
-const audit = (ctx: HiringCtx, action: Parameters<typeof writeAudit>[0]["action"], inviteId: string, metadata: Record<string, unknown> = {}) =>
-  writeAudit({ adminId: ctx.actorId, action, targetType: "invite", targetId: inviteId, metadata: { ...metadata, organizationId: ctx.organizationId } });
+const audit = async (ctx: HiringCtx, action: Parameters<typeof writeAudit>[0]["action"], inviteId: string, metadata: Record<string, unknown> = {}) => {
+  // Every review action is also activity on the candidate (export isn't).
+  if (action !== "APPLICANT_EXPORTED") await touchInvite(inviteId);
+  return writeAudit({ adminId: ctx.actorId, action, targetType: "invite", targetId: inviteId, metadata: { ...metadata, organizationId: ctx.organizationId } });
+};
 
 const Note = z.object({ body: z.string().trim().min(1, "Write a note first.").max(4000) });
 const Rating = z.object({ rating: z.number().int().min(1).max(5), body: z.string().trim().max(2000).optional() });
@@ -143,4 +148,24 @@ export async function reviewPanel(organizationId: string, inviteId: string, view
     assigned: assignments.map((a) => ({ userId: a.userId, name: display(a.user) })),
     members: members.map((m) => ({ userId: m.userId, name: display(m.user) })),
   };
+}
+
+/** A data request: everything held about this applicant, as a JSON download. */
+export async function exportApplicantHandler(ctx: HiringCtx, inviteId: string) {
+  if (!(await guard(ctx, inviteId))) return notFound();
+  const data = await exportApplicant(inviteId);
+  await audit(ctx, "APPLICANT_EXPORTED", inviteId);
+  return new Response(JSON.stringify(data, null, 2), {
+    headers: { "content-type": "application/json", "content-disposition": `attachment; filename="applicant-${inviteId}.json"`, "cache-control": "no-store" },
+  });
+}
+
+/** Deletes the applicant's data now (a deletion request), instead of at the end of retention. */
+export async function deleteApplicantHandler(ctx: HiringCtx, req: NextRequest, inviteId: string) {
+  const parsed = z.object({ confirm: z.literal("DELETE") }).safeParse(await body(req));
+  if (!parsed.success) return json({ error: "Type DELETE to confirm." }, 400);
+  if (!(await guard(ctx, inviteId))) return notFound();
+  await redactApplicant(inviteId);
+  await audit(ctx, "APPLICANT_DELETED", inviteId);
+  return json({ ok: true });
 }

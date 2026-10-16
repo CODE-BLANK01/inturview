@@ -10,6 +10,7 @@ interface Values {
   website: string;
   logoUrl: string;
   contactEmail: string;
+  retentionMonths: number;
 }
 
 export function WorkspaceSettingsForm({ slug, initial, readOnly }: { slug: string; initial: Values; readOnly: boolean }) {
@@ -61,6 +62,22 @@ export function WorkspaceSettingsForm({ slug, initial, readOnly }: { slug: strin
         <span className="text-xs text-text-muted">Contact email for applicants</span>
         <input className="input w-full" type="email" placeholder="talent@company.com" {...field("contactEmail")} />
         <span className="block text-xs text-text-dim">Shown on interview pages for accommodation and help requests.</span>
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs text-text-muted">Keep applicant answers for</span>
+        <select
+          className="input w-full"
+          value={v.retentionMonths}
+          disabled={readOnly || busy}
+          onChange={(e) => setV({ ...v, retentionMonths: Number(e.target.value) })}
+        >
+          {[1, 3, 6, 12].map((m) => (
+            <option key={m} value={m}>{m} month{m === 1 ? "" : "s"} after a decision</option>
+          ))}
+        </select>
+        <span className="block text-xs text-text-dim">
+          Then transcripts, scores, notes, names and emails are deleted. Applicants are told this before they start. 12 months is the most.
+        </span>
       </label>
       <label className="block space-y-1">
         <span className="text-xs text-text-muted">Website</span>
