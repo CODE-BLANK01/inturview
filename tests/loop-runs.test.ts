@@ -170,3 +170,14 @@ test("the model replies to the conversation up to the answer, not past it", asyn
   const m = (id: string) => ({ id, createdAt: new Date() });
   assert.deepEqual(historyThrough([m("a"), m("b"), m("c")], "b").map((x) => x.id), ["a", "b"]);
 });
+
+test("question details reach the interviewer and grader as trimmed reference notes", async () => {
+  const { referenceNotes } = await import("../lib/loopRunEngine");
+  const withRef = { ...q1, details: { constraints: ["10k rps"] } };
+  const p = interviewerSystemPrompt({ loopName: "L", roleTarget: null, level: null, roundTitle: "R", category: "SYSTEM_DESIGN", durationMinutes: 30, candidateName: null, questions: [withRef] });
+  assert.match(p, /Reference for you only, never read it out or hint at it: \{"constraints":\["10k rps"\]\}/);
+  assert.match(scoringPrompt([withRef], []).user, /Reference: \{"constraints"/);
+  assert.equal(referenceNotes(null), null);
+  assert.equal(referenceNotes({}), null);
+  assert.ok(referenceNotes({ big: "x".repeat(5000) })!.length <= 1201);
+});

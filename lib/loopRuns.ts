@@ -58,7 +58,61 @@ export async function loadLoopContext(token: string): Promise<LoopContext> {
  */
 export const applicantDistinctId = (inviteId: string) => `applicant:${inviteId}`;
 
+/** A round as stored in a published version: format 2 carries full question copies. */
+interface PublishedRound {
+  id: string;
+  questions: {
+    mode: "fixed" | "pool";
+    count?: number;
+    pinned?: { questionId: string; version: number }[];
+    frozen?: FrozenQuestion[];
+    frozenPool?: FrozenQuestion[];
+  };
+}
+
+const toFrozen = (q: FrozenQuestion): FrozenQuestion => ({
+  questionId: q.questionId,
+  version: q.version,
+  title: q.title,
+  prompt: q.prompt,
+  followUps: q.followUps ?? [],
+  signals: q.signals ?? [],
+  details: q.details ?? null,
+});
+
+/**
+ * The questions for one candidate's round. Format-2 versions serve the copies
+ * frozen at publish: fixed rounds exactly, pool rounds drawn from the frozen
+ * pool (avoiding questions this candidate already had). Older versions look
+ * up pinned versions. Either way the round has its full count, or it doesn't start.
+ */
 async function frozenQuestions(
+  round: LoopRoundConfig,
+  published: PublishedRound | undefined,
+  exclude: Set<string>,
+  organizationId: string | null,
+): Promise<FrozenQuestion[]> {
+  const want = round.questions.mode === "fixed" ? round.questions.questionIds.length : round.questions.count;
+  let picked: FrozenQuestion[];
+  if (published?.questions.frozen) {
+    picked = published.questions.frozen.map(toFrozen);
+  } else if (published?.questions.frozenPool) {
+    const pool = published.questions.frozenPool;
+    const fresh = pool.filter((q) => !exclude.has(q.questionId));
+    picked = pickRandom(fresh.length >= want ? fresh : pool, want).map(toFrozen);
+  } else {
+    picked = await legacyQuestions(round, published?.questions.pinned, exclude, organizationId);
+  }
+  if (picked.length < want) {
+    // Never quietly run a shorter interview than the one the company set up.
+    console.error("[loop] round can't be filled", { roundId: round.id, want, have: picked.length });
+    throw new LoopAccessError("This round can't start because some of its questions are missing. Reply to the invitation email and the hiring team will sort it out.", 500);
+  }
+  return picked;
+}
+
+/** Versions published before full copies were frozen: resolve pinned versions, or pick a pool live. */
+async function legacyQuestions(
   round: LoopRoundConfig,
   pinned: { questionId: string; version: number }[] | undefined,
   exclude: Set<string>,
@@ -72,6 +126,7 @@ async function frozenQuestions(
     const fresh = candidates.filter((c) => !exclude.has(c.id));
     refs = pickRandom(fresh.length >= round.questions.count ? fresh : candidates, round.questions.count).map((c) => ({ questionId: c.id, version: c.currentVersion }));
   }
+  if (refs.length === 0) return [];
   const versions = await prisma.questionVersion.findMany({
     where: { OR: refs.map((r) => ({ questionId: r.questionId, version: r.version })) },
     select: { questionId: true, version: true, snapshot: true },
@@ -80,7 +135,7 @@ async function frozenQuestions(
     const v = versions.find((x) => x.questionId === r.questionId && x.version === r.version);
     if (!v) return [];
     const s = v.snapshot as unknown as QuestionSnapshot;
-    return [{ questionId: r.questionId, version: r.version, title: s.title, prompt: s.prompt, followUps: s.followUps, signals: s.signals }];
+    return [{ questionId: r.questionId, version: r.version, title: s.title, prompt: s.prompt, followUps: s.followUps, signals: s.signals, details: s.details ?? null }];
   });
 }
 
@@ -118,11 +173,10 @@ export async function startRound(ctx: LoopContext, index: number) {
     where: { loopTemplateId_version: { loopTemplateId: ctx.invite.campaign.loopTemplateId, version: ctx.invite.campaign.loopVersion } },
     select: { snapshot: true },
   });
-  const publishedRound = ((versionRow?.snapshot as { config: { rounds: { id: string; questions: { pinned?: { questionId: string; version: number }[] } }[] } }).config.rounds).find((r) => r.id === round.id);
+  const publishedRound = (versionRow?.snapshot as unknown as { config: { rounds: PublishedRound[] } } | undefined)?.config.rounds.find((r) => r.id === round.id);
   const asked = new Set(existingRuns.flatMap((r) => (r.questions as unknown as FrozenQuestion[]).map((q) => q.questionId)));
   // The campaign belongs to the same workspace as its loop.
-  const questions = await frozenQuestions(round, publishedRound?.questions.pinned, asked, ctx.invite.campaign.organizationId);
-  if (questions.length === 0) throw new LoopAccessError("This round has no questions available. Reply to the invitation email and we'll sort it out.", 500);
+  const questions = await frozenQuestions(round, publishedRound, asked, ctx.invite.campaign.organizationId);
 
   try {
     const roundRun = await prisma.loopRoundRun.create({
