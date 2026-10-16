@@ -7,7 +7,7 @@ import { checkRateLimit, clientKey } from "@/lib/rateLimit";
 import { applicantDistinctId, CATEGORY_TO_ANALYTICS, LoopAccessError, loadLoopContext } from "@/lib/loopRuns";
 import { COMPLETE_MARKER, interviewerSystemPrompt, MAX_CANDIDATE_TURNS, splitMarker, type FrozenQuestion } from "@/lib/loopRunEngine";
 import { toTurns } from "@/lib/loopRoundTurns";
-import { CLIENT_TURN_ID, historyThrough, recordAnswer, replyTo, saveReply } from "@/lib/roundAnswers";
+import { claimReply, CLIENT_TURN_ID, historyThrough, recordAnswer, releaseReply, replyTo, saveReply, waitForReply } from "@/lib/roundAnswers";
 import { interviewerTimeNote, roundClock } from "@/lib/roundTiming";
 import { finishRound } from "@/lib/scoring";
 
@@ -20,6 +20,8 @@ const Body = z.object({
   roundRunId: z.string().min(1),
   /** Made by the browser once per answer; a retry sends the same one. */
   clientTurnId: z.string().regex(CLIENT_TURN_ID),
+  /** The browser's clock when it sent this answer; older draft autosaves can't overwrite after it. */
+  draftSeq: z.number().nonnegative().optional(),
   content: z.string().trim().min(1, "Write an answer first.").max(6000, "That answer is too long. Split it into two messages."),
 });
 
@@ -68,10 +70,18 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "This round has reached its length limit. Finish the round to continue.", limit: true }, { status: 409 });
   }
 
-  const { answer } = await recordAnswer(rr.id, clientTurnId, content);
+  const { answer } = await recordAnswer(rr.id, clientTurnId, content, parsed.data.draftSeq);
+  const replay = (m: { content: string; endsRound: boolean }) =>
+    new Response(`${JSON.stringify({ t: m.content })}\n${JSON.stringify({ done: true, complete: m.endsRound })}\n`, { headers: NDJSON });
   // A reply may have been saved by a concurrent retry since we loaded the round.
   const raced = await replyTo(answer.id);
-  if (raced) return new Response(`${JSON.stringify({ t: raced.content })}\n${JSON.stringify({ done: true, complete: raced.endsRound })}\n`, { headers: NDJSON });
+  if (raced) return replay(raced);
+  // One writer per answer: a second tab or a retry waits for that reply instead of asking the model again.
+  if (!(await claimReply(answer.id))) {
+    const theirs = await waitForReply(answer.id);
+    if (theirs) return replay(theirs);
+    return Response.json({ error: "Your interviewer is still replying. Try again in a moment.", busy: true }, { status: 409 });
+  }
   const system = interviewerSystemPrompt({
     loopName: ctx.loop.name, roleTarget: ctx.loop.roleTarget, level: ctx.loop.level, roundTitle: round.title,
     category: round.category, durationMinutes: round.durationMinutes, candidateName: ctx.invite.name,
@@ -111,10 +121,15 @@ export async function POST(req: NextRequest) {
         const final = await upstream.finalMessage();
         const { text, complete } = splitMarker(full);
         if (text.length > emitted) send({ t: text.slice(emitted) });
-        await saveReply(rr.id, answer.id, text, complete);
+        const saved = await saveReply(rr.id, answer.id, text, complete);
         await trackClaudeUsage(distinctId, { category: CATEGORY_TO_ANALYTICS[rr.category], sessionId: rr.id, model: MODEL, purpose: "interview_turn", usage: final.usage as ClaudeUsage, organizationId: ctx.invite.campaign.organizationId });
-        send({ done: true, complete });
+        // If another writer's reply was saved first (our claim had expired), show that one: it's the transcript.
+        if (saved.content !== text) send({ replace: saved.content });
+        // The interviewer closed the round: close it here, so a refresh can't reopen it.
+        if (saved.endsRound) await finishRound(rr.id, undefined, { inline: false });
+        send({ done: true, complete: saved.endsRound });
       } catch (e) {
+        await releaseReply(answer.id).catch(() => undefined);
         if (!abort.signal.aborted) {
           console.error("[i/message] stream failed:", e instanceof Error ? e.message : e);
           send({ error: "The interviewer didn't respond. Send your answer again." });
