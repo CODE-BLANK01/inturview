@@ -49,11 +49,10 @@ test("loops over four hours are blocked", () => {
   assert.ok(p.some((x) => /over 4 hours/.test(x)));
 });
 
-test("cost estimate: per-minute live rates plus scoring per round", () => {
-  const rates = { voice: 0.075, avatar: 0.1 };
-  const est = estimateLoopCost([behavioralPool, technicalFixed], rates);
-  assert.deepEqual(est.perRound, [{ id: "r1", usd: 3.55 }, { id: "r2", usd: 5.3 }]); // 20×0.175+0.05, 30×0.175+0.05
-  assert.equal(est.totalUsd, 8.85);
+test("cost estimate: text chat per minute plus scoring per round (what applicants actually get)", () => {
+  const est = estimateLoopCost([behavioralPool, technicalFixed], { chat: 0.005 });
+  assert.deepEqual(est.perRound, [{ id: "r1", usd: 0.15 }, { id: "r2", usd: 0.2 }]); // 20×0.005+0.05, 30×0.005+0.05
+  assert.equal(est.totalUsd, 0.35);
   assert.equal(totalMinutes([behavioralPool, technicalFixed]), 50);
 });
 
