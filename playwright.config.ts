@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
 // End-to-end journeys across Hire and the applicant flow. Runs the app in dev
@@ -5,6 +6,9 @@ import { defineConfig, devices } from "@playwright/test";
 // email logged instead of sent. See docs/runbooks/setup.md §9.
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const db = process.env.TEST_DATABASE_URL ?? "";
+// The app, the seed and the tests must share one auth secret (it signs invite
+// links). Generated once here; test workers inherit it from this process.
+process.env.NEXTAUTH_SECRET ||= randomBytes(24).toString("hex");
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -30,7 +34,7 @@ export default defineConfig({
       DATABASE_URL: db,
       DIRECT_URL: db,
       NEXTAUTH_URL: `http://localhost:${PORT}`,
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? "e2e-only-secret",
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       AI_FAKE: "1",
       AI_FAKE_DELAY_MS: "20",
       RESEND_API_KEY: "",

@@ -6,21 +6,21 @@ import { join } from "node:path";
 import bcrypt from "bcryptjs";
 
 export const FIXTURES = join(__dirname, ".fixtures.json");
-export const PASSWORD = "E2e-walkthrough-pass-1";
 
 export default async function globalSetup() {
   const url = process.env.TEST_DATABASE_URL;
   if (!url) throw new Error("Set TEST_DATABASE_URL to a throwaway Postgres to run end-to-end tests.");
   if (!["localhost", "127.0.0.1", "postgres"].includes(new URL(url).hostname)) throw new Error("End-to-end tests only run against a local or CI database.");
   process.env.DATABASE_URL = url;
-  process.env.NEXTAUTH_SECRET ??= "e2e-only-secret";
 
   const { prisma } = await import("../../lib/db");
   const { createQuestion, publishQuestion } = await import("../../lib/questionBank");
   const { publishLoop } = await import("../../lib/loopTemplates");
 
   const run = randomBytes(3).toString("hex");
-  const hash = await bcrypt.hash(PASSWORD, 10);
+  // A fresh password every run, kept only in the gitignored fixtures file.
+  const password = randomBytes(12).toString("base64url");
+  const hash = await bcrypt.hash(password, 10);
   const user = (who: string, practice = false) =>
     prisma.user.create({
       data: { email: `${who}-${run}@e2e.test`, name: who[0]!.toUpperCase() + who.slice(1), passwordHash: hash, emailVerifiedAt: new Date(), onboardingCompletedAt: practice ? new Date() : null },
@@ -55,7 +55,7 @@ export default async function globalSetup() {
     FIXTURES,
     JSON.stringify({
       run,
-      password: PASSWORD,
+      password,
       slugA: orgA.slug,
       slugB: orgB.slug,
       orgA: orgA.id,

@@ -32,6 +32,5 @@ export async function signIn(browser: Browser, email: string, callbackUrl?: stri
 /** Database access for arranging state and reading what the app wrote. */
 export async function db() {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
-  process.env.NEXTAUTH_SECRET ??= "e2e-only-secret";
   return (await import("../../lib/db")).prisma;
 }

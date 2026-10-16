@@ -93,9 +93,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      # Throwaway service container and test-only secret; not real credentials.
+      # Throwaway service container; not a real credential.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/intervue_e2e
-      NEXTAUTH_SECRET: e2e-only-secret
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
@@ -104,6 +103,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Generate a throwaway auth secret
+        run: echo "NEXTAUTH_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
       - name: Install the test browser
         run: npx playwright install --with-deps chromium
       - name: Migrate the test database
