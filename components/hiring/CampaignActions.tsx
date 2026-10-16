@@ -18,7 +18,10 @@ export function CampaignSendButtons({ campaignId, pending, failed }: { campaignI
     setNote(null);
     try {
       const r = await sendAll(paths.api, campaignId, { retryFailed });
-      setNote(`Sent ${r.sent}${r.failed ? `, ${r.failed} failed` : ""}.`);
+      setNote(
+        `Sent ${r.sent}${r.failed ? `, ${r.failed} failed` : ""}.` +
+          (r.remaining ? ` ${r.remaining} more will go out automatically in the next few minutes.` : ""),
+      );
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Sending failed");
     } finally {
@@ -63,7 +66,7 @@ export function AddCandidates({ campaignId }: { campaignId: string }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "Couldn't add candidates");
       const r = await sendAll(paths.api, campaignId);
-      setNote(`Added ${body.added}${body.skipped ? ` (${body.skipped} already invited)` : ""}; sent ${r.sent}${r.failed ? `, ${r.failed} failed` : ""}.`);
+      setNote(`Added ${body.added}${body.skipped ? ` (${body.skipped} already invited)` : ""}; sent ${r.sent}${r.failed ? `, ${r.failed} failed` : ""}.${r.remaining ? ` ${r.remaining} more will go out automatically.` : ""}`);
       setOpen(false);
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Couldn't add candidates");

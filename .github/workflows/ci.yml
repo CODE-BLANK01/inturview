@@ -47,6 +47,9 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: intervue_test
+          # Not UTC on purpose: catches SQL that reads zone-less UTC columns in the session's zone.
+          TZ: America/Los_Angeles
+          PGTZ: America/Los_Angeles
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
