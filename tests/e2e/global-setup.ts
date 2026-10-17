@@ -26,12 +26,15 @@ export default async function globalSetup() {
       data: { email: `${who}-${run}@e2e.test`, name: who[0]!.toUpperCase() + who.slice(1), passwordHash: hash, emailVerifiedAt: new Date(), onboardingCompletedAt: practice ? new Date() : null },
     });
   const [owner, reviewer, outsider] = [await user("owner"), await user("reviewer", true), await user("outsider")];
+  // Uses both products: Practice set up, and a recruiter in workspace A.
+  const both = await user("both", true);
   const orgA = await prisma.organization.create({ data: { name: `Acme ${run}`, slug: `e2e-a-${run}`, contactEmail: "talent@e2e.test", timezone: "America/New_York" } });
   const orgB = await prisma.organization.create({ data: { name: `Beta ${run}`, slug: `e2e-b-${run}` } });
   await prisma.organizationMember.createMany({
     data: [
       { organizationId: orgA.id, userId: owner.id, role: "OWNER" },
       { organizationId: orgA.id, userId: reviewer.id, role: "REVIEWER" },
+      { organizationId: orgA.id, userId: both.id, role: "RECRUITER" },
       { organizationId: orgB.id, userId: outsider.id, role: "OWNER" },
     ],
   });
@@ -62,6 +65,7 @@ export default async function globalSetup() {
       owner: owner.email,
       reviewer: reviewer.email,
       outsider: outsider.email,
+      both: both.email,
       loopId: loop.id,
       roleId: role.id,
       questionId: q.id,

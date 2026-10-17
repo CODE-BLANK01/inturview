@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ArrowUpLeft, Briefcase, ClipboardCheck, Building2, LayoutDashboard, Library, LifeBuoy, Route, Settings, UserCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Brand } from "@/components/Brand";
+import { RememberProduct } from "@/components/RememberProduct";
 
 interface HireShellProps {
   children: React.ReactNode;
@@ -42,6 +43,7 @@ export function HireShell({ children, org, roleLabel, user, support, canSwitch, 
 
   return (
     <div className="min-h-screen flex">
+      <RememberProduct product="hire" />
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-bg-elevated/40">
         <div className="h-14 flex items-center gap-2 px-4 border-b border-border">
           <Link href={base} aria-label={`${org.name} workspace`}>
