@@ -201,17 +201,20 @@ export async function createLoopHandler(ctx: HiringCtx, req: NextRequest) {
   if (!ctx.organizationId) return json({ error: "Templates are copied into a workspace." }, 400);
   const template = await prisma.loopTemplate.findFirst({
     where: { id: parsed.data.fromTemplateId, organizationId: null, status: LoopStatus.PUBLISHED },
-    select: { id: true, name: true, description: true, roleTarget: true, level: true, currentVersion: true, versions: { orderBy: { version: "desc" }, take: 1, select: { snapshot: true } } },
+    select: { id: true, currentVersion: true, versions: { orderBy: { version: "desc" }, take: 1, select: { snapshot: true } } },
   });
   if (!template) return notFound("Template");
-  // Copy what was published, not the operators' work in progress.
-  const rounds = publishedRounds(template.versions[0]?.snapshot);
+  // Copy what was published, all of it: rounds and details alike, never the operators' drafts.
+  const snapshot = template.versions[0]?.snapshot;
+  const published = (snapshot as { config?: { name: string; description: string | null; roleTarget: string | null; level: string | null } } | null)?.config;
+  if (!published) return notFound("Template");
+  const rounds = publishedRounds(snapshot);
   const loop = await prisma.loopTemplate.create({
     data: {
-      name: template.name,
-      description: template.description,
-      roleTarget: template.roleTarget,
-      level: template.level,
+      name: published.name,
+      description: published.description,
+      roleTarget: published.roleTarget,
+      level: published.level,
       rounds: rounds as unknown as Prisma.InputJsonValue,
       createdById: ctx.actorId,
       organizationId: ctx.organizationId,

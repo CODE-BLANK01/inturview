@@ -73,7 +73,10 @@ export function LoopBuilder(props: LoopBuilderProps) {
   /** Someone else changed the loop; saving would overwrite them, so only reloading is offered. */
   const [conflict, setConflict] = useState(false);
 
+  /** Bumped on every edit. A save only clears "unsaved" if nothing changed while it was in flight. */
+  const editGeneration = useRef(0);
   const touch = () => {
+    editGeneration.current += 1;
     setDirty(true);
     setMessage(null);
   };
@@ -95,6 +98,7 @@ export function LoopBuilder(props: LoopBuilderProps) {
   const minutes = totalMinutes(rounds);
 
   const save = async () => {
+    const savingGeneration = editGeneration.current;
     setBusy("save");
     setMessage(null);
     try {
@@ -107,7 +111,7 @@ export function LoopBuilder(props: LoopBuilderProps) {
           roleTarget: roleTarget || null,
           level: level || null,
           rounds,
-          revision,
+          revision: revisionRef.current,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -115,8 +119,10 @@ export function LoopBuilder(props: LoopBuilderProps) {
       if (!res.ok) throw new Error(body.error || `Save failed (${res.status})`);
       setRevision(body.revision);
       setProblems(body.problems ?? []);
-      setDirty(false);
-      setMessage({ tone: "ok", text: "Saved." });
+      // Edits made while this save was in flight weren't in it: they stay unsaved.
+      const caughtUp = editGeneration.current === savingGeneration;
+      setDirty(!caughtUp);
+      setMessage({ tone: "ok", text: caughtUp ? "Saved." : "Saved. You've made more changes since." });
       router.refresh();
       return true;
     } catch (e) {
@@ -165,7 +171,8 @@ export function LoopBuilder(props: LoopBuilderProps) {
       const res = await fetch(`${paths.api}/loops/${props.loopId}/status`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, revision }),
+        // The ref, not the render's value: publish right after a save must send the revision that save returned.
+        body: JSON.stringify({ action, revision: revisionRef.current }),
       });
       const body = await res.json().catch(() => ({}));
       if (body.conflict) setConflict(true);
