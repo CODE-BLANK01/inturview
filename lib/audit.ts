@@ -22,6 +22,8 @@ export type AuditAction =
   | "LOOP_PUBLISHED"
   | "LOOP_ARCHIVED"
   | "LOOP_RESTORED"
+  | "ROLE_CREATED"
+  | "ROLE_UPDATED"
   | "CAMPAIGN_CREATED"
   | "CAMPAIGN_RECIPIENTS_ADDED"
   | "INVITES_SENT"
@@ -38,7 +40,7 @@ export type AuditAction =
   | "SUPPORT_ACCESS_GRANTED"
   | "SUPPORT_ACCESS_ENDED";
 
-export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop" | "campaign" | "invite" | "organization" | "member" | "member_invitation";
+export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop" | "campaign" | "invite" | "organization" | "member" | "member_invitation" | "role";
 
 export async function writeAudit(opts: {
   adminId: string;

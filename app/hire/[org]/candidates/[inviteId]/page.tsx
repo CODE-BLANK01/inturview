@@ -5,14 +5,12 @@ import { accessAllows } from "@/lib/workspaces";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({ params }: { params: { org: string; id: string; inviteId: string } }) {
+export default async function Page({ params }: { params: { org: string; inviteId: string } }) {
   const access = await requireWorkspace(params.org, "applications.viewAll");
-  const paths = workspacePaths(access.org.slug);
   return (
     <CandidateView
       organizationId={access.org.id}
-      paths={paths}
-      campaignId={params.id}
+      paths={workspacePaths(access.org.slug)}
       inviteId={params.inviteId}
       canRescore={!!access.role && accessAllows(access, "applications.rescore")}
     />

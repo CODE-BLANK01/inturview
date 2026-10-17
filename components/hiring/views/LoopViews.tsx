@@ -169,7 +169,7 @@ export async function LoopDetailView({ organizationId, paths, id, canInvite }: S
       <header className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{loop.name}</h1>
         {loop.status === "PUBLISHED" && canInvite && (
-          <Link href={`${paths.invites}/new?loop=${loop.id}`} className="btn btn-primary text-sm">Invite candidates</Link>
+          <Link href={paths.roles} className="btn btn-primary text-sm">Invite candidates from a role</Link>
         )}
         {loop.status === "PUBLISHED" && !paths.workspace && (
           <p className="text-xs text-text-dim">Workspaces can start from this template on their Loops page.</p>
