@@ -9,6 +9,7 @@ import { interviewerSystemPrompt, splitMarker, type FrozenQuestion } from "@/lib
 import { JOIN_TURN } from "@/lib/loopRoundTurns";
 import { roundClock } from "@/lib/roundTiming";
 import { finishRound } from "@/lib/scoring";
+import { interviewerEndedRound } from "@/lib/roundAnswers";
 
 const MESSAGE_FIELDS = { id: true, role: true, content: true, clientTurnId: true, replyToId: true } as const;
 
@@ -31,6 +32,10 @@ export async function POST(req: NextRequest) {
     const round = ctx.loop.rounds[parsed.data.roundIndex]!;
     // Came back after the hard deadline: close the round; what was sent is kept and scored.
     if (rr.status === "IN_PROGRESS" && roundClock(rr.startedAt, round.durationMinutes, rr.deadlineAt).pastDeadline) {
+      rr = await finishRound(rr.id);
+    }
+    // The interviewer already closed it (the page was refreshed before it said Finish).
+    if (rr.status === "IN_PROGRESS" && (await interviewerEndedRound(rr.id))) {
       rr = await finishRound(rr.id);
     }
     let messages = await prisma.loopMessage.findMany({ where: { roundRunId: rr.id }, orderBy: { createdAt: "asc" }, select: MESSAGE_FIELDS });

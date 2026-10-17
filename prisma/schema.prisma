@@ -938,6 +938,9 @@ model LoopRoundRun {
   /// The candidate's unsent answer, saved as they type.
   draft        String?          @db.Text
   draftSavedAt DateTime?
+  /// The browser's sequence number for the stored draft (its clock, in ms).
+  /// Saves with a lower number are stale and ignored.
+  draftSeq     Float?
   /// Current scorecard: a copy of the latest SUCCEEDED ScoringAttempt.
   scorecard    Json?
   score        Int?
@@ -948,20 +951,23 @@ model LoopRoundRun {
 }
 
 model LoopMessage {
-  id           String       @id @default(cuid())
-  roundRunId   String
-  roundRun     LoopRoundRun @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  roundRunId     String
+  roundRun       LoopRoundRun @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
   /// "interviewer" or "candidate"
-  role         String
-  content      String       @db.Text
+  role           String
+  content        String       @db.Text
   /// Candidate messages: an ID the browser makes per answer, so a retry or a
   /// double click stores the answer once.
-  clientTurnId String?
+  clientTurnId   String?
   /// Interviewer messages: the candidate message this replies to. One reply per answer.
-  replyToId    String?      @unique
+  replyToId      String?      @unique
   /// The interviewer closed the round with this reply.
-  endsRound    Boolean      @default(false)
-  createdAt    DateTime     @default(now())
+  endsRound      Boolean      @default(false)
+  /// Candidate messages: when a request started writing the reply. One writer
+  /// at a time; a claim older than a couple of minutes is treated as abandoned.
+  replyClaimedAt DateTime?
+  createdAt      DateTime     @default(now())
 
   @@unique([roundRunId, clientTurnId])
   @@index([roundRunId, createdAt])

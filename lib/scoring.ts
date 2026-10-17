@@ -92,12 +92,18 @@ async function giveUp(roundRunId: string) {
     where: { roundRunId, status: ScoringStatus.SUCCEEDED },
     orderBy: { attempt: "desc" },
   });
-  await prisma.loopRoundRun.updateMany({
+  const r = await prisma.loopRoundRun.updateMany({
     where: { id: roundRunId, status: RoundRunStatus.SCORING },
     data: previous
       ? { status: RoundRunStatus.COMPLETED, scorecard: previous.scorecard ?? Prisma.JsonNull, score: previous.score }
       : { status: RoundRunStatus.SCORING_FAILED },
   });
+  // Putting the earlier score back can be what completes the interview (other
+  // rounds may have finished while this one was being re-scored).
+  if (r.count && previous) {
+    const rr = await prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId }, select: { runId: true } });
+    await refreshRun(rr.runId);
+  }
 }
 
 export function scoringHandlers(grade: Grader = anthropicGrader): Record<string, JobHandler> {
@@ -117,21 +123,39 @@ async function queueAndTry(roundRunId: string, grade?: Grader) {
 }
 
 /**
- * The candidate finished a round (or its time ran out). Safe to call twice:
- * only one call moves it to SCORING. `inline: false` just queues the scoring,
- * for sweeps that shouldn't wait on the model.
+ * The candidate finished a round (or its time ran out, or the interviewer
+ * closed it). Moving to SCORING and queuing the score job happen in one
+ * transaction, so a round can't be left scoring with nothing to score it.
+ * Safe to call again: a round already scoring gets its job re-queued if it
+ * lost it. `inline: false` just queues, for callers that shouldn't wait on the model.
  */
 export async function finishRound(roundRunId: string, grade?: Grader, opts: { inline?: boolean } = {}) {
-  const claimed = await prisma.loopRoundRun.updateMany({
-    where: { id: roundRunId, status: RoundRunStatus.IN_PROGRESS },
-    data: { status: RoundRunStatus.SCORING, completedAt: new Date(), draft: null },
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.loopRoundRun.updateMany({
+      where: { id: roundRunId, status: RoundRunStatus.IN_PROGRESS },
+      data: { status: RoundRunStatus.SCORING, completedAt: new Date(), draft: null },
+    });
+    if (claimed.count) await enqueueJob(SCORE_JOB, jobKey(roundRunId), { roundRunId }, { db: tx });
   });
-  if (claimed.count === 0) return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
-  if (opts.inline === false) {
-    await enqueueJob(SCORE_JOB, jobKey(roundRunId), { roundRunId });
-    return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
-  }
-  return queueAndTry(roundRunId, grade);
+  const rr = await prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
+  if (rr.status !== RoundRunStatus.SCORING) return rr;
+  // No-op when the job is already queued or running (one active job per key).
+  await enqueueJob(SCORE_JOB, jobKey(roundRunId), { roundRunId });
+  if (opts.inline === false) return rr;
+  await processJobs(scoringHandlers(grade), { key: jobKey(roundRunId), limit: 1 });
+  return prisma.loopRoundRun.findUniqueOrThrow({ where: { id: roundRunId } });
+}
+
+/** Rounds left scoring with no queued or running job (a crash, an old bug) get one. */
+export async function recoverOrphanedScoring(limit = 50) {
+  const scoring = await prisma.loopRoundRun.findMany({ where: { status: RoundRunStatus.SCORING }, select: { id: true }, take: limit });
+  if (scoring.length === 0) return 0;
+  const active = new Set(
+    (await prisma.job.findMany({ where: { key: { in: scoring.map((r) => jobKey(r.id)) }, state: { in: ["QUEUED", "RUNNING"] } }, select: { key: true } })).map((j) => j.key),
+  );
+  const orphans = scoring.filter((r) => !active.has(jobKey(r.id)));
+  for (const r of orphans) await enqueueJob(SCORE_JOB, jobKey(r.id), { roundRunId: r.id });
+  return orphans.length;
 }
 
 /** Rounds left open past their hard deadline (the candidate walked away) get finished and scored. */
