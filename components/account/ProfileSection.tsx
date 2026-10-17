@@ -4,24 +4,27 @@ import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import type { AccountProfile } from "./AccountPage";
 
-type Goal = "PRACTICING" | "RECRUITING" | "COACHING" | "EXPLORING";
+type Goal = "PRACTICING" | "EXPLORING";
 
 const GOAL_LABELS: Record<Goal, string> = {
   PRACTICING: "Practicing for interviews",
-  RECRUITING: "Hiring & evaluating candidates",
-  COACHING: "Coaching others",
   EXPLORING: "Just exploring",
 };
 
+function candidateGoal(goal: AccountProfile["goal"]): Goal | "" {
+  return goal === "PRACTICING" || goal === "EXPLORING" ? goal : "";
+}
+
 export function ProfileSection({ profile }: { profile: AccountProfile }) {
   const [name, setName] = useState(profile.name ?? "");
-  const [goal, setGoal] = useState<Goal | "">((profile.goal as Goal | null) ?? "");
+  const initialGoal = candidateGoal(profile.goal);
+  const [goal, setGoal] = useState<Goal | "">(initialGoal);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const dirty =
-    name !== (profile.name ?? "") || goal !== (profile.goal ?? "");
+    name !== (profile.name ?? "") || goal !== initialGoal;
 
   const save = async () => {
     setSaving(true);

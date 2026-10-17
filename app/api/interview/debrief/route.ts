@@ -7,6 +7,8 @@ import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import type { Debrief } from "@/lib/types";
+import { captureProductEvent } from "@/lib/analytics";
+import { trackClaudeUsage } from "@/lib/aiCost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -155,6 +157,7 @@ export async function POST(req: NextRequest) {
         system,
         messages: [{ role: "user", content: userTurn }],
       });
+      await trackClaudeUsage(user.id, { category: "coding", sessionId: interview.id, model: MODEL, purpose: "debrief", usage: resp.usage });
       const text = resp.content
         .map((b) => (b.type === "text" ? b.text : ""))
         .join("")
@@ -204,6 +207,16 @@ export async function POST(req: NextRequest) {
           },
         }),
       ]);
+
+      await captureProductEvent(user.id, {
+        event: "phase_advanced",
+        properties: { mode: "coding", session_id: interview.id, from: "code", to: "debrief" },
+      });
+
+      await captureProductEvent(user.id, {
+        event: "debrief_completed",
+        properties: { mode: "coding", session_id: interview.id, score: total },
+      });
 
       return Response.json(debrief);
     } catch (err) {

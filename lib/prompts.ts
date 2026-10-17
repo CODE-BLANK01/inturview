@@ -42,27 +42,14 @@ green-lighting wastes everyone's time. If you'd want to push harder, emit [CONTI
 
 export function codeSystemPrompt(
   problem: Problem,
-  phase1Transcript: ChatMessage[],
-  userCode: string
 ): string {
-  const transcript = phase1Transcript
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
   return `You are conducting a technical interview. The candidate is now in the CODE phase for: ${problem.title}.
 
 Problem: ${problem.description}
 Optimal: ${problem.optimal_time} time, ${problem.optimal_space} space.
 
-Approach discussion so far:
-${transcript || "(none yet)"}
-
-Their current code in the editor:
-\`\`\`
-${userCode || "(empty)"}
-\`\`\`
-
 In this phase the candidate may ask brief clarifying questions while coding. Rules:
-- You can see their live code above. When their question relates to what they've written,
+- You can see their live code in the latest context block. When their question relates to what they've written,
   reference the specific construct ("the inner loop", "the hash map you initialized") —
   do not pretend you can't see the editor.
 - Answer briefly (1-3 sentences). Do NOT solve the problem for them.
@@ -71,6 +58,12 @@ In this phase the candidate may ask brief clarifying questions while coding. Rul
   than waiting for permission.
 - Nudge them with questions if they're stuck. Stay in interviewer character.
 - If they ask you to evaluate their code, tell them to click "Submit Solution" when ready.`;
+}
+
+/** Per-turn context comes after the cached transcript so editor changes do not bust it. */
+export function codeLiveContext(phase1Transcript: ChatMessage[], userCode: string): string {
+  const transcript = phase1Transcript.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
+  return `Approach discussion so far:\n${transcript || "(none yet)"}\n\nTheir current code in the editor:\n\`\`\`\n${userCode || "(empty)"}\n\`\`\``;
 }
 
 export const DEBRIEF_SCHEMA = `{
@@ -168,15 +161,13 @@ You can explain the optimal solution (${problem.optimal_time} time, ${problem.op
 
 export function phasePromptFor(
   phase: Phase,
-  problem: Problem,
-  phase1Transcript: ChatMessage[],
-  userCode: string
+  problem: Problem
 ): string {
   switch (phase) {
     case "approach":
       return approachSystemPrompt(problem);
     case "code":
-      return codeSystemPrompt(problem, phase1Transcript, userCode);
+      return codeSystemPrompt(problem);
     case "debrief":
       return followUpSystemPrompt(problem);
   }

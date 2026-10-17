@@ -1,10 +1,12 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import Image from "next/image";
+import { MarketingNav } from "./marketing/MarketingNav";
+
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Brand } from "./Brand";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import {
   ChevronDown,
   ClipboardList,
@@ -17,6 +19,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { FACE_TO_FACE_ENABLED } from "@/lib/features";
+import { signOutTo } from "@/lib/signOutTo";
 
 const PRACTICE_MODES: {
   href: string;
@@ -26,73 +30,103 @@ const PRACTICE_MODES: {
   pathPrefixes: string[];
 }[] = [
   {
+    href: "/recruiter-screen",
+    label: "Recruiter screen",
+    blurb: "Your story, motivation, role fit, compensation",
+    icon: ClipboardList,
+    pathPrefixes: ["/recruiter-screen"],
+  },
+  {
+    href: "/behavioral",
+    label: "Behavioral",
+    blurb: "Practice stories with follow-up questions",
+    icon: Users,
+    pathPrefixes: ["/behavioral"],
+  },
+  {
     href: "/problems",
     label: "Coding",
-    blurb: "Approach, code, debrief — NeetCode 150",
+    blurb: "Approach, code, debrief",
     icon: Code2,
     pathPrefixes: ["/problems", "/interview"],
   },
   {
     href: "/design-problems",
     label: "System design",
-    blurb: "Free-draw whiteboard, scope → design → debrief",
+    blurb: "Whiteboard, scope, design, debrief",
     icon: Network,
     pathPrefixes: ["/design-problems", "/design"],
   },
-  {
-    href: "/behavioral",
-    label: "Behavioral",
-    blurb: "STAR drills against real interviewer questions",
-    icon: Users,
-    pathPrefixes: ["/behavioral"],
-  },
-  {
-    href: "/recruiter-screen",
-    label: "Recruiter screen",
-    blurb: "25-min phone screen — story, motivation, comp",
-    icon: ClipboardList,
-    pathPrefixes: ["/recruiter-screen"],
-  },
-  {
-    href: "/face-to-face",
-    label: "Face-to-face",
-    blurb: "Live video technical round — voice, camera, delivery scoring",
-    icon: Video,
-    pathPrefixes: ["/face-to-face"],
-  },
+  ...(FACE_TO_FACE_ENABLED
+    ? [
+        {
+          href: "/face-to-face",
+          label: "Face-to-face",
+          blurb: "Live video technical round — voice, camera, delivery scoring",
+          icon: Video,
+          pathPrefixes: ["/face-to-face"],
+        },
+      ]
+    : []),
 ];
 
-export function TopNav() {
+export function TopNav({ marketing = false }: { marketing?: boolean }) {
   const { data, status } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [practiceOpen, setPracticeOpen] = useState(false);
+  const practiceRef = useRef<HTMLDivElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on a click outside them. (A blur timer used to close them
+  // before a slow click on a menu item could register, so links didn't fire.)
+  useEffect(() => {
+    if (!open && !practiceOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!practiceRef.current?.contains(target)) setPracticeOpen(false);
+      if (!accountRef.current?.contains(target)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      (practiceOpen ? practiceRef : accountRef).current
+        ?.querySelector("button")
+        ?.focus();
+      setOpen(false);
+      setPracticeOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, practiceOpen]);
+
+  // Close menus once navigation lands on a new route.
+  useEffect(() => {
+    setOpen(false);
+    setPracticeOpen(false);
+  }, [pathname]);
 
   const practiceActive = PRACTICE_MODES.some((m) =>
-    m.pathPrefixes.some((p) => pathname === p || pathname?.startsWith(p + "/"))
+    m.pathPrefixes.some((p) => pathname === p || pathname?.startsWith(p + "/")),
   );
 
   const isAuthed = status === "authenticated";
+  if (marketing) return <MarketingNav />;
   const isAdmin =
     (data?.user as { role?: "USER" | "ADMIN" } | undefined)?.role === "ADMIN";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-bg/85 backdrop-blur">
-      <div className="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between gap-4">
+    <header className="site-topnav sticky top-0 z-30 border-b border-border bg-bg/85 backdrop-blur">
+      <div className="mx-auto max-w-7xl px-4 h-[76px] flex items-center justify-between gap-4">
         <Link
           href={isAuthed ? "/dashboard" : "/"}
           aria-label="inturview home"
-          className="flex items-center"
+          className="flex items-center shrink-0"
         >
-          {/* The SVG is the wordmark — no separate text needed. */}
-          <Image
-            src="/logo.svg"
-            alt="inturview"
-            width={1000}
-            height={500}
-            priority
-            className="h-8 w-auto rounded-[4px]"
-          />
+          <Brand wordmarkOnly />
         </Link>
 
         {isAuthed && (
@@ -100,11 +134,12 @@ export function TopNav() {
             <NavLink href="/dashboard" active={pathname === "/dashboard"}>
               Dashboard
             </NavLink>
-            <div className="relative">
+            <div className="relative" ref={practiceRef}>
               <button
                 type="button"
+                aria-expanded={practiceOpen}
+                aria-controls="practice-menu"
                 onClick={() => setPracticeOpen((v) => !v)}
-                onBlur={() => setTimeout(() => setPracticeOpen(false), 150)}
                 className={`px-3 py-1.5 rounded-md inline-flex items-center gap-1 transition-colors duration-150 ${
                   practiceActive
                     ? "text-text bg-bg-inset"
@@ -115,11 +150,14 @@ export function TopNav() {
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               {practiceOpen && (
-                <div className="absolute left-0 top-full mt-1 w-72 panel py-1 shadow-lg">
+                <div
+                  id="practice-menu"
+                  className="absolute left-0 top-full mt-1 w-72 panel py-1 shadow-lg"
+                >
                   {PRACTICE_MODES.map((m) => {
                     const Icon = m.icon;
                     const active = m.pathPrefixes.some(
-                      (p) => pathname === p || pathname?.startsWith(p + "/")
+                      (p) => pathname === p || pathname?.startsWith(p + "/"),
                     );
                     return (
                       <Link
@@ -132,7 +170,9 @@ export function TopNav() {
                         <Icon className="h-4 w-4 mt-0.5 text-accent shrink-0" />
                         <div className="min-w-0">
                           <div className="text-sm font-medium">{m.label}</div>
-                          <div className="text-xs text-text-dim truncate">{m.blurb}</div>
+                          <div className="text-xs text-text-dim truncate">
+                            {m.blurb}
+                          </div>
                         </div>
                       </Link>
                     );
@@ -140,11 +180,17 @@ export function TopNav() {
                 </div>
               )}
             </div>
-            <NavLink href="/history" active={pathname?.startsWith("/history") ?? false}>
+            <NavLink
+              href="/history"
+              active={pathname?.startsWith("/history") ?? false}
+            >
               History
             </NavLink>
             {isAdmin && (
-              <NavLink href="/admin" active={pathname?.startsWith("/admin") ?? false}>
+              <NavLink
+                href="/admin"
+                active={pathname?.startsWith("/admin") ?? false}
+              >
                 Admin
               </NavLink>
             )}
@@ -154,35 +200,56 @@ export function TopNav() {
         <nav className="flex items-center gap-2">
           <ThemeToggle />
           {isAuthed ? (
-            <div className="relative">
+            <div className="relative" ref={accountRef}>
               <button
+                type="button"
+                aria-expanded={open}
+                aria-controls="account-menu"
+                aria-label="Account menu"
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-text-muted hover:text-text hover:bg-bg-inset transition-colors duration-150"
                 onClick={() => setOpen((v) => !v)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
               >
-                <Avatar email={data?.user?.email ?? ""} name={data?.user?.name ?? null} />
+                <Avatar
+                  email={data?.user?.email ?? ""}
+                  name={data?.user?.name ?? null}
+                />
                 <span className="hidden sm:inline max-w-[160px] truncate">
                   {data?.user?.name || data?.user?.email || "Account"}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               {open && (
-                <div className="absolute right-0 top-full mt-1 w-56 panel py-1 shadow-lg">
+                <div
+                  id="account-menu"
+                  className="absolute right-0 top-full mt-1 w-56 panel py-1 shadow-lg"
+                >
                   <div className="px-3 py-2 border-b border-border">
                     <div className="text-sm font-medium truncate">
                       {data?.user?.name || "Account"}
                     </div>
-                    <div className="text-xs text-text-dim truncate">{data?.user?.email}</div>
+                    <div className="text-xs text-text-dim truncate">
+                      {data?.user?.email}
+                    </div>
                   </div>
                   <div className="md:hidden">
                     <DropdownLink href="/dashboard">Dashboard</DropdownLink>
-                    <DropdownLink href="/problems">Coding</DropdownLink>
-                    <DropdownLink href="/design-problems">System design</DropdownLink>
+                    <DropdownLink href="/recruiter-screen">
+                      Recruiter screen
+                    </DropdownLink>
                     <DropdownLink href="/behavioral">Behavioral</DropdownLink>
-                    <DropdownLink href="/recruiter-screen">Recruiter screen</DropdownLink>
-                    <DropdownLink href="/face-to-face">Face-to-face</DropdownLink>
+                    <DropdownLink href="/problems">Coding</DropdownLink>
+                    <DropdownLink href="/design-problems">
+                      System design
+                    </DropdownLink>
+                    {FACE_TO_FACE_ENABLED && (
+                      <DropdownLink href="/face-to-face">
+                        Face-to-face
+                      </DropdownLink>
+                    )}
                     <DropdownLink href="/history">History</DropdownLink>
-                    {isAdmin && <DropdownLink href="/admin">Admin</DropdownLink>}
+                    {isAdmin && (
+                      <DropdownLink href="/admin">Admin</DropdownLink>
+                    )}
                     <div className="my-1 border-t border-border" />
                   </div>
                   <Link
@@ -194,7 +261,7 @@ export function TopNav() {
                   </Link>
                   <div className="my-1 border-t border-border" />
                   <button
-                    onClick={() => signOut({ callbackUrl: "/" })}
+                    onClick={() => void signOutTo("/")}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-bg-inset inline-flex items-center gap-2"
                   >
                     <LogOut className="h-4 w-4" />
@@ -205,6 +272,18 @@ export function TopNav() {
             </div>
           ) : status === "unauthenticated" ? (
             <Fragment>
+              <Link
+                href="/pricing"
+                className="hidden sm:inline-flex px-2 py-1.5 text-sm text-text-muted hover:text-text"
+              >
+                Pricing
+              </Link>
+              <Link
+                href="/employers"
+                className="hidden md:inline-flex px-2 py-1.5 text-sm text-text-muted hover:text-text"
+              >
+                For employers
+              </Link>
               <Link href="/signin" className="btn text-sm">
                 Sign in
               </Link>
@@ -242,7 +321,13 @@ function NavLink({
   );
 }
 
-function DropdownLink({ href, children }: { href: string; children: React.ReactNode }) {
+function DropdownLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <Link href={href} className="block px-3 py-2 text-sm hover:bg-bg-inset">
       {children}
@@ -251,7 +336,11 @@ function DropdownLink({ href, children }: { href: string; children: React.ReactN
 }
 
 function Avatar({ email, name }: { email: string; name: string | null }) {
-  const initial = (name?.trim()?.[0] ?? email?.trim()?.[0] ?? "?").toUpperCase();
+  const initial = (
+    name?.trim()?.[0] ??
+    email?.trim()?.[0] ??
+    "?"
+  ).toUpperCase();
   return (
     <span
       className="inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs t-data"
@@ -265,4 +354,3 @@ function Avatar({ email, name }: { email: string; name: string | null }) {
     </span>
   );
 }
-

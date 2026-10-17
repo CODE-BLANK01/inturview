@@ -6,8 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "lint": "next lint",
+    "lint": "next lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test:db": "node --import tsx --test --test-concurrency=1 tests/db/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:push": "dotenv -e .env.local -- prisma db push",
@@ -16,7 +18,12 @@
     "db:seed-behavioral": "dotenv -e .env.local -- tsx prisma/seedBehavioral.ts",
     "db:backfill-free": "dotenv -e .env.local -- tsx prisma/backfillFreeTier.ts",
     "db:studio": "dotenv -e .env.local -- prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "check:env": "node scripts/check-env.mjs",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "db:new-migration": "node scripts/new-migration.mjs",
+    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:seed-questions": "dotenv -e .env.local -- tsx prisma/seedQuestions.ts"
   },
   "prisma": {
     "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
@@ -28,7 +35,10 @@
     "@mediapipe/tasks-vision": "1.0.1",
     "@monaco-editor/react": "^4.6.0",
     "@prisma/client": "^6.19.3",
+    "@sentry/nextjs": "^8.55.0",
     "bcryptjs": "^3.0.3",
+    "framer-motion": "^14.0.0",
+    "livekit-client": "^2.22.3",
     "lucide-react": "^0.453.0",
     "next": "14.2.35",
     "next-auth": "^4.24.14",
@@ -38,6 +48,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "resend": "^6.12.3",
+    "stripe": "^22.6.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -48,6 +59,8 @@
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "dotenv-cli": "^11.0.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "tsx": "^4.21.0",

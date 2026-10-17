@@ -7,6 +7,8 @@ import { describeCanvas } from "@/lib/designCanvas";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
+import { trackClaudeUsage } from "@/lib/aiCost";
 import { DesignDebriefSchema, type DesignDebrief } from "@/lib/designTypes";
 
 export const runtime = "nodejs";
@@ -134,6 +136,7 @@ export async function POST(req: NextRequest) {
         system,
         messages: [{ role: "user", content: userTurn }],
       });
+      await trackClaudeUsage(user.id, { category: "system_design", sessionId: session.id, model: DESIGN_MODEL, purpose: "debrief", usage: resp.usage });
       const text = resp.content
         .map((b) => (b.type === "text" ? b.text : ""))
         .join("")
@@ -176,6 +179,16 @@ export async function POST(req: NextRequest) {
           data: { status: "ABANDONED", completedAt: new Date() },
         }),
       ]);
+
+      await captureProductEvent(user.id, {
+        event: "phase_advanced",
+        properties: { mode: "system_design", session_id: session.id, from: "design", to: "debrief" },
+      });
+
+      await captureProductEvent(user.id, {
+        event: "debrief_completed",
+        properties: { mode: "system_design", session_id: session.id, score: total },
+      });
 
       return Response.json(debrief);
     } catch (err) {

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
 import { Check, Copy, KeyRound, Loader2, ShieldCheck, ShieldOff, X } from "lucide-react";
 import { SectionHeader } from "./ProfileSection";
+import { signOutTo } from "@/lib/signOutTo";
 
 interface SetupState {
   setupToken: string;
@@ -74,7 +74,7 @@ export function TwoFactorSection({ enabled }: { enabled: boolean }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `Failed (${res.status})`);
-      signOut({ callbackUrl: "/signin?reason=revoked" });
+      await signOutTo("/signin?reason=revoked");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't disable 2FA");
       setLoading(null);
@@ -144,6 +144,8 @@ export function TwoFactorSection({ enabled }: { enabled: boolean }) {
         {setup && (
           <form onSubmit={verifySetup} className="space-y-4 max-w-md">
             <div className="rounded-md border border-border bg-bg-inset/30 p-4">
+              {/* A generated data: URL — next/image has nothing to optimize here. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={setup.qrDataUrl} alt="Authenticator QR code" className="h-[220px] w-[220px]" />
               <p className="mt-3 break-all text-xs text-text-dim">{setup.otpauthUrl}</p>
             </div>

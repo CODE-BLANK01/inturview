@@ -21,7 +21,7 @@ export default async function RecruiterScreenPage() {
     <ConversationSession
       kind="RECRUITER_SCREEN"
       title="Recruiter screen"
-      subtitle="25-min initial phone screen"
+      subtitle="Text-based initial recruiter screen"
       prompt="A recruiter is calling you for an initial screen. They'll walk through your resume, ask why you're looking now, probe compensation expectations, and run logistics. Treat it like the real call — clear, professional, two-way."
       backHref="/dashboard"
       backLabel="Dashboard"

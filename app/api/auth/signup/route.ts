@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
+import { afterVerify } from "@/lib/nextPath";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { Prisma, Role } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { adminEmails } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { MIN_PASSWORD_LENGTH, validatePasswordStrength } from "@/lib/passwordCheck";
 import {
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 const Body = z.object({
   email: z.string().email().max(200),
   name: z.string().trim().min(1).max(80).optional(),
+  next: z.string().max(300).optional(),
   password: z
     .string()
     .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
@@ -75,10 +77,11 @@ export async function POST(req: NextRequest) {
         email,
         name: parsed.name?.trim() || null,
         passwordHash,
-        role: adminEmails().has(email) ? Role.ADMIN : Role.USER,
       },
       select: { id: true, email: true, name: true, role: true },
     });
+
+    await captureProductEvent(user.id, { event: "signup_completed" });
 
     // Fire verification email — don't block the response if Resend hiccups.
     // The user can hit "Resend verification" from /verify-email if needed.
@@ -88,6 +91,7 @@ export async function POST(req: NextRequest) {
         toEmail: user.email,
         toName: user.name,
         rawToken,
+        next: afterVerify(parsed.next),
       });
     } catch (err) {
       console.error("[signup] verification email failed:", err instanceof Error ? err.message : err);

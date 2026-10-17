@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getProblem } from "@/lib/problems";
-import { getAnthropic, MODEL } from "@/lib/anthropic";
-import { phasePromptFor } from "@/lib/prompts";
+import { trackClaudeUsage, type ClaudeUsage } from "@/lib/aiCost";
+import { captureProductEvent, type Category } from "@/lib/analytics";
+import { cachedInterviewPrompt, getAnthropic, logCacheUsage, MODEL } from "@/lib/anthropic";
+import { codeLiveContext, phasePromptFor } from "@/lib/prompts";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -172,7 +174,12 @@ export async function POST(req: NextRequest) {
     messagesForModel = [{ role: "user", content: "..." }];
   }
 
-  const system = phasePromptFor(parsed.phase, problem, phase1Transcript, userCode);
+  const system = phasePromptFor(parsed.phase, problem);
+  const cachedPrompt = cachedInterviewPrompt(
+    system,
+    messagesForModel,
+    parsed.phase === "code" ? codeLiveContext(phase1Transcript, userCode) : undefined
+  );
 
   let anthropic;
   try {
@@ -235,18 +242,21 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        const upstream = await anthropic.messages.stream(
+        const upstream = await anthropic.beta.promptCaching.messages.stream(
           {
             model: MODEL,
             max_tokens: parsed.phase === "approach" ? 400 : 700,
-            system,
-            messages: messagesForModel,
+            ...cachedPrompt,
           },
           { signal: abortController.signal }
         );
 
+        const turnUsage: ClaudeUsage = {};
         for await (const event of upstream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          if (event.type === "message_start") {
+            logCacheUsage(`coding/${parsed.phase}`, event.message.usage);
+            Object.assign(turnUsage, event.message.usage);
+          } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             const text = event.delta.text;
             if (!prefixDetected) {
               prefixBuffer += text;
@@ -261,6 +271,8 @@ export async function POST(req: NextRequest) {
             } else {
               emitDelta(text);
             }
+          } else if (event.type === "message_delta") {
+            turnUsage.output_tokens = event.usage.output_tokens;
           } else if (event.type === "message_stop") {
             // If we ended before the prefix could be parsed (short reply), settle now.
             if (!prefixDetected && prefixBuffer.length > 0) {
@@ -269,6 +281,12 @@ export async function POST(req: NextRequest) {
             }
             controller.enqueue(sseEncode("done", "{}"));
           }
+        }
+        // The reply finished: record its cost, and count debrief follow-up questions.
+        const category: Category = "coding" as const;
+        await trackClaudeUsage(user.id, { category, sessionId: interview.id, model: MODEL, purpose: "interview_turn", usage: turnUsage });
+        if (parsed.phase === "debrief") {
+          await captureProductEvent(user.id, { event: "followup_asked", properties: { mode: category, session_id: interview.id } });
         }
       } catch (err) {
         // Two paths to handle:

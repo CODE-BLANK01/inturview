@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,5 +43,11 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  if (result.count > 0) {
+    await captureProductEvent(user.id, {
+      event: "session_abandoned",
+      properties: { mode: "coding", session_id: parsed.interview_id },
+    });
+  }
   return Response.json({ ok: true, updated: result.count });
 }

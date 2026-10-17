@@ -6,11 +6,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // If you switch DATABASE_URL to a pooler (e.g. Supabase port 6543), uncomment the
-  // line below and set DIRECT_URL to the direct connection (port 5432) for migrations:
-  // directUrl = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // DATABASE_URL goes through Supabase's transaction pooler (port 6543), which
+  // can't run migrations. Prisma's CLI uses this direct connection (port 5432).
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -26,6 +26,11 @@ enum PlanTier {
   ENTERPRISE
 }
 
+enum BillingPurchaseStatus {
+  PAID
+  REFUNDED
+}
+
 enum OnboardingGoal {
   PRACTICING
   RECRUITING
@@ -34,16 +39,21 @@ enum OnboardingGoal {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
-  name         String?
-  passwordHash String
-  role         Role        @default(USER)
-  plan         PlanTier    @default(FREE)
-  goal         OnboardingGoal?
+  id                    String                   @id @default(cuid())
+  email                 String                   @unique
+  name                  String?
+  passwordHash          String
+  role                  Role                     @default(USER)
+  plan                  PlanTier                 @default(FREE)
+  /// Stripe customer used for candidate practice-pass purchases.
+  stripeCustomerId      String?                  @unique
+  /// Paid candidate access ends at this instant. Null is reserved for free
+  /// accounts and manually granted legacy access.
+  planExpiresAt         DateTime?
+  goal                  OnboardingGoal?
   /// Non-null once the user clicks the verification link from their inbox.
   /// Authenticated requests are routed to /verify-email until this is set.
-  emailVerifiedAt DateTime?
+  emailVerifiedAt       DateTime?
   /// Non-null once the user finishes the onboarding wizard. Until then, any
   /// authenticated request that lands on /dashboard etc. is redirected back
   /// to /onboarding.
@@ -52,30 +62,68 @@ model User {
   /// (password change, role change, disable, manual "sign out everywhere").
   /// The signed JWT carries the value at issue time; requireUser() compares
   /// it to the current DB value on every protected request.
-  tokenVersion Int @default(0)
+  tokenVersion          Int                      @default(0)
   /// Non-null when TOTP MFA is enabled for the user.
-  totpEnabledAt DateTime?
+  totpEnabledAt         DateTime?
   /// AES-GCM encrypted TOTP secret. Null until the user completes setup.
-  totpSecret String?
+  totpSecret            String?
   /// Bcrypt hashes of one-time recovery codes. Stored as JSON string array.
-  totpRecoveryCodes Json?
-  flagged      Boolean     @default(false)
-  flagReason   String?
+  totpRecoveryCodes     Json?
+  flagged               Boolean                  @default(false)
+  flagReason            String?
   // Non-null = the user is disabled and can't sign in. Existing data is retained.
-  disabledAt   DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  interviews   Interview[]
-  designSessions DesignSession[]
-  conversations  ConversationSession[]
-  auditEntries AuditLog[]  @relation("AdminAudit")
-  resetTokens  PasswordResetToken[]
-  verificationTokens EmailVerificationToken[]
+  disabledAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  /// First authenticated dashboard visit 24h–7d after signup; prevents duplicate retention events.
+  returnedWithin7dAt    DateTime?
+  interviews            Interview[]
+  designSessions        DesignSession[]
+  conversations         ConversationSession[]
+  auditEntries          AuditLog[]               @relation("AdminAudit")
+  resetTokens           PasswordResetToken[]
+  verificationTokens    EmailVerificationToken[]
+  billingPurchases      BillingPurchase[]
+  memberships           OrganizationMember[]
+  memberInvitesSent     MemberInvitation[]       @relation("MemberInvitationInviter")
+  supportGrants         SupportAccessGrant[]
 
   @@index([role])
   @@index([flagged])
   @@index([plan])
   @@index([emailVerifiedAt])
+}
+
+model BillingPurchase {
+  id                      String                @id @default(cuid())
+  userId                  String
+  stripeCheckoutSessionId String                @unique
+  stripePaymentIntentId   String?               @unique
+  stripeCustomerId        String?
+  amountCents             Int
+  currency                String
+  accessDays              Int                   @default(30)
+  accessStartsAt          DateTime
+  accessEndsAt            DateTime
+  status                  BillingPurchaseStatus @default(PAID)
+  purchasedAt             DateTime              @default(now())
+  refundedAt              DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purchasedAt])
+  @@index([stripeCustomerId])
+  @@index([status])
+}
+
+/// Stripe retries webhook deliveries. Recording every processed event makes
+/// granting access exactly-once even when the same delivery arrives repeatedly.
+model StripeWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
 }
 
 model EmailVerificationToken {
@@ -110,14 +158,16 @@ model PasswordResetToken {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  adminId    String
+  /// Who acted: an operator, or a workspace member for workspace events.
+  /// Null once that account is deleted; the entry itself is kept.
+  adminId    String?
   action     String
   targetType String
   targetId   String
   metadata   Json?
   createdAt  DateTime @default(now())
 
-  admin User @relation("AdminAudit", fields: [adminId], references: [id])
+  admin User? @relation("AdminAudit", fields: [adminId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([adminId])
@@ -150,23 +200,25 @@ enum InterviewStatus {
 }
 
 model Interview {
-  id             String          @id @default(cuid())
-  userId         String
-  problemId      String
-  status         InterviewStatus @default(IN_PROGRESS)
-  language       String          @default("python")
-  code           String          @default("")
-  totalScore     Int?
-  recommendation String?
-  startedAt      DateTime        @default(now())
-  completedAt    DateTime?
+  id                 String          @id @default(cuid())
+  userId             String
+  problemId          String
+  status             InterviewStatus @default(IN_PROGRESS)
+  language           String          @default("python")
+  code               String          @default("")
+  totalScore         Int?
+  recommendation     String?
+  startedAt          DateTime        @default(now())
+  completedAt        DateTime?
   // First time the interviewer emitted [READY] for this candidate's approach.
   // null when the candidate jumped to code without the interviewer signaling acceptance —
   // weighted negatively in the debrief's communication / approach_quality scores.
   approachAcceptedAt DateTime?
+  // First explicit transition from approach to code; analytics dedupe marker.
+  codePhaseEnteredAt DateTime?
   // Whether the candidate clicked "Start coding" while the latest interviewer
   // signal was still [CONTINUE]. Persisted for the debrief.
-  movedToCodeEarly   Boolean   @default(false)
+  movedToCodeEarly   Boolean         @default(false)
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem  Problem   @relation(fields: [problemId], references: [id])
@@ -209,10 +261,10 @@ model Debrief {
 
 model SystemDesignProblem {
   // Slug ("design-twitter"), mirrors Problem.id convention.
-  id                       String   @id
+  id                       String @id
   title                    String
-  difficulty               String   // Easy / Medium / Hard
-  topic                    String   // Feeds, Messaging, Storage, Geospatial, ...
+  difficulty               String // Easy / Medium / Hard
+  topic                    String // Feeds, Messaging, Storage, Geospatial, ...
   /// The open prompt the AI delivers at session start.
   prompt                   String
   /// JSON: { functional: string[], nonFunctional: string[] } — used as
@@ -223,7 +275,7 @@ model SystemDesignProblem {
   referenceArchitecture    String
   /// JSON string[] — suggested deep-dive topics the AI can probe.
   deepDiveTopics           Json
-  estimatedDurationMinutes Int      @default(45)
+  estimatedDurationMinutes Int    @default(45)
 
   sessions DesignSession[]
 
@@ -238,24 +290,26 @@ enum DesignSessionStatus {
 }
 
 model DesignSession {
-  id              String              @id @default(cuid())
-  userId          String
-  problemId       String
-  status          DesignSessionStatus @default(IN_PROGRESS)
+  id                   String              @id @default(cuid())
+  userId               String
+  problemId            String
+  status               DesignSessionStatus @default(IN_PROGRESS)
   /// Excalidraw scene JSON (the elements + appState subset we care about).
   /// Debounced auto-save from the client. Null at session start.
-  canvasJson      Json?
-  totalScore      Int?
-  recommendation  String?
-  startedAt       DateTime            @default(now())
-  completedAt     DateTime?
+  canvasJson           Json?
+  totalScore           Int?
+  recommendation       String?
+  startedAt            DateTime            @default(now())
+  completedAt          DateTime?
   /// First time the interviewer emitted [SCOPED] for this session's requirements.
   /// Null when the candidate moved to design without scope acceptance —
   /// caps the Requirements/Architecture scores in debrief.
-  scopeAcceptedAt DateTime?
+  scopeAcceptedAt      DateTime?
+  // First explicit transition from scope to design; analytics dedupe marker.
+  designPhaseEnteredAt DateTime?
   /// Whether the candidate clicked "Start designing" while the latest signal
   /// was still [CONTINUE]. Behavioral signal feeding the rubric.
-  movedToDesignEarly Boolean          @default(false)
+  movedToDesignEarly   Boolean             @default(false)
 
   user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem  SystemDesignProblem @relation(fields: [problemId], references: [id])
@@ -271,7 +325,7 @@ model DesignMessage {
   sessionId String
   /// "scope" | "design" | "debrief" (debrief = post-debrief follow-up chat)
   phase     String
-  role      String   // "user" | "assistant"
+  role      String // "user" | "assistant"
   content   String
   createdAt DateTime @default(now())
 
@@ -310,13 +364,13 @@ enum ConversationStatus {
 
 model BehavioralScenario {
   // Slug ("conflict-with-teammate"), mirrors Problem.id convention.
-  id          String   @id
-  title       String
+  id              String @id
+  title           String
   /// "Conflict" / "Leadership" / "Failure" / "Ambiguity" / "Growth" / ...
-  category    String
+  category        String
   /// The opening question the interviewer asks. Free-form prose; the LLM
   /// will probe with STAR follow-ups.
-  prompt      String
+  prompt          String
   /// JSON string[] — the specific behaviors / signals the debrief should
   /// look for. Used as grading reference, not shown to the candidate live.
   expectedSignals Json
@@ -327,7 +381,7 @@ model BehavioralScenario {
 }
 
 model ConversationSession {
-  id             String              @id @default(cuid())
+  id             String             @id @default(cuid())
   userId         String
   kind           ConversationKind
   /// Set when kind=BEHAVIORAL; null for RECRUITER_SCREEN (single canonical flow).
@@ -336,10 +390,10 @@ model ConversationSession {
   /// ({ track, level, questionIds, maxDurationSec }). Rebuilt into the
   /// realtime interviewer instructions on demand.
   plan           Json?
-  status         ConversationStatus  @default(IN_PROGRESS)
+  status         ConversationStatus @default(IN_PROGRESS)
   totalScore     Int?
   recommendation String?
-  startedAt      DateTime            @default(now())
+  startedAt      DateTime           @default(now())
   completedAt    DateTime?
 
   user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -355,7 +409,7 @@ model ConversationSession {
 model ConversationMessage {
   id        String   @id @default(cuid())
   sessionId String
-  role      String   // "user" | "assistant"
+  role      String // "user" | "assistant"
   content   String
   /// FACE_TO_FACE user turns: delivery metrics computed by the realtime
   /// service (wpm, filler_count, duration_ms, longest_pause_ms, ...).
@@ -375,4 +429,446 @@ model ConversationDebrief {
   createdAt  DateTime @default(now())
 
   session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Question bank ───────────────────────────────────────────────────────────
+// One library of interview questions for loops. organizationId = null means the
+// platform library; set it for questions private to one HR team. Practice
+// modes still read lib/*.ts until each is moved over.
+
+enum QuestionCategory {
+  RECRUITER_SCREEN
+  BEHAVIORAL
+  TECHNICAL
+  CODING
+  SYSTEM_DESIGN
+}
+
+enum QuestionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum QuestionSource {
+  SEED
+  ADMIN
+  AI_DRAFT
+  IMPORT
+}
+
+model Organization {
+  id                    String               @id @default(cuid())
+  name                  String
+  slug                  String               @unique
+  /// IANA zone used for deadlines shown to applicants, e.g. "America/New_York".
+  timezone              String               @default("UTC")
+  website               String?
+  logoUrl               String?
+  /// Where applicants can ask for accommodations or help.
+  contactEmail          String?
+  /// Created by an operator for a design partner; billing is handled by hand.
+  designPartner         Boolean              @default(false)
+  onboardingStep        String?
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @default(now()) @updatedAt
+  questions             Question[]
+  loops                 LoopTemplate[]
+  members               OrganizationMember[]
+  memberInvitations     MemberInvitation[]
+  supportGrants         SupportAccessGrant[]
+  campaigns             Campaign[]
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  RECRUITER
+  REVIEWER
+}
+
+/// Workspace access. Never inferred from email domain, practice plan or User.role.
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgRole
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+/// A teammate invitation. Accepting requires being signed in, verified, as exactly `email`.
+model MemberInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Lowercased.
+  email          String
+  role           OrgRole
+  /// SHA-256 of the link token.
+  tokenHash      String       @unique
+  invitedById    String?
+  invitedBy      User?        @relation("MemberInvitationInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   String?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, email])
+}
+
+/// Time-boxed, reasoned operator access to a workspace. Operators have none otherwise.
+model SupportAccessGrant {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  operatorId     String
+  operator       User         @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  reason         String       @db.Text
+  expiresAt      DateTime
+  endedAt        DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, operatorId])
+}
+
+model Question {
+  id             String            @id @default(cuid())
+  organizationId String?
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category       QuestionCategory
+  title          String
+  prompt         String            @db.Text
+  /// Follow-ups in order of increasing depth.
+  followUps      String[]
+  /// What a strong answer contains. Grading reference; never shown to candidates.
+  signals        String[]
+  /// Category-specific extras (coding examples, design requirements, ...).
+  details        Json?
+  levels         String[]
+  roles          String[]
+  tags           String[]
+  difficulty     String?
+  status         QuestionStatus    @default(DRAFT)
+  source         QuestionSource    @default(ADMIN)
+  /// Stable key for seeded questions so re-seeding updates instead of duplicating.
+  sourceKey      String?           @unique
+  /// 0 until first published; loops pin a specific version.
+  currentVersion Int               @default(0)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  versions       QuestionVersion[]
+
+  @@index([category, status])
+  @@index([organizationId])
+}
+
+model QuestionVersion {
+  id            String   @id @default(cuid())
+  questionId    String
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version       Int
+  /// Frozen copy of the question as published.
+  snapshot      Json
+  publishedById String?
+  publishedAt   DateTime @default(now())
+
+  @@unique([questionId, version])
+}
+
+// ─── Loop templates ──────────────────────────────────────────────────────────
+// An interview journey: ordered rounds, each a category, a length and either
+// specific questions or "pick N from this pool". Candidates only ever get a
+// published version, which pins question versions.
+
+enum LoopStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model LoopTemplate {
+  id             String                @id @default(cuid())
+  organizationId String?
+  organization   Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?               @db.Text
+  roleTarget     String?
+  level          String?
+  /// Editable rounds, validated by lib/loopTemplates.ts.
+  rounds         Json                  @default("[]")
+  status         LoopStatus            @default(DRAFT)
+  currentVersion Int                   @default(0)
+  /// Bumped on every save and status change. Saves and publishes name the
+  /// revision they started from; a mismatch means someone else changed it.
+  revision       Int                   @default(0)
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  versions       LoopTemplateVersion[]
+  campaigns      Campaign[]
+
+  @@index([organizationId, status])
+}
+
+model LoopTemplateVersion {
+  id             String       @id @default(cuid())
+  loopTemplateId String
+  loopTemplate   LoopTemplate @relation(fields: [loopTemplateId], references: [id], onDelete: Cascade)
+  version        Int
+  /// Frozen loop. Format 2 stores full copies of every fixed question and of
+  /// each pool's eligible questions, so candidates never see later edits.
+  snapshot       Json
+  publishedById  String?
+  publishedAt    DateTime     @default(now())
+
+  @@unique([loopTemplateId, version])
+}
+
+// ─── Campaigns and invites ───────────────────────────────────────────────────
+// A campaign sends one published loop version to a group of candidates. Each
+// invite carries a personal link; only its SHA-256 hash is stored.
+
+enum InviteStatus {
+  PENDING
+  SENT
+  OPENED
+  STARTED
+  COMPLETED
+  FAILED
+  REVOKED
+}
+
+model Campaign {
+  id             String        @id @default(cuid())
+  /// The workspace that owns it. Null only for test campaigns from before workspaces.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  loopTemplateId String
+  loopTemplate   LoopTemplate  @relation(fields: [loopTemplateId], references: [id], onDelete: Restrict)
+  /// The loop version every candidate in this campaign gets.
+  loopVersion    Int
+  name           String
+  /// Optional note from the hiring team, shown in the email and on the landing page.
+  message        String?       @db.Text
+  /// Links stop working after this; null means 14 days after each invite is sent.
+  deadline       DateTime?
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  invites        Invite[]
+
+  @@index([organizationId])
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  campaignId  String
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email       String
+  name        String?
+  /// SHA-256 of the link token; resending rotates it so old links stop working.
+  tokenHash   String?      @unique
+  status      InviteStatus @default(PENDING)
+  sendCount   Int          @default(0)
+  lastError   String?
+  sentAt      DateTime?
+  expiresAt   DateTime?
+  openedAt    DateTime?
+  consentedAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  deliveries  Delivery[]
+  /// Deprecated, no longer written: applicants don't get accounts. Older test
+  /// rows may still hold a user ID; dropped in a later migration.
+  userId      String?
+  run         LoopRun?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
+
+// ─── Loop runs ───────────────────────────────────────────────────────────────
+// One candidate going through a loop from an invite. Each round freezes the
+// exact questions asked, so scoring and review never depend on later edits.
+
+enum DeliveryState {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+/// One email send of an invite (the first send or a resend). Rows are their own
+/// queue: a worker claims QUEUED rows with a lease, sends, and finishes only if
+/// it still holds the claim, so a cancel or a newer claim always wins.
+/// At most one QUEUED/SENDING row per invite (partial unique index in SQL).
+model Delivery {
+  id                String        @id @default(cuid())
+  inviteId          String
+  invite            Invite        @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  state             DeliveryState @default(QUEUED)
+  /// SHA-256 of this delivery's link token. The token is derived from the
+  /// delivery ID, so a retry sends the same link instead of a competing one.
+  tokenHash         String        @unique
+  /// Set on each claim; the final write must match it.
+  claimId           String?
+  claimedAt         DateTime?
+  attempts          Int           @default(0)
+  /// Not before this time (backoff after a failed attempt).
+  runAfter          DateTime      @default(now())
+  lastError         String?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([state, runAfter])
+  @@index([inviteId])
+}
+
+enum LoopRunStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum RoundRunStatus {
+  IN_PROGRESS
+  SCORING
+  COMPLETED
+  /// Every automatic scoring attempt failed; a person can re-score.
+  SCORING_FAILED
+}
+
+enum ScoringStatus {
+  SUCCEEDED
+  /// The grader replied, but the reply failed validation.
+  INVALID
+  /// The model call itself failed.
+  ERROR
+}
+
+/// Append-only record of every grading attempt. The latest SUCCEEDED attempt is
+/// the round's current scorecard (copied onto LoopRoundRun for reading).
+model ScoringAttempt {
+  id         String        @id @default(cuid())
+  roundRunId String
+  roundRun   LoopRoundRun  @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
+  attempt    Int
+  status     ScoringStatus
+  scorecard  Json?
+  score      Int?
+  assessed   Int?
+  total      Int?
+  model      String
+  error      String?       @db.Text
+  createdAt  DateTime      @default(now())
+
+  @@unique([roundRunId, attempt])
+}
+
+enum JobState {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Durable background work (scoring today). Claimed with a lease like
+/// Delivery; at most one QUEUED/RUNNING job per key (partial unique index).
+model Job {
+  id          String    @id @default(cuid())
+  kind        String
+  /// Deduplication key, e.g. "score:<roundRunId>".
+  key         String
+  payload     Json
+  state       JobState  @default(QUEUED)
+  runAfter    DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  claimId     String?
+  claimedAt   DateTime?
+  lastError   String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([state, runAfter])
+  @@index([key])
+}
+
+model LoopRun {
+  id                String         @id @default(cuid())
+  inviteId          String         @unique
+  invite            Invite         @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  /// Deprecated, no longer written (see Invite.userId).
+  userId            String?
+  loopTemplateId    String
+  loopVersion       Int
+  status            LoopRunStatus  @default(IN_PROGRESS)
+  /// 0–100, rounds weighted by length, once every round is scored.
+  overallScore      Int?
+  /// Coverage behind overallScore, e.g. 4 of 5 questions assessed.
+  assessedQuestions Int?
+  totalQuestions    Int?
+  startedAt         DateTime       @default(now())
+  completedAt       DateTime?
+  rounds            LoopRoundRun[]
+}
+
+model LoopRoundRun {
+  id           String           @id @default(cuid())
+  runId        String
+  run          LoopRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  roundIndex   Int
+  roundId      String
+  category     QuestionCategory
+  /// Frozen questions: [{ questionId, version, title, prompt, followUps, signals }]
+  questions    Json
+  status       RoundRunStatus   @default(IN_PROGRESS)
+  startedAt    DateTime         @default(now())
+  /// Hard stop, set by the server when the round starts. After it, answers are
+  /// refused and the round is finished and scored.
+  deadlineAt   DateTime?
+  completedAt  DateTime?
+  /// The candidate's unsent answer, saved as they type.
+  draft        String?          @db.Text
+  draftSavedAt DateTime?
+  /// Current scorecard: a copy of the latest SUCCEEDED ScoringAttempt.
+  scorecard    Json?
+  score        Int?
+  messages     LoopMessage[]
+  attempts     ScoringAttempt[]
+
+  @@unique([runId, roundIndex])
+}
+
+model LoopMessage {
+  id           String       @id @default(cuid())
+  roundRunId   String
+  roundRun     LoopRoundRun @relation(fields: [roundRunId], references: [id], onDelete: Cascade)
+  /// "interviewer" or "candidate"
+  role         String
+  content      String       @db.Text
+  /// Candidate messages: an ID the browser makes per answer, so a retry or a
+  /// double click stores the answer once.
+  clientTurnId String?
+  /// Interviewer messages: the candidate message this replies to. One reply per answer.
+  replyToId    String?      @unique
+  /// The interviewer closed the round with this reply.
+  endsRound    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  @@unique([roundRunId, clientTurnId])
+  @@index([roundRunId, createdAt])
 }

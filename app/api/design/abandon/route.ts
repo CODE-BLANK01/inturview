@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { captureProductEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,5 +28,11 @@ export async function POST(req: NextRequest) {
     data: { status: "ABANDONED", completedAt: new Date() },
   });
 
+  if (result.count > 0) {
+    await captureProductEvent(user.id, {
+      event: "session_abandoned",
+      properties: { mode: "system_design", session_id: parsed.session_id },
+    });
+  }
   return Response.json({ ok: true, updated: result.count });
 }

@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { TopNav } from "@/components/TopNav";
+import { PracticeWorkspace } from "@/components/dashboard/PracticeWorkspace";
 import { ConversationDebriefView } from "@/components/conversation/ConversationDebriefView";
 import { TopicBadge } from "@/components/Badges";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { ConversationDebrief } from "@/lib/conversationTypes";
-import { LEVEL_LABELS, TRACK_LABELS, type FaceToFacePlan } from "@/lib/faceToFaceQuestions";
+import { DebriefViewed } from "@/components/analytics/TrackOnMount";
+import {
+  LEVEL_LABELS,
+  TRACK_LABELS,
+  type FaceToFacePlan,
+} from "@/lib/faceToFaceQuestions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +47,8 @@ export default async function ConversationHistoryPage({
 
   if (!session) notFound();
 
-  const debrief = session.debrief?.payload as unknown as ConversationDebrief | null;
+  const debrief = session.debrief
+    ?.payload as unknown as ConversationDebrief | null;
   const plan = session.plan as unknown as FaceToFacePlan | null;
   const kindLabel =
     session.kind === "BEHAVIORAL"
@@ -52,13 +58,13 @@ export default async function ConversationHistoryPage({
         : "Recruiter screen";
   const title =
     session.kind === "BEHAVIORAL"
-      ? session.scenario?.title ?? "Behavioral"
+      ? (session.scenario?.title ?? "Behavioral")
       : session.kind === "FACE_TO_FACE"
         ? "Face-to-face technical round"
         : "Recruiter screen";
   const subtitle =
     session.kind === "BEHAVIORAL"
-      ? session.scenario?.category ?? "Behavioral"
+      ? (session.scenario?.category ?? "Behavioral")
       : session.kind === "FACE_TO_FACE"
         ? plan
           ? `${TRACK_LABELS[plan.track]} · ${LEVEL_LABELS[plan.level]}`
@@ -66,15 +72,14 @@ export default async function ConversationHistoryPage({
         : "25-min initial phone screen";
   const prompt =
     session.kind === "BEHAVIORAL"
-      ? session.scenario?.prompt ?? ""
+      ? (session.scenario?.prompt ?? "")
       : session.kind === "FACE_TO_FACE"
         ? "A live, spoken technical interview over video."
         : "A recruiter is calling for an initial phone screen.";
 
   return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+    <PracticeWorkspace user={user}>
+      <div className="workspace-page w-full space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <Link
             href="/history"
@@ -98,22 +103,29 @@ export default async function ConversationHistoryPage({
               className="badge"
               style={{
                 background: "rgb(var(--bg-inset))",
-                color: "rgb(var(--text-muted))",
+                color: "rgb(var(--text-secondary))",
                 borderColor: "rgb(var(--border-base))",
               }}
             >
               {kindLabel}
             </span>
           </div>
-          <p className="text-sm text-text-muted whitespace-pre-wrap">{prompt}</p>
+          <p className="text-sm text-text-muted whitespace-pre-wrap">
+            {prompt}
+          </p>
         </header>
 
         {debrief && (
-          <ConversationDebriefView debrief={debrief} kind={session.kind} />
+          <>
+            <DebriefViewed mode={session.kind.toLowerCase()} sessionId={session.id} />
+            <ConversationDebriefView debrief={debrief} kind={session.kind} />
+          </>
         )}
 
         <section className="panel p-5">
-          <h2 className="text-sm uppercase tracking-wide text-text-dim mb-3">Transcript</h2>
+          <h2 className="text-sm uppercase tracking-wide text-text-dim mb-3">
+            Transcript
+          </h2>
           <ul className="space-y-3">
             {session.messages.map((m, i) => (
               <li key={i} className="text-sm">
@@ -125,7 +137,7 @@ export default async function ConversationHistoryPage({
             ))}
           </ul>
         </section>
-      </main>
-    </>
+      </div>
+    </PracticeWorkspace>
   );
 }

@@ -18,6 +18,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useTypewriter } from "@/lib/useTypewriter";
 import { streamInterviewMessage } from "@/lib/stream";
 import type { ChatMessage, Debrief, Phase, Problem } from "@/lib/types";
+import { trackPhaseAdvance } from "@/lib/trackPhaseAdvance";
 
 type DebriefState =
   | { status: "idle" }
@@ -52,18 +53,8 @@ export function InterviewSession({ problem }: { problem: Problem }) {
   const [followUpStreaming, setFollowUpStreaming] = useState(false);
   const followUpWriter = useTypewriter(45);
 
-  // Authoritative "interview started at" timestamp. Initialized to 0 so SSR
-  // and first client render agree (hydration-safe); replaced with the row's
-  // actual startedAt as soon as /api/interview/start resolves. The timer
-  // isn't visible until interviewId is set anyway — see the `!interviewId`
-  // loader branch below.
-  const [startedAt, setStartedAt] = useState<number>(0);
-
-  // Session controls (client-only — pause is a UI freeze, not a persisted state).
-  // When paused, we shift `startedAt` forward by the paused duration on resume
-  // so the timer doesn't snap to include the paused time.
+  const [timerResumed, setTimerResumed] = useState(false);
   const [paused, setPaused] = useState(false);
-  const pausedAtRef = useRef<number | null>(null);
   const [endDialogOpen, setEndDialogOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -72,16 +63,10 @@ export function InterviewSession({ problem }: { problem: Problem }) {
 
   const pauseSession = useCallback(() => {
     if (phase === "debrief") return;
-    pausedAtRef.current = Date.now();
     setPaused(true);
   }, [phase]);
 
   const resumeSession = useCallback(() => {
-    if (pausedAtRef.current !== null) {
-      const pausedDuration = Date.now() - pausedAtRef.current;
-      pausedAtRef.current = null;
-      setStartedAt((prev) => prev + pausedDuration);
-    }
     setPaused(false);
   }, []);
 
@@ -136,10 +121,7 @@ export function InterviewSession({ problem }: { problem: Problem }) {
         };
         if (cancelled) return;
 
-        // Authoritative timestamp — both fresh and resumed paths set this so
-        // the Timer reflects total elapsed time across reopens.
-        const persistedStart = new Date(data.startedAt).getTime();
-        if (Number.isFinite(persistedStart)) setStartedAt(persistedStart);
+        setTimerResumed(data.resumed);
 
         if (!data.resumed) {
           // Fresh interview — set id, kick off the approach.
@@ -158,7 +140,6 @@ export function InterviewSession({ problem }: { problem: Problem }) {
           interview: {
             language: string;
             code: string;
-            startedAt: string;
             approachAcceptedAt: string | null;
             messages: { phase: string; role: "user" | "assistant"; content: string }[];
           };
@@ -166,8 +147,6 @@ export function InterviewSession({ problem }: { problem: Problem }) {
         if (cancelled) return;
 
         const iv = detailJson.interview;
-        const ivStart = new Date(iv.startedAt).getTime();
-        if (Number.isFinite(ivStart)) setStartedAt(ivStart);
         const approachMsgs: ChatMessage[] = iv.messages
           .filter((m) => m.phase === "approach")
           .map((m) => ({ role: m.role, content: m.content }));
@@ -458,7 +437,11 @@ export function InterviewSession({ problem }: { problem: Problem }) {
             <span className="text-sm text-text-muted">{problem.title}</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <Timer startedAt={startedAt} paused={phase === "debrief" || paused} />
+            <Timer
+              sessionId={interviewId}
+              resumed={timerResumed}
+              paused={phase === "debrief" || paused}
+            />
             <PhaseIndicator current={phase} />
             {phase !== "debrief" && (
               <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
@@ -505,7 +488,10 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                 ready={approachReady}
                 disabled={approachStreaming}
                 followups={aiTurnsInApproach}
-                onStartCoding={() => setPhase("code")}
+                onStartCoding={() => {
+                  if (interviewId) trackPhaseAdvance("coding", interviewId);
+                  setPhase("code");
+                }}
                 onSkipAhead={() => {
                   // Persist behavioral flag, then advance.
                   if (interviewId) {
@@ -518,6 +504,7 @@ export function InterviewSession({ problem }: { problem: Problem }) {
                       /* non-fatal — the debrief route will still see approachAcceptedAt is null */
                     });
                   }
+                  if (interviewId) trackPhaseAdvance("coding", interviewId);
                   setPhase("code");
                 }}
                 onKeepDiscussing={() => approachInputRef.current?.focus()}

@@ -8,6 +8,7 @@ If anything here is wrong or out of date, fix it in your PR.
 
 ## Table of contents
 
+1. [How we work](#how-we-work)
 1. [Local development setup](#local-development-setup)
 2. [Repository layout](#repository-layout)
 3. [Architecture overview](#architecture-overview)
@@ -19,6 +20,34 @@ If anything here is wrong or out of date, fix it in your PR.
 9. [Testing, typecheck, build](#testing-typecheck-build)
 10. [Pull request checklist](#pull-request-checklist)
 11. [Common pitfalls](#common-pitfalls)
+
+---
+
+## How we work
+
+Two of us, no standing meetings. Pull requests carry the conversation; CI and a
+weekly Discord digest carry the status. The full reasoning is in
+[docs/decisions/001](docs/decisions/001-pull-requests-on-the-free-plan.md).
+
+1. **Start from an issue.** Features say the problem, who it's for and when it's
+   done. Bugs say how to reproduce.
+2. **Branch off `dev`:** `feat/short-name` or `fix/short-name`. Keep it small.
+3. **Open a pull request into `dev`** and fill in the template. Link the issue
+   with `Closes #N`.
+4. **CI must be green.** Typecheck, lint, env check, tests, build, realtime
+   service, secret scan, and the schema guard when the schema changes.
+5. **Risky paths need the other person's approval:** schema, `lib/plans.ts`,
+   auth, billing, `.env*.example` and CI. The **Risky paths reviewed** check
+   requests the review and stays red until it's approved. Everything else you
+   merge yourself.
+6. **Release** by opening a pull request from `dev` into `main`.
+
+Direct pushes to `main` and `dev` are blocked by `.githooks/pre-push`, which
+`npm install` turns on. In a real emergency: `ALLOW_DIRECT_PUSH=1 git push`.
+It still pings Discord.
+
+When you make a decision the code doesn't explain, add a short record in
+`docs/decisions/` (copy `000-template.md`).
 
 ---
 
@@ -68,7 +97,9 @@ Sign up at `/signup` with the email you put in `ADMIN_EMAILS`. You'll land on `/
 | `npm run build`     | Production build                                                         |
 | `npm start`         | Serve the production build                                               |
 | `npm run typecheck` | `tsc --noEmit` — TypeScript strict mode, must pass                       |
-| `npm run lint`      | Next's ESLint                                                            |
+| `npm run lint`      | Next's ESLint, zero warnings allowed                                     |
+| `npm run check:env` | Fails if code reads an env var missing from an `.env*.example` file      |
+| `npm run test:unit` | Unit tests in `tests/`                                                   |
 | `npm run db:push`   | Sync Prisma schema → DB (no migration files; fine for dev / solo work)   |
 | `npm run db:migrate`| Generate a versioned migration (use for shared / prod environments)      |
 | `npm run db:seed`   | Re-seed problems (idempotent upsert)                                     |
@@ -230,7 +261,7 @@ If the user clicks "Skip ahead anyway" before `[READY]`, the client POSTs `/api/
 - **`db:push`** — for local dev and solo iteration. Syncs the schema directly, doesn't create migration files.
 - **`db:migrate`** — for shared environments. Generates a versioned migration in `prisma/migrations/` that's committed and applied via `prisma migrate deploy` in CI/prod.
 
-For the current project, `db:push` is fine until we have multiple devs writing to the same prod DB.
+**We now share a database, so never run `db:push` against a database someone else uses.** It syncs from *your* branch's schema and will drop columns that exist only on a teammate's branch. Schema changes go through a pull request, where the schema guard posts the exact SQL and blocks anything destructive.
 
 ### Adding a new model
 

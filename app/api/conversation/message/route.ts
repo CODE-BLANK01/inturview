@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { getAnthropic, MODEL } from "@/lib/anthropic";
+import { trackClaudeUsage, type ClaudeUsage } from "@/lib/aiCost";
+import { captureProductEvent, type Category } from "@/lib/analytics";
+import { cachedInterviewPrompt, getAnthropic, logCacheUsage, MODEL } from "@/lib/anthropic";
 import {
   behavioralSystemPrompt,
   recruiterScreenSystemPrompt,
@@ -187,24 +189,35 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const upstream = await anthropic.messages.stream(
+        const upstream = await anthropic.beta.promptCaching.messages.stream(
           {
             model: MODEL,
             max_tokens: 500,
-            system,
-            messages: messagesForModel,
+            ...cachedInterviewPrompt(system, messagesForModel),
           },
           { signal: abortController.signal }
         );
 
+        const turnUsage: ClaudeUsage = {};
         for await (const event of upstream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          if (event.type === "message_start") {
+            logCacheUsage(`${session.kind.toLowerCase()}/${parsed.mode}`, event.message.usage);
+            Object.assign(turnUsage, event.message.usage);
+          } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             const text = event.delta.text;
             assistantBuffer += text;
             controller.enqueue(sseEncode("delta", JSON.stringify({ text })));
+          } else if (event.type === "message_delta") {
+            turnUsage.output_tokens = event.usage.output_tokens;
           } else if (event.type === "message_stop") {
             controller.enqueue(sseEncode("done", "{}"));
           }
+        }
+        // The reply finished: record its cost, and count debrief follow-up questions.
+        const category: Category = session.kind.toLowerCase() as Category;
+        await trackClaudeUsage(user.id, { category, sessionId: session.id, model: MODEL, purpose: "interview_turn", usage: turnUsage });
+        if (parsed.mode === "followup") {
+          await captureProductEvent(user.id, { event: "followup_asked", properties: { mode: category, session_id: session.id } });
         }
       } catch (err) {
         const isAbort =

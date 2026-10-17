@@ -22,13 +22,22 @@ import { ConversationDebriefView } from "./conversation/ConversationDebriefView"
 import { EndConversationDialog } from "./conversation/EndConversationDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { useTypewriter } from "@/lib/useTypewriter";
+import {
+  connectAvatar,
+  type AvatarHandle,
+  type AvatarSession,
+  type AvatarState,
+} from "@/lib/avatarClient";
+import { FACE_TO_FACE_AVATAR_ENABLED } from "@/lib/features";
 import { streamConversationMessage } from "@/lib/stream";
 import {
   connectRealtime,
   type RealtimeHandle,
   type RealtimeStatus,
+  type RelayTransport,
   type UserTurn,
 } from "@/lib/realtimeClient";
+import { PcmPlayer } from "@/lib/pcmAudio";
 import {
   BodyLanguageTracker,
   type BodyCalibration,
@@ -44,6 +53,7 @@ import {
 } from "@/lib/faceToFaceQuestions";
 import type { ChatMessage } from "@/lib/types";
 import type { ConversationDebrief } from "@/lib/conversationTypes";
+import { track as trackEvent } from "@/lib/track";
 
 type Phase = "setup" | "starting" | "live" | "debrief";
 
@@ -181,13 +191,35 @@ interface RealtimeSessionResponse {
 
 const SOCKET_RECONNECT_ATTEMPTS = 5;
 
-export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; backLabel: string }) {
+export interface FaceToFaceUsage {
+  used: number;
+  /** null = unlimited on this plan. */
+  cap: number | null;
+  planName: string;
+  /** At the cap with no resumable session: starting would be refused. */
+  limitReached: boolean;
+  /** ISO date the monthly count resets. */
+  resetsOn: string;
+}
+
+export function FaceToFaceSession({
+  backHref,
+  backLabel,
+  usage,
+}: {
+  backHref: string;
+  backLabel: string;
+  usage: FaceToFaceUsage;
+}) {
   const media = useLocalMedia();
 
   const [phase, setPhase] = useState<Phase>("setup");
   const [track, setTrack] = useState<FaceToFaceTrack>("backend");
   const [level, setLevel] = useState<FaceToFaceLevel>("mid");
   const [startError, setStartError] = useState<string | null>(null);
+  // Starts true when the page loaded at the cap; flips true if the start
+  // route refuses on the cap (e.g. a session started in another tab).
+  const [limitReached, setLimitReached] = useState(usage.limitReached);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
@@ -206,6 +238,19 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const realtimeRef = useRef<RealtimeHandle | null>(null);
+  // Optional interviewer face. "off" = voice-only from the start; "ended" =
+  // it dropped mid-interview and the interview carried on voice-only.
+  const [avatarMode, setAvatarMode] = useState<"off" | "live" | "ended">("off");
+  const [avatarState, setAvatarState] = useState<AvatarState>("idle");
+  const avatarRef = useRef<AvatarHandle | null>(null);
+  const avatarStopRef = useRef<(() => void) | null>(null);
+  const avatarAudioRef = useRef<HTMLAudioElement>(null);
+  const attachAvatarVideo = useCallback(
+    (el: HTMLVideoElement | null) => avatarRef.current?.attachVideo(el),
+    []
+  );
+  // Avatar interviews only: plays the interviewer's voice if the face drops.
+  const playerRef = useRef<PcmPlayer | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pendingAcksRef = useRef(0);
   const timersRef = useRef<number[]>([]);
@@ -291,12 +336,23 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
     timersRef.current = [];
   }, []);
 
+  // Closes the face, stops LiveAvatar billing and the fallback player.
+  const stopAvatar = useCallback(() => {
+    avatarRef.current?.close();
+    avatarRef.current = null;
+    avatarStopRef.current?.();
+    avatarStopRef.current = null;
+    playerRef.current?.close();
+    playerRef.current = null;
+  }, []);
+
   const teardownLive = useCallback(() => {
     clearTimers();
     realtimeRef.current?.disconnect();
     realtimeRef.current = null;
+    stopAvatar();
     closeSocket();
-  }, [clearTimers, closeSocket]);
+  }, [clearTimers, closeSocket, stopAvatar]);
 
   useEffect(
     () => () => {
@@ -377,10 +433,61 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
     );
   };
 
+  // Never throws: any avatar problem just means a voice-only interview.
+  const startAvatar = async (id: string, token: string, avatarAudioEl: HTMLAudioElement) => {
+    try {
+      const res = await fetch(`${REALTIME_BASE}/sessions/${id}/avatar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Avatar unavailable (${res.status})`);
+      const avatar = (await res.json()) as AvatarSession;
+      avatarStopRef.current = () => {
+        fetch(`${REALTIME_BASE}/sessions/${id}/avatar/stop`, {
+          method: "POST",
+          keepalive: true,
+          headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ avatar_session_id: avatar.avatar_session_id }),
+        }).catch(() => {});
+      };
+      avatarRef.current = await connectAvatar(avatar, avatarAudioEl, {
+        onState: (state) => {
+          setAvatarState(state);
+          // The face's voice is what the candidate hears, so its talking state
+          // drives barge-in and the mic gate.
+          realtimeRef.current?.setInterviewerSpeaking(state === "talking");
+        },
+        onEnded: (reason) => {
+          if (reason === "closed") return;
+          console.warn("[face-to-face] avatar ended, continuing voice-only:", reason);
+          trackEvent({ event: "avatar_fallback", properties: { session_id: id, reason: "ended" } });
+          // From here on the relay's audio goes to the fallback player.
+          avatarRef.current = null;
+          avatarStopRef.current?.();
+          avatarStopRef.current = null;
+          realtimeRef.current?.setInterviewerSpeaking(false);
+          setAvatarMode("ended");
+        },
+      });
+      setAvatarMode("live");
+      trackEvent({ event: "avatar_connected", properties: { session_id: id } });
+    } catch (err) {
+      console.warn("[face-to-face] avatar unavailable, running voice-only:", err);
+      trackEvent({ event: "avatar_fallback", properties: { session_id: id, reason: "unavailable" } });
+      avatarRef.current = null;
+      avatarStopRef.current?.();
+      avatarStopRef.current = null;
+      setAvatarMode("off");
+    }
+  };
+
   const startInterview = async () => {
-    if (media.state.status !== "ready" || !audioRef.current) return;
+    const audioEl = audioRef.current;
+    if (media.state.status !== "ready" || !audioEl) return;
     setStartError(null);
     setPhase("starting");
+    setAvatarMode("off");
+    setAvatarState("idle");
 
     try {
       const startRes = await fetch("/api/face-to-face/start", {
@@ -390,6 +497,7 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
       });
       if (!startRes.ok) {
         const j = await startRes.json().catch(() => ({}));
+        if (j.code === "PLAN_LIMIT_REACHED") setLimitReached(true);
         throw new Error(j.error || `Could not start session (${startRes.status})`);
       }
       const start = (await startRes.json()) as StartResponse;
@@ -423,12 +531,39 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
       pendingAcksRef.current = 0;
       wsRef.current = await connectSocket(start.id, start.token);
 
+      if (FACE_TO_FACE_AVATAR_ENABLED && avatarAudioRef.current) {
+        await startAvatar(start.id, start.token, avatarAudioRef.current);
+      }
+
+      // With the face live, talk to OpenAI through the service's WebSocket
+      // relay: the interviewer's voice arrives as raw PCM that goes straight
+      // to the avatar (or to the fallback player if the face drops).
+      let relay: RelayTransport | undefined;
+      if (avatarRef.current) {
+        const player = new PcmPlayer((playing) => {
+          if (!avatarRef.current) realtimeRef.current?.setInterviewerSpeaking(playing);
+        });
+        playerRef.current = player;
+        relay = {
+          url: `${REALTIME_BASE.replace(/^http/, "ws")}/sessions/${start.id}/voice?token=${encodeURIComponent(start.token)}`,
+          sink: {
+            write: (pcm) => (avatarRef.current ? avatarRef.current.pushAudio(pcm) : player.write(pcm)),
+            end: () => avatarRef.current?.endAudio(),
+            clear: () => {
+              avatarRef.current?.interrupt();
+              player.clear();
+            },
+          },
+        };
+      }
+
       realtimeRef.current = await connectRealtime({
         clientSecret: rt.client_secret,
         micStream: media.state.stream,
-        audioEl: audioRef.current,
+        audioEl,
+        relay,
         openingInstruction: start.resumed
-          ? "The session is resuming after an interruption. Briefly welcome the candidate back and continue from where the transcript left off."
+          ? "Speak only in English. The session is resuming after an interruption. Briefly welcome the candidate back and continue from where the transcript left off."
           : undefined,
         callbacks: {
           onStatus: setLinkStatus,
@@ -495,6 +630,7 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
     // while the socket is up and the body tracker is still alive.
     realtimeRef.current?.disconnect();
     realtimeRef.current = null;
+    stopAvatar();
 
     const deadline = Date.now() + 3000;
     while (pendingAcksRef.current > 0 && wsRef.current && Date.now() < deadline) {
@@ -576,6 +712,7 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
     <>
       <TopNav />
       <audio ref={audioRef} autoPlay hidden />
+      <audio ref={avatarAudioRef} autoPlay hidden />
       <main className="mx-auto max-w-6xl px-4 py-6">
         <div className="mb-5 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -619,6 +756,8 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
             onLevel={setLevel}
             starting={phase === "starting"}
             error={startError}
+            usage={usage}
+            limitReached={limitReached}
             onStart={startInterview}
             bodyState={bodyState}
             onCalibrate={calibrateBody}
@@ -638,6 +777,11 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
                 Time&apos;s up — the interviewer is wrapping. Click Finish when they&apos;re done.
               </div>
             )}
+            {avatarMode === "ended" && (
+              <div className="rounded-md border border-border bg-bg-inset text-text-muted text-sm px-3 py-2">
+                The interviewer&apos;s video ended, so the rest of the interview is voice-only.
+              </div>
+            )}
             <LiveView
               stream={media.state.stream}
               micMuted={media.micMuted}
@@ -648,6 +792,9 @@ export function FaceToFaceSession({ backHref, backLabel }: { backHref: string; b
               linkStatus={linkStatus}
               transcript={transcript}
               interviewerLive={interviewerLive}
+              avatarLive={avatarMode === "live"}
+              avatarState={avatarState}
+              onAvatarVideo={attachAvatarVideo}
             />
             <div className="flex justify-end">
               <button
@@ -731,6 +878,8 @@ function SetupView({
   onLevel,
   starting,
   error,
+  usage,
+  limitReached,
   onStart,
   bodyState,
   onCalibrate,
@@ -743,6 +892,8 @@ function SetupView({
   onLevel: (l: FaceToFaceLevel) => void;
   starting: boolean;
   error: string | null;
+  usage: FaceToFaceUsage;
+  limitReached: boolean;
   onStart: () => void;
   bodyState: BodyState;
   onCalibrate: () => void;
@@ -760,10 +911,22 @@ function SetupView({
       ? "Calibrate body language first (two seconds)"
       : "Start the interview";
 
+  const resetsOn = new Date(usage.resetsOn).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
   return (
     <div className="space-y-4">
       <section className="panel p-5">
-        <div className="text-xs text-text-dim mb-2">Live technical round · ~20 minutes</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs text-text-dim">
+          <span>Live technical round · ~20 minutes</span>
+          <span>
+            <span className="tabular-nums">{usage.used}</span>
+            {usage.cap === null ? " · unlimited" : ` / ${usage.cap}`} this month
+          </span>
+        </div>
         <h1 className="text-xl font-semibold">Face-to-face interview</h1>
         <p className="mt-3 text-sm text-text-muted">
           A live technical interview over video. The interviewer asks about your stack, digs
@@ -774,6 +937,25 @@ function SetupView({
         </p>
       </section>
 
+      {limitReached ? (
+        <section className="panel border-hard/40 p-6 flex flex-col items-center text-center gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-hard/40 bg-hard-bg/30 text-hard">
+            <AlertTriangle className="h-5 w-5" />
+          </span>
+          <h2 className="text-lg font-semibold">Monthly limit reached</h2>
+          <p className="text-sm text-text-muted max-w-md">
+            You&apos;ve used all {usage.cap} face-to-face interviews on the {usage.planName}{" "}
+            plan this month. Your count resets on {resetsOn}.
+          </p>
+          <p className="text-sm text-text-muted max-w-md">
+            You can keep practicing in the other modes in the meantime.
+          </p>
+          <Link href="/dashboard" className="btn btn-primary mt-1">
+            Back to dashboard
+          </Link>
+        </section>
+      ) : (
+      <>
       {error && (
         <div className="rounded-md border border-hard/40 bg-hard-bg/30 text-hard text-sm px-3 py-2">
           {error}
@@ -935,9 +1117,17 @@ function SetupView({
                 </>
               )}
             </button>
+            {/* Repeated by the button: the top banner is often scrolled out of view. */}
+            {error && (
+              <p role="alert" className="mt-2 text-sm text-hard">
+                {error}
+              </p>
+            )}
           </div>
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -1008,6 +1198,9 @@ function LiveView({
   linkStatus,
   transcript,
   interviewerLive,
+  avatarLive,
+  avatarState,
+  onAvatarVideo,
 }: {
   stream: MediaStream;
   micMuted: boolean;
@@ -1018,15 +1211,38 @@ function LiveView({
   linkStatus: RealtimeStatus;
   transcript: TranscriptEntry[];
   interviewerLive: string;
+  avatarLive: boolean;
+  avatarState: AvatarState;
+  onAvatarVideo: (el: HTMLVideoElement | null) => void;
 }) {
+  // With the face live, the tile follows what the face is doing (its voice
+  // lags OpenAI's by the render delay).
+  const tileStatus: RealtimeStatus = !avatarLive
+    ? linkStatus
+    : avatarState === "talking"
+      ? "speaking"
+      : linkStatus === "connecting" || linkStatus === "disconnected"
+        ? linkStatus
+        : "listening";
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-4">
       <section className="panel p-3 flex flex-col gap-3">
         <div className="relative">
-          <SelfView stream={stream} cameraOff={cameraOff} className="aspect-video w-full" />
-          <InterviewerTile status={linkStatus} />
+          {avatarLive ? (
+            <>
+              <AvatarView onVideo={onAvatarVideo} />
+              <div className="absolute bottom-3 right-3 w-1/4 min-w-[120px] rounded-lg shadow-lg ring-1 ring-white/20">
+                <SelfView stream={stream} cameraOff={cameraOff} className="aspect-video w-full" />
+              </div>
+            </>
+          ) : (
+            <SelfView stream={stream} cameraOff={cameraOff} className="aspect-video w-full" />
+          )}
+          <InterviewerTile status={tileStatus} />
           {micMuted && (
-            <span className="absolute bottom-3 right-3 badge border-hard/40 bg-hard-bg/80 text-hard">
+            <span
+              className={`absolute bottom-3 ${avatarLive ? "left-3" : "right-3"} badge border-hard/40 bg-hard-bg/80 text-hard`}
+            >
               <MicOff className="h-3 w-3 mr-1" />
               Muted
             </span>
@@ -1063,6 +1279,21 @@ function LiveView({
       </section>
 
       <TranscriptPanel entries={transcript} interviewerLive={interviewerLive} />
+    </div>
+  );
+}
+
+function AvatarView({ onVideo }: { onVideo: (el: HTMLVideoElement | null) => void }) {
+  return (
+    <div
+      className="relative aspect-video w-full overflow-hidden rounded-lg"
+      style={{ background: "rgb(14 12 10)" }}
+    >
+      {/* The face's voice plays through a separate element; this only shows video. */}
+      <video ref={onVideo} autoPlay playsInline muted className="h-full w-full object-cover" />
+      <span className="absolute top-3 right-3 badge border-border bg-bg/80 text-text-muted">
+        AI interviewer
+      </span>
     </div>
   );
 }

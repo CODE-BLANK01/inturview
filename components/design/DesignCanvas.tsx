@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 import "@excalidraw/excalidraw/index.css";
 
 // Excalidraw is a heavy client-only component — dynamic import with SSR off.
 // We import the named `Excalidraw` export.
 const Excalidraw = dynamic(
   async () => (await import("@excalidraw/excalidraw")).Excalidraw,
-  { ssr: false, loading: () => <CanvasSkeleton /> }
+  { ssr: false, loading: () => <CanvasSkeleton /> },
 );
 
 type ExcalidrawElement = unknown;
@@ -17,10 +18,14 @@ type Files = Record<string, unknown>;
 
 interface DesignCanvasProps {
   /** Persisted scene from the DB. Null on fresh session. */
-  initialScene?: { elements?: ExcalidrawElement[]; appState?: AppState; files?: Files } | null;
+  initialScene?: {
+    elements?: ExcalidrawElement[];
+    appState?: AppState;
+    files?: Files;
+  } | null;
   /** Read-only mode — e.g. post-debrief or completed session. */
   readOnly?: boolean;
-  /** Theme override; defaults to light to match Parchment. */
+  /** Optional override; otherwise follows the app's selected theme. */
   theme?: "light" | "dark";
   /** Called whenever the scene changes. Caller is responsible for debouncing
    *  before hitting the network (we already debounce 1.2s internally). */
@@ -42,15 +47,16 @@ function CanvasSkeleton() {
 export function DesignCanvas({
   initialScene,
   readOnly,
-  theme = "light",
+  theme,
   onSceneChange,
 }: DesignCanvasProps) {
+  const { theme: appTheme } = useTheme();
   // Debounce scene-change emits so we don't hammer the parent (and through it,
   // the network) on every cursor wiggle. 1.2s after the last edit.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestRef = useRef<Parameters<NonNullable<DesignCanvasProps["onSceneChange"]>>[0] | null>(
-    null
-  );
+  const latestRef = useRef<
+    Parameters<NonNullable<DesignCanvasProps["onSceneChange"]>>[0] | null
+  >(null);
 
   useEffect(() => {
     return () => {
@@ -76,7 +82,7 @@ export function DesignCanvas({
       <Excalidraw
         initialData={initialData as never}
         viewModeEnabled={readOnly}
-        theme={theme}
+        theme={theme ?? appTheme}
         onChange={(elements, appState, files) => {
           latestRef.current = {
             elements,

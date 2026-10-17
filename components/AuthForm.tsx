@@ -5,6 +5,8 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { track } from "@/lib/track";
+import { afterVerify, safeNext } from "@/lib/nextPath";
 
 type Mode = "signin" | "signup";
 
@@ -15,10 +17,23 @@ export function AuthForm({ mode }: { mode: Mode }) {
   // honor an explicit callbackUrl (e.g. from a deep link) or get sent to
   // /dashboard — server-side gates re-route them to /verify-email or
   // /onboarding as needed.
+  const intended = safeNext(params.get("callbackUrl"));
+  // New accounts verify their email first; the intended page rides along so
+  // an invited teammate lands back on their invitation, not practice onboarding.
+  const afterSignup = afterVerify(intended);
   const callbackUrl =
-    params.get("callbackUrl") ||
-    (mode === "signup" ? "/verify-email" : "/dashboard");
-  const [email, setEmail] = useState("");
+    mode === "signup"
+      ? `/verify-email${afterSignup ? `?next=${encodeURIComponent(afterSignup)}` : ""}`
+      : intended || "/dashboard";
+  const [email, setEmail] = useState(() => params.get("email")?.slice(0, 200) ?? "");
+  // Switching between sign in and sign up keeps the destination and email.
+  const carry = (path: string) => {
+    const q = new URLSearchParams();
+    if (intended) q.set("callbackUrl", intended);
+    if (email.trim()) q.set("email", email.trim());
+    const s = q.toString();
+    return s ? `${path}?${s}` : path;
+  };
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [needsSecondFactor, setNeedsSecondFactor] = useState(false);
@@ -33,6 +48,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setError(null);
     try {
       if (mode === "signup") {
+        track({ event: "signup_started" });
         const res = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -40,6 +56,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             email: email.trim(),
             password,
             name: name.trim() || undefined,
+            next: afterSignup ?? undefined,
           }),
         });
         if (!res.ok) {
@@ -77,7 +94,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
         if (result.error.startsWith(TOTP_INVALID_PREFIX)) {
           setNeedsSecondFactor(true);
           setSecondFactorReady(false);
-          throw new Error(result.error.slice(TOTP_INVALID_PREFIX.length).trim());
+          throw new Error(
+            result.error.slice(TOTP_INVALID_PREFIX.length).trim(),
+          );
         }
         throw new Error("Invalid email or password.");
       }
@@ -96,14 +115,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
       ? reason === "password-changed"
         ? "Password updated. Sign in again with your new password."
         : reason === "revoked"
-        ? "Signed out of every device. Sign in to start a fresh session."
-        : null
+          ? "Signed out of every device. Sign in to start a fresh session."
+          : null
       : null;
 
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="panel p-7">
-        <h1 className="text-2xl font-semibold mb-1">
+        <h1 className="t-section-headline text-2xl mb-1">
           {mode === "signin" ? "Welcome back" : "Create your account"}
         </h1>
         <p className="text-sm text-text-muted mb-6">
@@ -172,8 +191,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 setNeedsSecondFactor(false);
                 setSecondFactorReady(false);
               }}
-              placeholder={mode === "signin" ? "Your password" : "Min. 10 characters"}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              placeholder={
+                mode === "signin" ? "Your password" : "Min. 10 characters"
+              }
+              autoComplete={
+                mode === "signin" ? "current-password" : "new-password"
+              }
               disabled={needsSecondFactor}
             />
           </label>
@@ -218,8 +241,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
             {needsSecondFactor
               ? "Verify code"
               : mode === "signin"
-              ? "Sign in"
-              : "Create account"}
+                ? "Sign in"
+                : "Create account"}
           </button>
         </form>
 
@@ -227,14 +250,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
           {mode === "signin" ? (
             <>
               No account yet?{" "}
-              <Link href="/signup" className="text-accent hover:underline">
+              <Link
+                href={carry("/signup")}
+                className="text-accent underline underline-offset-4"
+              >
                 Sign up
               </Link>
             </>
           ) : (
             <>
               Already have an account?{" "}
-              <Link href="/signin" className="text-accent hover:underline">
+              <Link
+                href={carry("/signin")}
+                className="text-accent underline underline-offset-4"
+              >
                 Sign in
               </Link>
             </>

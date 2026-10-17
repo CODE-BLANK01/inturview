@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { Brand } from "@/components/Brand";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
   Database,
+  Library,
+  Route,
+  Send,
   Activity,
   ScrollText,
   ArrowUpLeft,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 
 interface AdminShellProps {
@@ -20,6 +25,10 @@ interface AdminShellProps {
 const NAV = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Users", href: "/admin/users", icon: Users },
+  { label: "Workspaces", href: "/admin/organizations", icon: Building2 },
+  { label: "Question library", href: "/admin/content/questions", icon: Library },
+  { label: "Template loops", href: "/admin/content/loops", icon: Route },
+  { label: "Legacy invites", href: "/admin/campaigns", icon: Send },
   { label: "Problems", href: "/admin/problems", icon: Database },
   { label: "Interviews", href: "/admin/interviews", icon: Activity },
   { label: "Audit log", href: "/admin/audit", icon: ScrollText },
@@ -35,9 +44,9 @@ export function AdminShell({ children, user }: AdminShellProps) {
             <ShieldCheck className="h-4 w-4" />
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-semibold">
-              inturview<span className="text-accent">.</span>
-            </div>
+            <Link href="/dashboard" aria-label="Inturview home">
+              <Brand compact />
+            </Link>
             <div className="text-[10px] uppercase tracking-[0.14em] text-hard/80">
               admin
             </div>
@@ -86,7 +95,9 @@ export function AdminShell({ children, user }: AdminShellProps) {
         <header className="lg:hidden h-12 flex items-center gap-2 px-4 border-b border-border bg-bg/85 backdrop-blur sticky top-0 z-10">
           <ShieldCheck className="h-4 w-4 text-hard" />
           <span className="text-sm font-semibold">
-            inturview<span className="text-accent">.</span>{" "}
+            <Link href="/dashboard" aria-label="Inturview home">
+              <Brand compact />
+            </Link>{" "}
             <span className="text-hard/80 text-xs">admin</span>
           </span>
           <Link

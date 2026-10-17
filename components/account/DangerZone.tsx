@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
 import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
+import { signOutTo } from "@/lib/signOutTo";
 
 const CONFIRM_PHRASE = "delete my account";
 
@@ -37,7 +37,7 @@ export function DangerZone({ email, isAdmin }: DangerZoneProps) {
         throw new Error(j.error || `Failed (${res.status})`);
       }
       // Account is gone — drop the JWT and send them to the landing page.
-      await signOut({ callbackUrl: "/" });
+      await signOutTo("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't delete");
       setSubmitting(false);

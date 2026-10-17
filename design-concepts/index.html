@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inturview — Five design directions</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: light; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1816; background: #f6f4f0; }
+    body { margin: 0; }
+    header, main, footer { max-width: 1680px; margin: auto; padding: 40px; }
+    header { padding-top: 64px; padding-bottom: 32px; }
+    .eyebrow { font: 12px ui-monospace, monospace; text-transform: uppercase; letter-spacing: .16em; color: #696158; }
+    h1 { font-size: clamp(36px, 5vw, 72px); font-weight: 600; letter-spacing: -.055em; line-height: 1.03; margin: 22px 0; }
+    header p { font-size: 17px; line-height: 1.6; max-width: 730px; color: #615b54; }
+    nav { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+    nav a { border: 1px solid #d6d0c8; border-radius: 30px; padding: 10px 15px; font-size: 13px; text-decoration: none; }
+    a { color: inherit; text-underline-offset: 4px; }
+    a:focus-visible { outline: 3px solid #315efb; outline-offset: 5px; }
+    nav a:hover { background: #fff; }
+    main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding-top: 0; }
+    article { border: 1px solid #ded9d2; border-radius: 16px; background: #fff; overflow: hidden; scroll-margin-top: 24px; }
+    .info { padding: 26px; }
+    .title { display: flex; gap: 14px; align-items: baseline; }
+    .number { color: #79716a; font: 13px ui-monospace, monospace; }
+    h2 { font-size: 25px; margin: 0; letter-spacing: -.04em; font-weight: 600; }
+    .info p { color: #655f58; font-size: 14px; line-height: 1.6; margin: 12px 0 18px; }
+    .palette { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .swatch { display: block; height: 35px; border-radius: 5px; border: 1px solid #00000015; background: var(--swatch); margin-bottom: 8px; }
+    code { font: 11px ui-monospace, monospace; color: #534d47; }
+    .board { display: block; border-top: 1px solid #e6e0d9; background: var(--canvas, #faf7f2); }
+    .board img { display: block; width: 100%; height: auto; }
+    .open { display: block; padding: 16px 26px; font-size: 13px; border-top: 1px solid #e6e0d9; }
+    aside { display: flex; flex-direction: column; justify-content: center; padding: clamp(28px, 5vw, 80px); border: 1px solid #ded9d2; border-radius: 16px; }
+    aside h2 { font-size: 38px; max-width: 400px; }
+    aside p { color: #655f58; line-height: 1.8; max-width: 430px; }
+    aside strong { color: #1a1816; }
+    footer { color: #746b61; font-size: 12px; padding-top: 0; }
+    @media (max-width: 800px) {
+      header, main, footer { padding-left: 18px; padding-right: 18px; }
+      main { grid-template-columns: 1fr; gap: 22px; }
+      .info { padding: 20px; }
+      code { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Inturview / Brand &amp; product exploration</div>
+    <h1>One product.<br>Five distinct directions.</h1>
+    <p>Five palettes, five logo treatments, and five approaches to the practice dashboard and AI interview room. Each direction retains the framed Inturview wordmark and explores its color alongside the interface.</p>
+    <nav aria-label="Design directions">
+      <a href="#ember">01 Ember</a><a href="#midnight">02 Midnight</a><a href="#cobalt">03 Cobalt</a><a href="#monochrome">04 Monochrome</a><a href="#bordeaux">05 Bordeaux</a>
+    </nav>
+  </header>
+  <main>
+    <article id="ember">
+      <div class="info">
+        <div class="title"><span class="number">01</span><h2>Ember Editorial</h2></div>
+        <p>Warm paper, charcoal, and an ember logo. A sidebar dashboard with generous spacing; the interview room pairs a dark editor with the interviewer on the right.</p>
+        <div class="palette" aria-label="Ember palette">
+          <div><span class="swatch" style="--swatch:#FAF7F2"></span><code>#FAF7F2</code></div>
+          <div><span class="swatch" style="--swatch:#1A1410"></span><code>#1A1410</code></div>
+          <div><span class="swatch" style="--swatch:#E26C2F"></span><code>#E26C2F</code></div>
+          <div><span class="swatch" style="--swatch:#D4C9BE"></span><code>#D4C9BE</code></div>
+          <div><span class="swatch" style="--swatch:#FFFFFF"></span><code>#FFFFFF</code></div>
+        </div>
+      </div>
+      <a class="board" href="01-ember-editorial.png" target="_blank" rel="noopener" aria-label="Open Ember Editorial full size"><img src="01-ember-editorial.png" alt="Ember Editorial design board showing a warm orange practice dashboard and AI coding interview room."></a>
+      <a class="open" href="01-ember-editorial.png" target="_blank" rel="noopener">Open full-size design ↗</a>
+    </article>
+    <article id="midnight">
+      <div class="info">
+        <div class="title"><span class="number">02</span><h2>Midnight Studio</h2></div>
+        <p>Graphite, cream, and a copper logo. Horizontal navigation and a compact dashboard lead into a focused interview workspace with separate problem, editor, and persona columns.</p>
+        <div class="palette" aria-label="Midnight palette">
+          <div><span class="swatch" style="--swatch:#111316"></span><code>#111316</code></div>
+          <div><span class="swatch" style="--swatch:#1B1F24"></span><code>#1B1F24</code></div>
+          <div><span class="swatch" style="--swatch:#F2EDE4"></span><code>#F2EDE4</code></div>
+          <div><span class="swatch" style="--swatch:#DDA477"></span><code>#DDA477</code></div>
+          <div><span class="swatch" style="--swatch:#87929D"></span><code>#87929D</code></div>
+        </div>
+      </div>
+      <a class="board" style="--canvas:#111316" href="02-midnight-studio.png" target="_blank" rel="noopener" aria-label="Open Midnight Studio full size"><img src="02-midnight-studio.png" alt="Midnight Studio design board showing a dark graphite dashboard and coding room with copper accents."></a>
+      <a class="open" href="02-midnight-studio.png" target="_blank" rel="noopener">Open full-size design ↗</a>
+    </article>
+    <article id="cobalt">
+      <div class="info">
+        <div class="title"><span class="number">03</span><h2>Cobalt Precision</h2></div>
+        <p>White, navy, and a cobalt logo. Numbered practice rows make the dashboard easy to scan; the interview room puts the persona on the left and code on the right.</p>
+        <div class="palette" aria-label="Cobalt palette">
+          <div><span class="swatch" style="--swatch:#F6F8FC"></span><code>#F6F8FC</code></div>
+          <div><span class="swatch" style="--swatch:#FFFFFF"></span><code>#FFFFFF</code></div>
+          <div><span class="swatch" style="--swatch:#132440"></span><code>#132440</code></div>
+          <div><span class="swatch" style="--swatch:#315EFB"></span><code>#315EFB</code></div>
+          <div><span class="swatch" style="--swatch:#C8D7F4"></span><code>#C8D7F4</code></div>
+        </div>
+      </div>
+      <a class="board" style="--canvas:#F6F8FC" href="03-cobalt-precision.png" target="_blank" rel="noopener" aria-label="Open Cobalt Precision full size"><img src="03-cobalt-precision.png" alt="Cobalt Precision design board with a bright blue and navy dashboard and a persona-first coding room." loading="lazy"></a>
+      <a class="open" href="03-cobalt-precision.png" target="_blank" rel="noopener">Open full-size design ↗</a>
+    </article>
+    <article id="monochrome">
+      <div class="info">
+        <div class="title"><span class="number">04</span><h2>Monochrome Signal</h2></div>
+        <p>Chalk, ink, and selective vermilion. A black logo, strong typography, numbered practice cards, and thin rules give this direction its identity.</p>
+        <div class="palette" aria-label="Monochrome palette">
+          <div><span class="swatch" style="--swatch:#F5F4F0"></span><code>#F5F4F0</code></div>
+          <div><span class="swatch" style="--swatch:#171717"></span><code>#171717</code></div>
+          <div><span class="swatch" style="--swatch:#FFFFFF"></span><code>#FFFFFF</code></div>
+          <div><span class="swatch" style="--swatch:#A3A09B"></span><code>#A3A09B</code></div>
+          <div><span class="swatch" style="--swatch:#EF573C"></span><code>#EF573C</code></div>
+        </div>
+      </div>
+      <a class="board" style="--canvas:#F5F4F0" href="04-monochrome-signal.png" target="_blank" rel="noopener" aria-label="Open Monochrome Signal full size"><img src="04-monochrome-signal.png" alt="Monochrome Signal design board with black framed branding, numbered dashboard cards, and restrained orange interview controls." loading="lazy"></a>
+      <a class="open" href="04-monochrome-signal.png" target="_blank" rel="noopener">Open full-size design ↗</a>
+    </article>
+    <article id="bordeaux">
+      <div class="info">
+        <div class="title"><span class="number">05</span><h2>Bordeaux Atelier</h2></div>
+        <p>Ivory, wine, and dusty rose. The wine logo reverses to ivory in the sidebar; serif headings and grouped conversation and technical modes create a calmer, editorial feel.</p>
+        <div class="palette" aria-label="Bordeaux palette">
+          <div><span class="swatch" style="--swatch:#F5F0E9"></span><code>#F5F0E9</code></div>
+          <div><span class="swatch" style="--swatch:#4E2337"></span><code>#4E2337</code></div>
+          <div><span class="swatch" style="--swatch:#B7838D"></span><code>#B7838D</code></div>
+          <div><span class="swatch" style="--swatch:#DAD0C5"></span><code>#DAD0C5</code></div>
+          <div><span class="swatch" style="--swatch:#242027"></span><code>#242027</code></div>
+        </div>
+      </div>
+      <a class="board" style="--canvas:#F5F0E9" href="05-bordeaux-atelier.png" target="_blank" rel="noopener" aria-label="Open Bordeaux Atelier full size"><img src="05-bordeaux-atelier.png" alt="Bordeaux Atelier design board showing an ivory dashboard with burgundy sidebar and serif headings, plus an AI coding room." loading="lazy"></a>
+      <a class="open" href="05-bordeaux-atelier.png" target="_blank" rel="noopener">Open full-size design ↗</a>
+    </article>
+    <aside>
+      <div class="eyebrow">Selected direction</div>
+      <h2 style="margin-top:20px">Ember, refined for practice.</h2>
+      <p><strong>01 Ember</strong> sets the direction for the product: warm paper, charcoal, the orange wordmark, and clear practice actions. The implemented dashboard keeps the palette and removes decorative desk imagery. The other boards remain as reference explorations.</p>
+      <p>These are visual concepts. The AI avatar, code execution, metrics, and example content illustrate the proposed experience; the boards do not indicate that those features are implemented.</p>
+    </aside>
+  </main>
+  <footer>Inturview / Five design directions / September 2026 · Click any board to inspect the full-size image.</footer>
+</body>
+</html>

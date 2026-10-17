@@ -10,7 +10,7 @@
 
 # inturview
 
-inturview is a full-stack web app that simulates real technical interviews. It runs **five interview modes** — coding, system design, behavioral, recruiter screen, and a live face-to-face voice round — each with a live AI interviewer and a rubric-based scorecard at the end.
+inturview is a full-stack web app for practicing recruiter screens, behavioral interviews, coding, system design, and a live face-to-face voice round. Each mode runs against an AI interviewer and ends with a rubric-based scorecard.
 
 The interviewer is powered by Claude (Anthropic) and behaves like a real one: it probes your reasoning, won't green-light you to the next phase until you've earned it, and penalizes you in the debrief if you skip ahead anyway. Behavior matters, not just correctness.
 
@@ -18,13 +18,13 @@ The interviewer is powered by Claude (Anthropic) and behaves like a real one: it
 
 | Mode | Route | Shape | Phases |
 | ---- | ----- | ----- | ------ |
+| **Recruiter screen** | `/recruiter-screen` | Pure chat (single canonical flow) | conversation → debrief |
+| **Behavioral** | `/behavioral` → `/behavioral/[id]` | Pure chat (STAR drills) | conversation → debrief |
 | **Coding** | `/problems` → `/interview/[id]` | Monaco editor + chat | approach → code → debrief |
 | **System design** | `/design-problems` → `/design/[id]` | Excalidraw whiteboard + chat | scope → design → debrief |
-| **Behavioral** | `/behavioral` → `/behavioral/[id]` | Pure chat (STAR drills) | conversation → debrief |
-| **Recruiter screen** | `/recruiter-screen` | Pure chat (single canonical flow) | conversation → debrief |
 | **Face-to-face** | `/face-to-face` | Live voice + camera (OpenAI Realtime) | setup → live → debrief |
 
-The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup, architecture, and troubleshooting.
+The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup and architecture.
 
 Every mode green-lights with a gating signal where it makes sense (`[READY]` for coding approach, `[SCOPED]` for design scope), persists every turn, and ends with a 5-dimension scorecard + follow-up Q&A.
 
@@ -41,12 +41,15 @@ Every mode green-lights with a gating signal where it makes sense (`[READY]` for
   - **Design** — free-draw Excalidraw whiteboard with a side chat; the canvas is extracted to a text spec the interviewer reads and probes
   - **Debrief** — 5-dimension rubric (requirements / architecture / scalability / trade-offs / communication) + reference architecture
 - **Behavioral interview** — `/behavioral/[id]`: STAR-method drills against 8 seeded scenarios (Conflict / Failure / Leadership / Ambiguity / Growth / Communication). Scored on STAR structure / depth / self-awareness / impact / communication.
-- **Recruiter screen** — `/recruiter-screen`: a 25-minute initial phone screen — resume walkthrough, motivation, compensation framing, logistics. Scored on story clarity / motivation fit / comp savvy / role alignment / communication, with an `Advance / No Advance` recommendation.
+- **Recruiter screen** — `/recruiter-screen`: a text-based simulation of an initial screen — resume walkthrough, motivation, compensation framing, logistics. Scored on story clarity / motivation fit / comp savvy / role alignment / communication, with an `Advance / No Advance` recommendation.
 - **Face-to-face** — `/face-to-face`: a live, spoken technical round over video. Pick a track (backend / frontend / full-stack / data & ML / mobile / DevOps / AI & LLM engineering) and level; the interviewer (OpenAI Realtime, speech-to-speech) climbs a depth ladder on each question. Scored by Claude on technical depth / problem solving / clarity / delivery / body language, with measured pace, filler-word and pause metrics from the audio and eye-contact, posture and restlessness metrics from on-device MediaPipe tracking (no video leaves the browser). Runs through a small FastAPI service in `services/realtime` — see [FACE_TO_FACE.md](FACE_TO_FACE.md).
 - **Smooth streaming** — Anthropic SSE → server-side prefix parser (`[READY]/[CONTINUE]`, `[SCOPED]/[CONTINUE]`) → typewriter buffer (~45 cps) on the client. Backpressure-safe, abort-propagating.
 - **Auth + persistence** — NextAuth v4 credentials (email + bcrypt), session JWTs, Postgres via Prisma. Every message, code snapshot, canvas, and debrief is persisted scoped to the user.
 - **User dashboard** — `/dashboard`: greeting, 4-stat strip, resume-in-progress card, all four practice modes live, a per-mode plan-usage grid, topic mastery bars, recent interviews, roadmap sidebar.
 - **Per-mode plan caps** — Free tier is capped separately per mode (coding 5 / design 2 / behavioral 3 / recruiter 2 per calendar month); paid tiers scale or go unlimited. See [`lib/plans.ts`](lib/plans.ts).
+- **Product analytics** — Five server-side PostHog events measure signup, starts, phase advancement, debrief completion, and first-week return. No emails, answers, code, or transcripts are sent.
+- **Pricing split** — `/pricing` is only for candidate practice (Free + a $19/30-day Interview Sprint); `/employers` separately presents the employer screening design-partner offer and per-completed-screen validation price.
+- **Prompt caching** — Explicit 5-minute Anthropic cache breakpoints on stable system instructions and prior transcript turns. Live code and canvas context follows the cached prefix.
 - **History** — `/history` merges all four modes with kind badges; per-mode detail routes show the read-only transcript + scorecard (+ code or canvas where relevant).
 - **Admin console** — `/admin`, gated by `Role.ADMIN`. Overview tiles, user management (flag / disable / promote / delete with self-protection), problem CRUD (block delete when interviews reference), interview monitor, and a paginated audit log of every admin mutation.
 - **Loading states everywhere** — Next.js `loading.tsx` skeletons on every route, typing-dots in chat bubbles between request and first token, debrief skeleton that matches the eventual layout (no layout shift on resolve).
@@ -108,6 +111,9 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `DATABASE_URL`     | Postgres connection string.                                        |
 | `NEXTAUTH_SECRET`  | JWT signing secret. `openssl rand -base64 32`.                      |
 | `NEXTAUTH_URL`     | Public app URL (`http://localhost:3000` in dev).                   |
+| `STRIPE_SECRET_KEY` | Secret key used by server-side Checkout and webhook processing.   |
+| `STRIPE_INTERVIEW_SPRINT_PRICE_ID` | Active one-time USD $19 Stripe Price.              |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for `/api/billing/webhook`.                     |
 
 ### Optional
 
@@ -115,6 +121,7 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | --------------------- | ---------------------- | ------------------------------------------------------------------ |
 | `ANTHROPIC_MODEL`     | `claude-sonnet-4-5`    | Override the Claude model. Swap to `claude-opus-4-7` for higher fidelity. |
 | `ANTHROPIC_DESIGN_MODEL` | `ANTHROPIC_MODEL`   | Separate model knob for system-design sessions (bigger context). Falls back to `ANTHROPIC_MODEL`. |
+| `ANTHROPIC_LOG_CACHE_USAGE` | `0`             | Set to `1` to log cache-created/read token counts for interview turns. |
 | `APP_ENCRYPTION_KEY`  | `NEXTAUTH_SECRET`      | Optional separate encryption root for TOTP secrets. Generate with `openssl rand -base64 32`. |
 | `ADMIN_EMAILS`        | _(empty)_              | Comma-separated emails auto-promoted to `ADMIN` on signup/signin.  |
 | `DIRECT_URL`          | _(unused)_             | If you set `DATABASE_URL` to a pooler (e.g. Supabase port 6543), set this to the direct connection (5432) and uncomment `directUrl` in `prisma/schema.prisma`. |
@@ -125,10 +132,43 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `FREE_DESIGN_SESSIONS_PER_MONTH` | `2`         | Free-tier system-design cap per calendar month.                    |
 | `FREE_BEHAVIORAL_SESSIONS_PER_MONTH` | `3`     | Free-tier behavioral cap per calendar month.                       |
 | `FREE_RECRUITER_SESSIONS_PER_MONTH` | `2`      | Free-tier recruiter-screen cap per calendar month.                 |
+| `NEXT_PUBLIC_FACE_TO_FACE_ENABLED` | `false` | Exposes the face-to-face route and navigation when the realtime flow is ready. |
+| `NEXT_PUBLIC_FACE_TO_FACE_AVATAR_ENABLED` | `false` | Enables the optional HeyGen interviewer video. Requires LiveAvatar configuration in the Python service; see [local setup](FACE_TO_FACE.md#1d-optional-heygen-interviewer-video). |
 | `FREE_FACE_TO_FACE_SESSIONS_PER_MONTH` | `2`   | Free-tier face-to-face cap per calendar month (realtime audio is the most expensive mode). |
 | `FACE_TO_FACE_MAX_MINUTES` | `20`               | Hard cap on a single face-to-face session.                          |
 | `REALTIME_SERVICE_SECRET` | _(required for face-to-face)_ | Shared secret with the FastAPI realtime service. 32+ chars, same value on both sides. |
 | `NEXT_PUBLIC_REALTIME_SERVICE_URL` | `http://localhost:8000` | Where the browser reaches the realtime service.            |
+| `UNLIMITED_PLAN_EMAILS` | _(empty)_             | Comma-separated emails granted unlimited starts without changing billing tier. |
+| `POSTHOG_PROJECT_TOKEN` | _(disabled)_          | PostHog project token for server-side event capture. |
+| `POSTHOG_HOST` | `https://us.i.posthog.com`  | PostHog ingestion host; use `https://eu.i.posthog.com` for EU projects. |
+
+### Candidate billing
+
+Create one Stripe product named `Interview Sprint` with an active one-time
+USD $19.00 Price. Set its `price_...` ID as
+`STRIPE_INTERVIEW_SPRINT_PRICE_ID`, then configure a webhook endpoint at
+`https://YOUR_DOMAIN/api/billing/webhook` for
+`checkout.session.completed`, `checkout.session.async_payment_succeeded`, and
+`charge.refunded`.
+
+For local testing, install the Stripe CLI and run:
+
+```bash
+stripe listen --forward-to localhost:3000/api/billing/webhook
+```
+
+Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout is
+the only entry point; paid access is granted by a verified webhook. Each
+successful payment adds 30 days after the user's current expiry, and webhook
+event and Checkout Session IDs make retries idempotent.
+
+### Product analytics
+
+Set `POSTHOG_PROJECT_TOKEN` and the matching `POSTHOG_HOST` in the deployed server environment, then run `npm run db:push` to add the retention and phase-transition markers before deploying the new code. The five event names are `signup`, `interview_started`, `phase_advanced`, `debrief_completed`, and `returned_within_7d`. All use the database user ID as the PostHog distinct ID.
+
+`interview_started` fires only for a newly created session, never for a resume, and carries `mode` (`recruiter_screen`, `behavioral`, `coding`, `system_design`, or `face_to_face`) and `session_id`. `phase_advanced` fires on an explicit move to code/design and on successful debrief completion. `debrief_completed` fires after the debrief transaction succeeds and carries the score. `returned_within_7d` fires once on the first authenticated dashboard visit between 24 hours and seven days after signup; it does not count an uninterrupted first-day visit. These events are disabled when the project token is unset.
+
+In PostHog, build a funnel from `signup` → `interview_started` → `debrief_completed`, break down starts by `mode`, and compare the `returned_within_7d` rate by first mode. Anthropic cache savings depend on repeated prefixes and the model's minimum cacheable token length; set `ANTHROPIC_LOG_CACHE_USAGE=1` to inspect cache-created and cache-read token counts before projecting savings.
 
 ---
 
@@ -144,7 +184,7 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 - `/interview/[id]` — coding interview (approach → code → debrief)
 - `/design-problems` — system-design browser → `/design/[id]` (scope → design → debrief)
 - `/behavioral` — behavioral scenario browser → `/behavioral/[id]` (conversation → debrief)
-- `/recruiter-screen` — recruiter phone-screen sim (single canonical flow)
+- `/recruiter-screen` — text-based recruiter-screen simulation (single canonical flow)
 - `/face-to-face` — live voice + camera technical round (setup → live → debrief)
 - `/history` — all five modes merged with kind badges
 - `/history/[id]` — coding transcript + code + debrief
@@ -208,7 +248,7 @@ These bands are **guidelines for Claude**, not enforced math — the recommendat
 
 ## Roadmap (visible on the dashboard / landing)
 
-Shipped: ✅ coding · ✅ system design (Excalidraw whiteboard) · ✅ behavioral · ✅ recruiter screen · ✅ face-to-face (live voice + on-device body-language scoring).
+Shipped: ✅ coding · ✅ system design (Excalidraw whiteboard) · ✅ behavioral · ✅ recruiter screen. Face-to-face stays behind `NEXT_PUBLIC_FACE_TO_FACE_ENABLED` until its live voice and on-device body-language flow is ready for production.
 
 Still ahead:
 
