@@ -7,7 +7,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="auth-shell">
       <header className="auth-header">
         <Link href="/" aria-label="Inturview home">
-          <Brand />
+          <Brand wordmarkOnly />
         </Link>
         <ThemeToggle />
       </header>

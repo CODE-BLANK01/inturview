@@ -74,6 +74,56 @@ jobs:
       - name: Workspace isolation and permission tests
         run: npm run test:db
 
+  e2e:
+    name: End-to-end · Hire, applicant and reviewer journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: intervue_e2e
+          TZ: America/Los_Angeles
+          PGTZ: America/Los_Angeles
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Throwaway service container; not a real credential.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/intervue_e2e
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate a throwaway auth secret
+        run: echo "NEXTAUTH_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+      - name: Migrate the test database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          DIRECT_URL: ${{ env.TEST_DATABASE_URL }}
+      - name: Run the journeys (AI faked, email logged)
+        run: npm run test:e2e
+      - name: Keep the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
   realtime:
     name: Realtime service · lint, import
     runs-on: ubuntu-latest

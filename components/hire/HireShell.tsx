@@ -45,7 +45,7 @@ export function HireShell({ children, org, roleLabel, user, support, canSwitch, 
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-bg-elevated/40">
         <div className="h-14 flex items-center gap-2 px-4 border-b border-border">
           <Link href={base} aria-label={`${org.name} workspace`}>
-            <Brand compact />
+            <Brand compact wordmarkOnly />
           </Link>
           <span className="text-[10px] uppercase tracking-[0.14em] text-accent">hire</span>
         </div>
@@ -101,7 +101,7 @@ export function HireShell({ children, org, roleLabel, user, support, canSwitch, 
         )}
         <header className="lg:hidden h-12 flex items-center gap-2 px-4 border-b border-border bg-bg/85 backdrop-blur sticky top-0 z-10">
           <Link href={base} aria-label={`${org.name} workspace`}>
-            <Brand compact />
+            <Brand compact wordmarkOnly />
           </Link>
           <span className="text-sm font-medium truncate">{org.name}</span>
           <Link href="/dashboard" className="ml-auto text-xs text-text-muted hover:text-text inline-flex items-center gap-1">

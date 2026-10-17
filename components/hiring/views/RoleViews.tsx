@@ -46,7 +46,28 @@ function countByStage(rows: CandidateRow[]) {
 
 export function CandidatesTable({ rows, paths, showRole, canSend }: { rows: CandidateRow[]; paths: HiringPaths; showRole: boolean; canSend: boolean }) {
   return (
-    <div className="panel overflow-hidden">
+    <>
+    {/* Phones: one card per candidate instead of a table to scroll sideways. */}
+    <ul className="sm:hidden space-y-2">
+      {rows.map((c) => (
+        <li key={c.id} className="panel p-3 space-y-1.5">
+          <div className="flex items-start justify-between gap-3">
+            <Link href={`${paths.candidates}/${c.id}`} className="font-medium hover:underline underline-offset-2 min-w-0 truncate">{c.redacted ? "Deleted applicant" : c.name ?? c.email}</Link>
+            <span className={`badge whitespace-nowrap ${STAGE_PILL[c.stage]}`}>{STAGE_LABEL[c.stage]}</span>
+          </div>
+          {c.name && !c.redacted && <div className="text-xs text-text-dim truncate">{c.email}</div>}
+          <div className="text-xs text-text-muted flex flex-wrap gap-x-3">
+            {showRole && <span>{c.role?.title ?? "No role"}</span>}
+            {c.score !== null && <span>Score {c.score}</span>}
+            <span>{ago(c.lastActivity)}</span>
+          </div>
+          {c.attention && <div className="text-xs text-hard">{c.attention}</div>}
+          {canSend && <InviteRowActions inviteId={c.id} status={c.inviteStatus} />}
+        </li>
+      ))}
+      {rows.length === 0 && <li className="text-center text-sm text-text-dim py-6">No candidates here yet.</li>}
+    </ul>
+    <div className="panel overflow-hidden hidden sm:block">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -85,6 +106,7 @@ export function CandidatesTable({ rows, paths, showRole, canSend }: { rows: Cand
         </table>
       </div>
     </div>
+    </>
   );
 }
 
@@ -178,20 +200,6 @@ export async function RoleDetailView({ organizationId, paths, id, canEdit, canSe
         ))}
       </section>
 
-      {canSend && role.status === "OPEN" && (
-        <section className="space-y-3" aria-labelledby="invite-heading">
-          <h2 id="invite-heading" className="text-sm font-semibold">Invite candidates</h2>
-          {loops.length === 0 ? (
-            <p className="panel p-4 text-sm text-text-muted">
-              Publish a loop first. <Link href={paths.loops} className="underline underline-offset-2">Go to loops</Link>
-            </p>
-          ) : (
-            <NewCampaignForm loops={loops} defaultLoopId={role.loopTemplateId ?? undefined} roleId={role.id} company={role.organization} />
-          )}
-        </section>
-      )}
-      {role.status !== "OPEN" && <p className="panel p-3 text-sm text-text-muted">This role is {ROLE_STATUS[role.status]!.toLowerCase()}. Reopen it to invite more candidates; existing invites keep working.</p>}
-
       <section className="space-y-3" aria-labelledby="candidates-heading">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="candidates-heading" className="text-sm font-semibold">Candidates</h2>
@@ -201,6 +209,26 @@ export async function RoleDetailView({ organizationId, paths, id, canEdit, canSe
         </div>
         <CandidatesTable rows={candidates.slice(0, ROLE_PAGE)} paths={paths} showRole={false} canSend={canSend} />
       </section>
+      {canSend && role.status === "OPEN" && (
+        // Collapsed once there are candidates, so the pipeline is what you see first.
+        <details className="panel group" open={candidates.length === 0}>
+          <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
+            <span id="invite-heading" className="text-sm font-semibold">Invite candidates</span>
+            <span className="text-xs text-text-dim group-open:hidden">Paste a list, upload a CSV or paste from Sheets</span>
+          </summary>
+          <div className="px-4 pb-4 pt-1">
+          {loops.length === 0 ? (
+            <p className="panel p-4 text-sm text-text-muted">
+              Publish a loop first. <Link href={paths.loops} className="underline underline-offset-2">Go to loops</Link>
+            </p>
+          ) : (
+            <NewCampaignForm loops={loops} defaultLoopId={role.loopTemplateId ?? undefined} roleId={role.id} company={role.organization} />
+          )}
+          </div>
+        </details>
+      )}
+      {role.status !== "OPEN" && <p className="panel p-3 text-sm text-text-muted">This role is {ROLE_STATUS[role.status]!.toLowerCase()}. Reopen it to invite more candidates; existing invites keep working.</p>}
+
     </div>
   );
 }

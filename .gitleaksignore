@@ -3,3 +3,10 @@
 
 # CI placeholder for the realtime service, removed in b456245. Never a real secret.
 4e582ce88ebd3c2806dfb195d2c74dc37be045b9:.github/workflows/ci.yml:generic-api-key:61
+
+# End-to-end test values in a10bc8b86386144d5cfdc70455123e2bb4c0bb29 / c7512b3, replaced by per-run random values in the next commit. Never real secrets.
+a10bc8b86386144d5cfdc70455123e2bb4c0bb29:tests/e2e/global-setup.ts:generic-api-key:9
+a10bc8b86386144d5cfdc70455123e2bb4c0bb29:tests/e2e/global-setup.ts:generic-api-key:16
+a10bc8b86386144d5cfdc70455123e2bb4c0bb29:playwright.config.ts:generic-api-key:33
+a10bc8b86386144d5cfdc70455123e2bb4c0bb29:tests/e2e/helpers.ts:generic-api-key:35
+c7512b3cc73402271be2ae47d8c790f5f01aff66:.github/workflows/ci.yml:generic-api-key:98

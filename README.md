@@ -92,7 +92,7 @@ cp .env.local.example .env.local
 #   openssl rand -base64 32
 
 # 3. Schema + seed
-npm run db:push             # creates tables in your Postgres
+npm run db:deploy           # applies the migrations to your Postgres
 npm run db:seed             # NeetCode coding problems
 npm run db:seed-design      # system-design problems
 npm run db:seed-behavioral  # behavioral scenarios
@@ -164,11 +164,11 @@ event and Checkout Session IDs make retries idempotent.
 
 ### Product analytics
 
-Set `POSTHOG_PROJECT_TOKEN` and the matching `POSTHOG_HOST` in the deployed server environment, then run `npm run db:push` to add the retention and phase-transition markers before deploying the new code. The five event names are `signup`, `interview_started`, `phase_advanced`, `debrief_completed`, and `returned_within_7d`. All use the database user ID as the PostHog distinct ID.
+Set `POSTHOG_PROJECT_TOKEN` and the matching `POSTHOG_HOST` in the deployed server environment, and make sure migrations are applied (`npm run db:deploy`). The core event names are `signup_completed`, `interview_started`, `phase_advanced`, `debrief_completed`, and `returned_within_7d`. All use the database user ID as the PostHog distinct ID.
 
 `interview_started` fires only for a newly created session, never for a resume, and carries `mode` (`recruiter_screen`, `behavioral`, `coding`, `system_design`, or `face_to_face`) and `session_id`. `phase_advanced` fires on an explicit move to code/design and on successful debrief completion. `debrief_completed` fires after the debrief transaction succeeds and carries the score. `returned_within_7d` fires once on the first authenticated dashboard visit between 24 hours and seven days after signup; it does not count an uninterrupted first-day visit. These events are disabled when the project token is unset.
 
-In PostHog, build a funnel from `signup` → `interview_started` → `debrief_completed`, break down starts by `mode`, and compare the `returned_within_7d` rate by first mode. Anthropic cache savings depend on repeated prefixes and the model's minimum cacheable token length; set `ANTHROPIC_LOG_CACHE_USAGE=1` to inspect cache-created and cache-read token counts before projecting savings.
+In PostHog, build a funnel from `signup_completed` → `interview_started` → `debrief_completed`, break down starts by `mode`, and compare the `returned_within_7d` rate by first mode. Anthropic cache savings depend on repeated prefixes and the model's minimum cacheable token length; set `ANTHROPIC_LOG_CACHE_USAGE=1` to inspect cache-created and cache-read token counts before projecting savings.
 
 ---
 
@@ -266,7 +266,7 @@ Still ahead:
 1. Push to GitHub
 2. Import the repo into Vercel
 3. Set the env vars from `.env.local.example` in **Settings → Environment Variables**
-4. Run `npm run db:push` from your local machine pointing at the production `DATABASE_URL`, then the three seeders (`db:seed`, `db:seed-design`, `db:seed-behavioral`)
+4. Apply migrations (`npm run db:deploy` against the production database, or `RUN_MIGRATIONS=true` on Netlify; see `docs/runbooks/setup.md`), then the three seeders (`db:seed`, `db:seed-design`, `db:seed-behavioral`)
 5. Trigger a deploy
 
 ### Anywhere with Node

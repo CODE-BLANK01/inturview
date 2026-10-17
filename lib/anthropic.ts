@@ -1,8 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { fakeAnthropic } from "./fakeAnthropic";
 
 let client: Anthropic | null = null;
 
 export function getAnthropic(): Anthropic {
+  // End-to-end tests: canned replies, no network. Refused in production builds.
+  if (process.env.AI_FAKE === "1" && process.env.NODE_ENV !== "production") {
+    return fakeAnthropic as unknown as Anthropic;
+  }
   if (client) return client;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import tsx --test tests/*.test.ts",
     "test:db": "node --import tsx --test --test-concurrency=1 tests/db/*.test.ts",
+    "test:e2e": "playwright test",
     "db:generate": "prisma generate",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
-    "db:push": "dotenv -e .env.local -- prisma db push",
     "db:seed": "dotenv -e .env.local -- tsx prisma/seed.ts",
     "db:seed-design": "dotenv -e .env.local -- tsx prisma/seedDesign.ts",
     "db:seed-behavioral": "dotenv -e .env.local -- tsx prisma/seedBehavioral.ts",
@@ -52,6 +52,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.11",
     "@types/qrcode": "^1.5.6",
