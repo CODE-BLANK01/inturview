@@ -28,7 +28,11 @@ test("reviewers see only their assignments, rate blind, and the owner decides", 
   await owner.selectOption('select[aria-label="Teammate to assign"]', { label: "Reviewer" });
   await owner.getByRole("button", { name: "Assign" }).click();
   await expect(owner.locator("li").filter({ hasText: /^Reviewer$/ })).toBeVisible();
-  await owner.getByRole("button", { name: "4 of 5" }).click();
+  // Wait for the save itself: the first call can include the dev server compiling the route.
+  await Promise.all([
+    owner.waitForResponse((r) => r.url().endsWith("/ratings") && r.request().method() === "POST", { timeout: 90_000 }),
+    owner.getByRole("button", { name: "4 of 5" }).click(),
+  ]);
   await expect(owner.getByRole("button", { name: "4 of 5" })).toHaveAttribute("aria-pressed", "true");
 
   const reviewer = await signIn(browser, f.reviewer, `/hire/${f.slugA}/reviews`);
@@ -38,7 +42,10 @@ test("reviewers see only their assignments, rate blind, and the owner decides", 
   await reviewer.getByRole("link", { name: "Cara" }).click();
   await expect(reviewer.getByText(/Rate first to see your teammates/)).toBeVisible();
   await expect(reviewer.getByRole("button", { name: "Advance" })).toHaveCount(0);
-  await reviewer.getByRole("button", { name: "3 of 5" }).click();
+  await Promise.all([
+    reviewer.waitForResponse((r) => r.url().endsWith("/ratings") && r.request().method() === "POST", { timeout: 90_000 }),
+    reviewer.getByRole("button", { name: "3 of 5" }).click(),
+  ]);
   await expect(reviewer.getByText("Owner: 4/5")).toBeVisible();
   await reviewer.goto(`/hire/${f.slugA}/candidates/${other}`);
   await expect(reviewer.getByText("This page could not be found")).toBeVisible();
