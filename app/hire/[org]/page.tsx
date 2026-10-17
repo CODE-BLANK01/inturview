@@ -17,7 +17,8 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
     prisma.loopTemplate.count({ where: { organizationId: org.id, status: "PUBLISHED" } }),
     prisma.hiringRole.count({ where: { organizationId: org.id } }),
     prisma.invite.count({ where: { campaign: { organizationId: org.id } } }),
-    seesCandidates ? prisma.invite.count({ where: { campaign: { organizationId: org.id }, status: "COMPLETED" } }) : 0,
+    // Finished and not yet decided.
+    seesCandidates ? prisma.invite.count({ where: { campaign: { organizationId: org.id }, status: "COMPLETED", decision: null } }) : 0,
     // Emails that bounced and rounds whose scoring didn't finish.
     seesCandidates
       ? prisma.invite.count({
@@ -30,6 +31,11 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
   const canBuild = accessAllows(access, "loops.edit");
   const canSend = accessAllows(access, "invitations.send");
   const base = `/hire/${org.slug}`;
+  const myReviews = access.role
+    ? await prisma.reviewerAssignment.count({
+        where: { userId: access.user.id, invite: { campaign: { organizationId: org.id }, status: { not: "REVOKED" }, reviews: { none: { authorId: access.user.id, kind: "RATING" } } } },
+      })
+    : 0;
 
   // Setup the company can finish today.
   const steps = [
@@ -50,6 +56,13 @@ export default async function WorkspaceOverview({ params }: { params: { org: str
           {org.designPartner && " · Design partner"}
         </p>
       </header>
+
+      {myReviews > 0 && (
+        <Link href={`${base}/reviews`} className="panel p-4 flex items-center justify-between hover:border-accent/40">
+          <span className="text-sm font-medium">{myReviews} candidate{myReviews === 1 ? "" : "s"} waiting for your rating</span>
+          <ArrowRight className="h-4 w-4 text-text-dim" />
+        </Link>
+      )}
 
       {steps.length > 0 && (
         <section className="panel p-5 space-y-3" aria-labelledby="setup-heading">

@@ -16,10 +16,16 @@ export interface CandidateRow {
   lastActivity: Date;
 }
 
-/** Candidates in a workspace, newest activity first. Scoped by organizationId on every row. */
-export async function listCandidates(organizationId: string, opts: { roleId?: string } = {}): Promise<CandidateRow[]> {
+/**
+ * Candidates in a workspace, newest activity first. Scoped by organizationId on
+ * every row; `assignedTo` limits it to one reviewer's assignments.
+ */
+export async function listCandidates(organizationId: string, opts: { roleId?: string; assignedTo?: string } = {}): Promise<CandidateRow[]> {
   const invites = await prisma.invite.findMany({
-    where: { campaign: { organizationId, ...(opts.roleId && { hiringRoleId: opts.roleId }) } },
+    where: {
+      campaign: { organizationId, ...(opts.roleId && { hiringRoleId: opts.roleId }) },
+      ...(opts.assignedTo && { assignments: { some: { userId: opts.assignedTo } } }),
+    },
     orderBy: { updatedAt: "desc" },
     take: 1000,
     select: {
@@ -28,6 +34,7 @@ export async function listCandidates(organizationId: string, opts: { roleId?: st
       email: true,
       status: true,
       updatedAt: true,
+      decision: true,
       campaign: { select: { loopTemplateId: true, loopVersion: true, hiringRole: { select: { id: true, title: true } } } },
       run: { select: { overallScore: true, assessedQuestions: true, totalQuestions: true, rounds: { select: { status: true } } } },
     },
@@ -50,7 +57,7 @@ export async function listCandidates(organizationId: string, opts: { roleId?: st
       name: i.name,
       email: i.email,
       role: i.campaign.hiringRole,
-      stage: stageOf(i.status, rounds, total),
+      stage: stageOf(i.status, rounds, total, i.decision),
       attention: attentionReason(i.status, rounds),
       score: i.run?.overallScore ?? null,
       coverage: i.run?.totalQuestions ? { assessed: i.run.assessedQuestions ?? 0, total: i.run.totalQuestions } : null,

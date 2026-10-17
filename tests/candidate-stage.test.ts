@@ -26,3 +26,9 @@ test("failed emails and failed scoring need attention, with a reason", () => {
   assert.match(attentionReason("STARTED", r("SCORING_FAILED"))!, /re-score/);
   assert.equal(attentionReason("STARTED", r("COMPLETED")), null);
 });
+
+test("a decision is the last word, but a cancelled invite stays cancelled", () => {
+  assert.equal(stageOf("COMPLETED", r("COMPLETED"), 1, "ADVANCE"), "advanced");
+  assert.equal(stageOf("STARTED", r("SCORING_FAILED"), 1, "DECLINE"), "declined");
+  assert.equal(stageOf("REVOKED", [], 1, "ADVANCE"), "cancelled");
+});
