@@ -6,6 +6,13 @@ export interface ApplicantCompany {
   contactEmail: string | null;
   logoUrl: string | null;
   website: string | null;
+  retentionMonths?: number;
+}
+
+/** How long answers are kept, as promised to applicants. Must match lib/applicantData.ts. */
+export function retentionText(company: { retentionMonths?: number } | null): string {
+  const n = Math.min(Math.max(company?.retentionMonths ?? 12, 1), 12);
+  return `up to ${n} month${n === 1 ? "" : "s"} after a decision (or after your interview, if no decision is made), then deleted`;
 }
 
 /** "Wednesday, October 28 at 11:59 PM EDT", in the company's timezone. */

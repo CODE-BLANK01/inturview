@@ -183,7 +183,7 @@ async function finishSent(row: Claimed, claimId: string, tokenHash: string, expi
       data: { state: DeliveryState.SENT, sentAt: new Date(), providerMessageId: messageId, tokenHash, lastError: null },
     });
     if (done.count !== 1) return false;
-    const fields = { tokenHash, sentAt: new Date(), expiresAt, sendCount: { increment: 1 }, lastError: null };
+    const fields = { tokenHash, sentAt: new Date(), expiresAt, sendCount: { increment: 1 }, lastError: null, lastActivityAt: new Date() };
     // A resend never moves an opened, started or finished invite backwards.
     await tx.invite.updateMany({
       where: { id: row.inviteId, status: { in: [InviteStatus.PENDING, InviteStatus.FAILED, InviteStatus.SENT] } },

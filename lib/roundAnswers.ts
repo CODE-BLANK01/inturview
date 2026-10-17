@@ -3,6 +3,7 @@
 // of a second model call; an answer whose reply never got saved gets a fresh one.
 import type { LoopMessage } from "@prisma/client";
 import { prisma } from "./db";
+import { touchInviteForRound } from "./activity";
 
 export const CLIENT_TURN_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -24,6 +25,7 @@ export async function recordAnswer(
       prisma.loopMessage.create({ data: { roundRunId, role: "candidate", content, clientTurnId } }),
       prisma.loopRoundRun.update({ where: { id: roundRunId }, data: { draft: null, draftSavedAt: null, ...(draftSeq !== undefined && { draftSeq }) } }),
     ]);
+    await touchInviteForRound(roundRunId);
     return { answer, isNew: true };
   } catch (e) {
     // The same answer arrived twice at once; use the copy that won.

@@ -260,7 +260,7 @@ export function LoopBuilder(props: LoopBuilderProps) {
             <div><dt className="text-xs text-text-dim">Total time</dt><dd className="font-semibold tabular-nums">{Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)}h ` : ""}{minutes % 60} min</dd></div>
             <div><dt className="text-xs text-text-dim">Est. cost / candidate</dt><dd className="font-semibold tabular-nums">${estimate.totalUsd.toFixed(2)}</dd></div>
           </dl>
-          <p className="text-xs text-text-dim">Estimate: live voice and avatar per minute plus scoring. Rates are set in env.</p>
+          <p className="text-xs text-text-dim">Estimate: the AI interviewer&apos;s text chat per minute, plus scoring each round. Rough, for planning.</p>
         </div>
 
         <div className="panel p-4 space-y-3">

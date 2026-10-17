@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { ApplicantShell } from "@/components/applicant/ApplicantShell";
-import { companyTime, contactFor } from "@/lib/applicant";
+import { companyTime, contactFor, retentionText } from "@/lib/applicant";
 import { prisma } from "@/lib/db";
 import { campaignSnapshot } from "@/lib/loopSnapshot";
 import { findInviteByToken } from "@/lib/invites";
@@ -41,7 +41,7 @@ export default async function DonePage({ params }: { params: { token: string } }
           <li>People at {company?.name ?? "the company"} review it and decide on next steps. They&apos;ll contact you directly.</li>
           <li>You won&apos;t see a score here. Assessments go to the hiring team only.</li>
           <li>
-            Your answers are kept for up to 12 months after a decision. To have them deleted sooner, contact{" "}
+            Your answers are kept {retentionText(company)}. To have them deleted sooner, contact{" "}
             {contact.href ? <a className="underline underline-offset-2" href={contact.href}>{contact.label}</a> : contact.label}.
           </li>
         </ul>

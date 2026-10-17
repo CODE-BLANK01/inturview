@@ -20,6 +20,7 @@ const Patch = z.object({
   timezone: z.string().trim().refine((tz) => tz === "UTC" || Intl.supportedValuesOf("timeZone").includes(tz), "Unknown timezone"),
   website: optionalUrl,
   logoUrl: optionalUrl,
+  retentionMonths: z.number().int().min(1).max(12).optional(),
   contactEmail: z
     .string()
     .trim()

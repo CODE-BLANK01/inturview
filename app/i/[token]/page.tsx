@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ApplicantShell } from "@/components/applicant/ApplicantShell";
-import { contactFor, deadlineText } from "@/lib/applicant";
+import { contactFor, deadlineText, retentionText } from "@/lib/applicant";
 import { prisma } from "@/lib/db";
 import { campaignSnapshot } from "@/lib/loopSnapshot";
 import { findInviteByToken, markOpened } from "@/lib/invites";
@@ -82,7 +82,7 @@ export default async function InvitePage({ params }: { params: { token: string }
         {invite.consentedAt ? (
           <RoundsPanel token={params.token} roundCount={rounds.length} done={doneRounds} inProgress={inProgressRound} />
         ) : (
-          <InviteConsent token={params.token} consented={false} company={company?.name ?? null} contact={contact} />
+          <InviteConsent token={params.token} consented={false} company={company?.name ?? null} contact={contact} retention={retentionText(company)} />
         )}
       </div>
     </ApplicantShell>

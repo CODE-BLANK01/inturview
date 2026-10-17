@@ -15,6 +15,8 @@ import { AddCandidates, CampaignSendButtons, InviteRowActions } from "../Campaig
 import { NewCampaignForm } from "../NewCampaignForm";
 import { RescoreButton } from "../RescoreButton";
 import { ReviewPanel } from "../ReviewPanel";
+import { ApplicantDataControls } from "../ApplicantDataControls";
+import { deletionDue } from "@/lib/applicantData";
 import type { ReviewPanelData } from "@/lib/hiring/reviews";
 
 interface Scope {
@@ -232,12 +234,15 @@ export async function CandidateView({
   inviteId,
   canRescore,
   review,
+  data,
 }: Scope & {
   campaignId?: string;
   inviteId: string;
   canRescore: boolean;
   /** Workspaces: the review panel and what this viewer may do in it. */
   review?: { data: ReviewPanelData; canReview: boolean; canDecide: boolean; canAssign: boolean };
+  /** Workspaces: retention status, and export/delete for owners and workspace admins. */
+  data?: { canManage: boolean; retentionMonths: number };
 }) {
   const invite = await prisma.invite.findFirst({
     where: { id: inviteId, ...(campaignId && { campaignId }), campaign: { organizationId } },
@@ -273,8 +278,8 @@ export async function CandidateView({
       )}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{invite.name ?? invite.email}</h1>
-          <p className="text-sm text-text-muted">{invite.email} · {invite.status.toLowerCase()}{invite.consentedAt && ` · consented ${invite.consentedAt.toISOString().slice(0, 10)}`}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{invite.redactedAt ? "Deleted applicant" : invite.name ?? invite.email}</h1>
+          <p className="text-sm text-text-muted">{invite.redactedAt ? "data deleted" : invite.email} · {invite.status.toLowerCase()}{invite.consentedAt && ` · consented ${invite.consentedAt.toISOString().slice(0, 10)}`}</p>
         </div>
         {invite.run?.overallScore != null && (
           <div className="text-right">
@@ -290,6 +295,14 @@ export async function CandidateView({
         <p className="panel p-3 text-sm text-text-muted">This was a preview: a teammate trying the loop as a candidate. It isn&apos;t listed with your candidates.</p>
       )}
       <p className="text-xs text-text-dim">AI scores support your judgment; they don&apos;t replace it. Read the transcript before deciding.</p>
+      {data && !invite.campaign.preview && (
+        <ApplicantDataControls
+          inviteId={invite.id}
+          dueAt={deletionDue(invite, data.retentionMonths).toISOString()}
+          redactedAt={invite.redactedAt?.toISOString() ?? null}
+          canManage={data.canManage}
+        />
+      )}
 
       <div className={review ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] items-start" : ""}>
       <div className="space-y-6 min-w-0">

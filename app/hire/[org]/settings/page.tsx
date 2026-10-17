@@ -25,6 +25,7 @@ export default async function SettingsPage({ params }: { params: { org: string }
           website: org.website ?? "",
           logoUrl: org.logoUrl ?? "",
           contactEmail: org.contactEmail ?? "",
+          retentionMonths: org.retentionMonths,
         }}
       />
       {access.role === "OWNER" && (

@@ -15,8 +15,8 @@ export const hashInviteToken = (raw: string) => createHash("sha256").update(raw)
 export { DEFAULT_LINK_DAYS, inviteEmail, inviteExpiry, type InviteEmailInput } from "./inviteEmail";
 
 /** Adds candidates to a campaign as PENDING. Existing emails are skipped. */
-export async function addRecipients(campaignId: string, recipients: Recipient[]) {
-  const result = await prisma.invite.createMany({
+export async function addRecipients(campaignId: string, recipients: Recipient[], db: Prisma.TransactionClient = prisma) {
+  const result = await db.invite.createMany({
     data: recipients.map((r) => ({ campaignId, email: r.email.toLowerCase(), name: r.name })),
     skipDuplicates: true,
   });
@@ -42,7 +42,7 @@ export async function resendInvite(inviteId: string): Promise<{ sent: boolean; e
 export const revokeInvite = cancelInvite;
 
 /** What an applicant may see about the hiring company. */
-const APPLICANT_ORG = { select: { name: true, slug: true, timezone: true, contactEmail: true, logoUrl: true, website: true } } as const;
+const APPLICANT_ORG = { select: { name: true, slug: true, timezone: true, contactEmail: true, logoUrl: true, website: true, retentionMonths: true } } as const;
 
 export type InviteLookup =
   | { ok: true; invite: Prisma.InviteGetPayload<{ include: { campaign: { include: { organization: typeof APPLICANT_ORG } } } }> }
@@ -65,10 +65,10 @@ export async function findInviteByToken(raw: string, now = new Date()): Promise<
 export async function markOpened(inviteId: string) {
   await prisma.invite.updateMany({
     where: { id: inviteId, status: InviteStatus.SENT },
-    data: { status: InviteStatus.OPENED, openedAt: new Date() },
+    data: { status: InviteStatus.OPENED, openedAt: new Date(), lastActivityAt: new Date() },
   });
 }
 
 export async function recordConsent(inviteId: string) {
-  await prisma.invite.updateMany({ where: { id: inviteId, consentedAt: null }, data: { consentedAt: new Date() } });
+  await prisma.invite.updateMany({ where: { id: inviteId, consentedAt: null }, data: { consentedAt: new Date(), lastActivityAt: new Date() } });
 }

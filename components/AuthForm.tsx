@@ -126,9 +126,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
           {mode === "signin" ? "Welcome back" : "Create your account"}
         </h1>
         <p className="text-sm text-text-muted mb-6">
-          {mode === "signin"
-            ? "Sign in to continue practicing."
-            : "Start running mock interviews in under a minute."}
+          {intended?.startsWith("/hire")
+            ? mode === "signin"
+              ? "Sign in to your hiring workspace."
+              : "Create your account to join your team on inturview Hire."
+            : mode === "signin"
+              ? "Sign in to practice, or to your hiring workspace."
+              : "Start running mock interviews in under a minute."}
         </p>
 
         {reasonBanner && (

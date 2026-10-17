@@ -41,6 +41,7 @@ export interface WorkspaceOrg {
   logoUrl: string | null;
   contactEmail: string | null;
   designPartner: boolean;
+  retentionMonths: number;
 }
 
 export type WorkspaceAccess = {
@@ -60,6 +61,7 @@ const ORG_SELECT = {
   logoUrl: true,
   contactEmail: true,
   designPartner: true,
+  retentionMonths: true,
 } satisfies Prisma.OrganizationSelect;
 
 /** Support access is read-only: it shows what the company sees, nothing more. */

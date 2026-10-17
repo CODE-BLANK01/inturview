@@ -96,11 +96,12 @@ export async function trackLiveMinutes(
 }
 
 /** Current per-minute estimates for live voice and the avatar. Used by loop cost estimates. */
+/**
+ * Per-minute cost of a loop round, which applicants take as a text chat.
+ * About one exchange every two minutes with a mostly cached prompt.
+ */
 export function liveRatesPerMinute() {
-  return {
-    voice: ratePerMinute(process.env.COST_REALTIME_VOICE_PER_MIN, 0.075),
-    avatar: ratePerMinute(process.env.COST_AVATAR_PER_MIN, 0.1),
-  };
+  return { chat: ratePerMinute(process.env.COST_TEXT_CHAT_PER_MIN, 0.005) };
 }
 
 function round(usd: number) {

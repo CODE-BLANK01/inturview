@@ -366,33 +366,40 @@ export async function createCampaignHandler(ctx: HiringCtx, req: NextRequest) {
   if (role && role.status !== "OPEN") return json({ error: "This role isn't open. Reopen it to invite candidates." }, 409);
   const name = d.name || (role ? `${role.title} · ${new Date().toISOString().slice(0, 10)}` : "");
   if (name.length < 2) return json({ error: "Name the campaign." }, 400);
-  // Someone already invited for this role (and not cancelled) isn't invited again.
-  let recipients = d.recipients;
-  let alreadyInvited = 0;
-  if (role) {
-    const existing = new Set(
-      (await prisma.invite.findMany({
-        where: { campaign: { hiringRoleId: role.id }, status: { not: "REVOKED" }, email: { in: recipients.map((r) => r.email.toLowerCase()) } },
-        select: { email: true },
-      })).map((i) => i.email),
-    );
-    recipients = recipients.filter((r) => !existing.has(r.email.toLowerCase()));
-    alreadyInvited = d.recipients.length - recipients.length;
-    if (recipients.length === 0) return json({ error: "Everyone on this list has already been invited for this role." }, 409);
-  }
-  const campaign = await prisma.campaign.create({
-    data: {
-      organizationId: ctx.organizationId,
-      hiringRoleId: role?.id ?? null,
-      loopTemplateId: d.loopTemplateId,
-      loopVersion: loop.currentVersion,
-      name,
-      message: d.message,
-      deadline: d.deadline ? new Date(`${d.deadline}T23:59:59Z`) : null,
-      createdById: ctx.actorId,
-    },
+  // Someone already invited for this role (and not cancelled) isn't invited
+  // again. A per-role lock makes the check and the insert one step, so two
+  // recruiters inviting the same person at once can't both get through.
+  // A cancelled invite doesn't block a fresh one.
+  const result = await prisma.$transaction(async (tx) => {
+    let recipients = d.recipients;
+    if (role) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`role-invites:${role.id}`}))`;
+      const existing = new Set(
+        (await tx.invite.findMany({
+          where: { campaign: { hiringRoleId: role.id }, status: { not: "REVOKED" }, email: { in: recipients.map((r) => r.email.toLowerCase()) } },
+          select: { email: true },
+        })).map((i) => i.email),
+      );
+      recipients = recipients.filter((r) => !existing.has(r.email.toLowerCase()));
+      if (recipients.length === 0) return null;
+    }
+    const campaign = await tx.campaign.create({
+      data: {
+        organizationId: ctx.organizationId,
+        hiringRoleId: role?.id ?? null,
+        loopTemplateId: d.loopTemplateId,
+        loopVersion: loop.currentVersion,
+        name,
+        message: d.message,
+        deadline: d.deadline ? new Date(`${d.deadline}T23:59:59Z`) : null,
+        createdById: ctx.actorId,
+      },
+    });
+    const { added, skipped } = await addRecipients(campaign.id, recipients, tx);
+    return { campaign, added, skipped, alreadyInvited: d.recipients.length - recipients.length };
   });
-  const { added, skipped } = await addRecipients(campaign.id, recipients);
+  if (!result) return json({ error: "Everyone on this list has already been invited for this role." }, 409);
+  const { campaign, added, skipped, alreadyInvited } = result;
   await audit(ctx, "CAMPAIGN_CREATED", "campaign", campaign.id, { loopVersion: loop.currentVersion, added, hiringRoleId: role?.id ?? null });
   return json({ id: campaign.id, added, skipped: skipped + alreadyInvited, alreadyInvited }, 201);
 }

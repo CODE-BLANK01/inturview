@@ -15,6 +15,7 @@ export default async function Page({ params, searchParams }: { params: { org: st
       canSend={!!access.role && accessAllows(access, "invitations.send")}
       stage={one(searchParams.stage)}
       roleId={one(searchParams.role)}
+      page={Number(one(searchParams.page) ?? 1) || 1}
     />
   );
 }
