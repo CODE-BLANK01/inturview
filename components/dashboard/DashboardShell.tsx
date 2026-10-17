@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { RememberProduct } from "@/components/RememberProduct";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -179,6 +180,7 @@ export function DashboardShell({
 
   return (
     <div className="workspace">
+      <RememberProduct product="practice" />
       <a href="#workspace-main" className="skip-link">
         Skip to content
       </a>

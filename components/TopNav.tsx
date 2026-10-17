@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { RememberProduct } from "./RememberProduct";
 import { FACE_TO_FACE_ENABLED } from "@/lib/features";
 import { signOutTo } from "@/lib/signOutTo";
 
@@ -120,6 +121,8 @@ export function TopNav({ marketing = false }: { marketing?: boolean }) {
 
   return (
     <header className="site-topnav sticky top-0 z-30 border-b border-border bg-bg/85 backdrop-blur">
+      {/* The signed-in top nav is Practice's; the next plain sign-in comes back here. */}
+      {isAuthed && <RememberProduct product="practice" />}
       <div className="mx-auto max-w-7xl px-4 h-[76px] flex items-center justify-between gap-4">
         <Link
           href={isAuthed ? "/dashboard" : "/"}
