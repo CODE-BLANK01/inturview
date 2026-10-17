@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ApplicantShell } from "@/components/applicant/ApplicantShell";
 import { prisma } from "@/lib/db";
+import { campaignSnapshot } from "@/lib/loopSnapshot";
 import { findInviteByToken } from "@/lib/invites";
 import { publishedRounds } from "@/lib/loopTemplates";
 import { CATEGORY_LABELS } from "@/lib/questionBank";
@@ -13,15 +14,12 @@ export default async function LoopRoundPage({ params }: { params: { token: strin
   const found = await findInviteByToken(params.token);
   if (!found.ok || !found.invite.consentedAt) redirect(`/i/${params.token}`);
   const index = Number(params.index);
-  const version = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: found.invite.campaign.loopTemplateId, version: found.invite.campaign.loopVersion } },
-    select: { snapshot: true },
-  });
-  const rounds = publishedRounds(version?.snapshot);
+  const snapshot = await campaignSnapshot(found.invite.campaign);
+  const rounds = publishedRounds(snapshot);
   const round = rounds[index];
   if (!Number.isInteger(index) || !round) redirect(`/i/${params.token}`);
   return (
-    <ApplicantShell company={found.invite.campaign.organization}>
+    <ApplicantShell company={found.invite.campaign.organization} preview={found.invite.campaign.preview}>
       <LoopRoundChat
         token={params.token}
         roundIndex={index}

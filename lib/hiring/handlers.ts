@@ -23,6 +23,7 @@ import {
 import { DRAFT_MODEL, generateDrafts } from "../questionDrafts";
 import {
   checkReadiness,
+  freezeLoop,
   LoopChangedError,
   LoopEditSchema,
   LoopNotReadyError,
@@ -32,7 +33,7 @@ import {
   publishLoop,
   setLoopArchived,
 } from "../loopTemplates";
-import { addRecipients, InviteActionError, resendInvite, revokeInvite } from "../invites";
+import { addRecipients, InviteActionError, newInviteToken, resendInvite, revokeInvite } from "../invites";
 import { processDeliveries, queueCampaign, remainingFor } from "../delivery";
 import { RecipientsSchema } from "../recipients";
 import { rescoreRound } from "../scoring";
@@ -266,6 +267,47 @@ export async function loopStatusHandler(ctx: HiringCtx, req: NextRequest, id: st
     if ((e as { code?: string }).code === "P2002") return json({ error: "Already published. Refresh to see the latest version." }, 409);
     throw e;
   }
+}
+
+const PREVIEW_DAYS = 3;
+
+/**
+ * Try the loop as a candidate. Freezes the current draft exactly as publishing
+ * would, into a hidden batch with one invite for the person asking. Nothing is
+ * emailed and it never shows up with real candidates.
+ */
+export async function previewLoopHandler(ctx: HiringCtx, req: NextRequest, id: string) {
+  const parsed = z.object({ revision: Revision }).safeParse(await body(req));
+  if (!parsed.success) return json({ error: "Invalid request" }, 400);
+  const loop = await prisma.loopTemplate.findFirst({ where: { id, organizationId: ctx.organizationId } });
+  if (!loop) return notFound("Loop");
+  if (loop.revision !== parsed.data.revision) return changed(new LoopChangedError(loop.revision));
+  let snapshot;
+  try {
+    snapshot = (await prisma.$transaction((tx) => freezeLoop(tx, loop))).snapshot;
+  } catch (e) {
+    if (e instanceof LoopNotReadyError) return json({ error: `Fix this before previewing: ${e.message}`, problems: e.problems }, 409);
+    throw e;
+  }
+  const me = await prisma.user.findUniqueOrThrow({ where: { id: ctx.actorId }, select: { email: true, name: true } });
+  const token = newInviteToken();
+  const now = new Date();
+  await prisma.campaign.create({
+    data: {
+      organizationId: ctx.organizationId,
+      loopTemplateId: loop.id,
+      loopVersion: loop.currentVersion,
+      name: `Preview · ${loop.name}`,
+      preview: true,
+      previewSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+      previewRevision: loop.revision,
+      createdById: ctx.actorId,
+      invites: {
+        create: { email: me.email, name: me.name, tokenHash: token.hash, status: "SENT", sentAt: now, expiresAt: new Date(now.getTime() + PREVIEW_DAYS * 86_400_000) },
+      },
+    },
+  });
+  return json({ link: `/i/${token.raw}` }, 201);
 }
 
 const tags = z.array(z.string().trim().toLowerCase().min(1).max(40)).max(10).default([]);

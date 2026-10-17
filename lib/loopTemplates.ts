@@ -195,6 +195,36 @@ async function freezeVersions(db: Prisma.TransactionClient, refs: { id: string; 
   });
 }
 
+type FreezableLoop = { name: string; description: string | null; roleTarget: string | null; level: string | null; rounds: unknown; organizationId: string | null };
+
+/**
+ * The loop as candidates will get it: full copies of each fixed question and of
+ * every question each pool may draw from. Used by publish and by preview, so a
+ * preview runs exactly what publishing would freeze. Throws if it isn't ready.
+ */
+export async function freezeLoop(tx: Prisma.TransactionClient, loop: FreezableLoop) {
+  const rounds = parseRounds(loop.rounds);
+  const facts = await gatherFacts(rounds, loop.organizationId, tx);
+  const problems = readinessProblems(rounds, facts);
+  if (problems.length) throw new LoopNotReadyError(problems);
+
+  const frozenRounds = [];
+  for (const r of rounds) {
+    if (r.questions.mode === "fixed") {
+      const refs = await tx.question.findMany({ where: { id: { in: r.questions.questionIds } }, select: { id: true, currentVersion: true } });
+      const ordered = r.questions.questionIds.map((qid) => refs.find((q) => q.id === qid)!);
+      const frozen = await freezeVersions(tx, ordered);
+      frozenRounds.push({ ...r, questions: { mode: "fixed" as const, pinned: frozen.map((q) => ({ questionId: q.questionId, version: q.version })), frozen } });
+    } else {
+      // Every candidate draws from exactly this set, whatever is published later.
+      const eligible = await tx.question.findMany({ where: poolWhere(r.category, r.questions, loop.organizationId), select: { id: true, currentVersion: true }, orderBy: { id: "asc" } });
+      frozenRounds.push({ ...r, questions: { ...r.questions, frozenPool: await freezeVersions(tx, eligible) } });
+    }
+  }
+  const config = { name: loop.name, description: loop.description, roleTarget: loop.roleTarget, level: loop.level, rounds: frozenRounds };
+  return { config, rounds, snapshot: { format: 2, config, totalMinutes: totalMinutes(rounds), estimate: estimateLoopCost(rounds) } };
+}
+
 /**
  * Freezes the loop: full copies of each fixed question, and of every question
  * each pool may draw from, at their current versions. `expectedRevision` is the
@@ -206,25 +236,7 @@ export async function publishLoop(id: string, publishedById: string | null, expe
     const loop = await tx.loopTemplate.findUniqueOrThrow({ where: { id } });
     if (expectedRevision !== undefined && loop.revision !== expectedRevision) throw new LoopChangedError(loop.revision);
     if (loop.status === LoopStatus.ARCHIVED) throw new LoopNotReadyError(["Restore this loop before publishing it."]);
-    const rounds = parseRounds(loop.rounds);
-    const facts = await gatherFacts(rounds, loop.organizationId, tx);
-    const problems = readinessProblems(rounds, facts);
-    if (problems.length) throw new LoopNotReadyError(problems);
-
-    const frozenRounds = [];
-    for (const r of rounds) {
-      if (r.questions.mode === "fixed") {
-        const refs = await tx.question.findMany({ where: { id: { in: r.questions.questionIds } }, select: { id: true, currentVersion: true } });
-        const ordered = r.questions.questionIds.map((qid) => refs.find((q) => q.id === qid)!);
-        const frozen = await freezeVersions(tx, ordered);
-        frozenRounds.push({ ...r, questions: { mode: "fixed" as const, pinned: frozen.map((q) => ({ questionId: q.questionId, version: q.version })), frozen } });
-      } else {
-        // Every candidate draws from exactly this set, whatever is published later.
-        const eligible = await tx.question.findMany({ where: poolWhere(r.category, r.questions, loop.organizationId), select: { id: true, currentVersion: true }, orderBy: { id: "asc" } });
-        frozenRounds.push({ ...r, questions: { ...r.questions, frozenPool: await freezeVersions(tx, eligible) } });
-      }
-    }
-    const config = { name: loop.name, description: loop.description, roleTarget: loop.roleTarget, level: loop.level, rounds: frozenRounds };
+    const { config, snapshot } = await freezeLoop(tx, loop);
     const latest = await tx.loopTemplateVersion.findFirst({ where: { loopTemplateId: id }, orderBy: { version: "desc" } });
     if (latest && stableStringify((latest.snapshot as { config?: unknown }).config) === stableStringify(config)) {
       return loop.status === LoopStatus.PUBLISHED
@@ -236,7 +248,7 @@ export async function publishLoop(id: string, publishedById: string | null, expe
       data: {
         loopTemplateId: id,
         version,
-        snapshot: { format: 2, config, totalMinutes: totalMinutes(rounds), estimate: estimateLoopCost(rounds) } as unknown as Prisma.InputJsonValue,
+        snapshot: snapshot as unknown as Prisma.InputJsonValue,
         publishedById,
       },
     });

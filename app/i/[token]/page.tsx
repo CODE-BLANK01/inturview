@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ApplicantShell } from "@/components/applicant/ApplicantShell";
 import { contactFor, deadlineText } from "@/lib/applicant";
 import { prisma } from "@/lib/db";
+import { campaignSnapshot } from "@/lib/loopSnapshot";
 import { findInviteByToken, markOpened } from "@/lib/invites";
 import { publishedRounds, totalMinutes } from "@/lib/loopTemplates";
 import { CATEGORY_LABELS } from "@/lib/questionBank";
@@ -35,12 +36,9 @@ export default async function InvitePage({ params }: { params: { token: string }
   if (invite.status === "COMPLETED") redirect(`/i/${params.token}/done`);
   await markOpened(invite.id);
 
-  const version = await prisma.loopTemplateVersion.findUnique({
-    where: { loopTemplateId_version: { loopTemplateId: invite.campaign.loopTemplateId, version: invite.campaign.loopVersion } },
-    select: { snapshot: true },
-  });
-  const config = (version?.snapshot as { config?: { name: string; description: string | null; rounds: unknown } } | undefined)?.config;
-  const rounds = publishedRounds(version?.snapshot);
+  const snapshot = await campaignSnapshot(invite.campaign);
+  const config = (snapshot as { config?: { name: string; description: string | null; rounds: unknown } } | undefined)?.config;
+  const rounds = publishedRounds(snapshot);
   const run = await prisma.loopRun.findUnique({ where: { inviteId: invite.id }, select: { rounds: { select: { roundIndex: true, status: true } } } });
   const doneRounds = new Set((run?.rounds ?? []).filter((r) => r.status !== "IN_PROGRESS").map((r) => r.roundIndex));
   const inProgressRound = run?.rounds.find((r) => r.status === "IN_PROGRESS")?.roundIndex ?? null;
@@ -51,7 +49,7 @@ export default async function InvitePage({ params }: { params: { token: string }
   const contact = contactFor(company);
 
   return (
-    <ApplicantShell company={company}>
+    <ApplicantShell company={company} preview={invite.campaign.preview}>
       <div className="w-full max-w-xl mx-auto space-y-5">
         <div className="panel p-7 space-y-4">
           <p className="t-eyebrow">{company ? `Interview with ${company.name}` : "Interview invitation"}</p>

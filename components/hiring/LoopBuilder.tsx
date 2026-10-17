@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Loader2, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { LoopRoundConfig } from "@/lib/loopTemplates";
 import { estimateLoopCost, totalMinutes, type LiveRates } from "@/lib/loopEstimate";
+import { diffLoop, type LoopShape } from "@/lib/loopDiff";
 
 type Category = LoopRoundConfig["category"];
 const CATEGORIES: [Category, string][] = [
@@ -34,6 +35,8 @@ export interface LoopBuilderProps {
   version: number;
   /** The revision this editor loaded; every save and status change sends it. */
   revision: number;
+  /** The latest published version, to show what publishing would change. */
+  published: LoopShape | null;
 }
 
 const newRound = (category: Category = "BEHAVIORAL"): LoopRoundConfig => ({
@@ -60,7 +63,13 @@ export function LoopBuilder(props: LoopBuilderProps) {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState<"save" | "publish" | "archive" | "restore" | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const [revision, setRevision] = useState(props.revision);
+  const [revision, setRevisionState] = useState(props.revision);
+  // Preview runs right after a save; it needs the revision the save returned, not the stale render's.
+  const revisionRef = useRef(props.revision);
+  const setRevision = (r: number) => {
+    revisionRef.current = r;
+    setRevisionState(r);
+  };
   /** Someone else changed the loop; saving would overwrite them, so only reloading is offered. */
   const [conflict, setConflict] = useState(false);
 
@@ -116,6 +125,36 @@ export function LoopBuilder(props: LoopBuilderProps) {
     } finally {
       setBusy(null);
     }
+  };
+
+  const [previewing, setPreviewing] = useState(false);
+  const changes = useMemo(
+    () => diffLoop(props.published, { name, description: description || null, roleTarget: roleTarget || null, level: level || null, rounds }),
+    [props.published, name, description, roleTarget, level, rounds],
+  );
+
+  /** Saves if needed, then opens the draft as a candidate would see it, in a new tab. */
+  const preview = async () => {
+    if (dirty && !(await save())) return;
+    // Open the tab now, while we still have the click; pop-up blockers allow that.
+    const tab = window.open("about:blank", "_blank");
+    setPreviewing(true);
+    setMessage(null);
+    const res = await fetch(`${paths.api}/loops/${props.loopId}/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ revision: revisionRef.current }),
+    }).catch(() => null);
+    const body = await res?.json().catch(() => ({}));
+    setPreviewing(false);
+    if (body?.conflict) setConflict(true);
+    if (!res?.ok || !body?.link) {
+      tab?.close();
+      if (body?.problems) setProblems(body.problems);
+      return setMessage({ tone: "error", text: body?.error ?? "Couldn't open a preview." });
+    }
+    if (tab) tab.location.href = body.link;
+    else window.location.href = body.link;
   };
 
   const status = async (action: "publish" | "archive" | "restore") => {
@@ -223,6 +262,18 @@ export function LoopBuilder(props: LoopBuilderProps) {
             {props.status === "DRAFT" && "Draft. Not available for invites yet."}
             {props.status === "ARCHIVED" && "Archived. Existing invites keep working; it can't be used for new ones."}
           </p>
+          {props.status !== "ARCHIVED" && (
+            <div className="text-sm">
+              <p className="font-medium">{props.published ? `Changes since version ${props.version}` : "Publishing creates version 1"}</p>
+              {props.published && changes.length === 0 ? (
+                <p className="text-text-dim">None. Publishing again changes nothing.</p>
+              ) : props.published ? (
+                <ul className="mt-1 space-y-1 text-text-muted list-disc pl-4">
+                  {changes.map((c) => <li key={c}>{c}</li>)}
+                </ul>
+              ) : null}
+            </div>
+          )}
           {problems.length > 0 && (
             <div className="text-sm">
               <p className="font-medium">Before you can publish:</p>
@@ -232,6 +283,9 @@ export function LoopBuilder(props: LoopBuilderProps) {
             </div>
           )}
           <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn text-sm" onClick={preview} disabled={!!busy || previewing || conflict}>
+              {previewing && <Loader2 className="h-4 w-4 animate-spin" />} Preview as candidate
+            </button>
             <button type="button" className="btn text-sm" onClick={save} disabled={!!busy || !dirty || conflict}>
               {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
             </button>
