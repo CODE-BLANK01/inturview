@@ -20,7 +20,7 @@ export function ModeArt({
             width="137"
             height="55"
             rx="10"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".18"
             transform="rotate(-6 43 19)"
@@ -40,9 +40,9 @@ export function ModeArt({
             rx="10"
             fill="currentColor"
           />
-          <circle cx="116" cy="82" r="3" fill="var(--art-paper)" />
-          <circle cx="130" cy="82" r="3" fill="var(--art-paper)" />
-          <circle cx="144" cy="82" r="3" fill="var(--art-paper)" />
+          <circle cx="116" cy="82" r="3" fill="rgb(var(--art-paper))" />
+          <circle cx="130" cy="82" r="3" fill="rgb(var(--art-paper))" />
+          <circle cx="144" cy="82" r="3" fill="rgb(var(--art-paper))" />
           <path d="m187 106 14 10v-12" fill="currentColor" />
           <path
             d="m207 26 3-8 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z"
@@ -66,7 +66,7 @@ export function ModeArt({
             width="43"
             height="43"
             rx="11"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".2"
             transform="rotate(-8 25 57)"
@@ -87,7 +87,7 @@ export function ModeArt({
             width="45"
             height="45"
             rx="11"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".2"
             transform="rotate(5 82 10)"
@@ -108,7 +108,7 @@ export function ModeArt({
             width="44"
             height="44"
             rx="11"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".2"
             transform="rotate(-5 139 43)"
@@ -135,7 +135,7 @@ export function ModeArt({
           <text
             x="209"
             y="95"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             fontSize="18"
             fontFamily="Georgia,serif"
             fontStyle="italic"
@@ -152,7 +152,7 @@ export function ModeArt({
             width="176"
             height="99"
             rx="9"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".22"
           />
@@ -177,7 +177,7 @@ export function ModeArt({
           <circle cx="216" cy="94" r="18" fill="currentColor" />
           <path
             d="m208 94 5 5 10-10"
-            stroke="var(--art-paper)"
+            stroke="rgb(var(--art-paper))"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -198,7 +198,7 @@ export function ModeArt({
             width="49"
             height="36"
             rx="7"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".3"
           />
@@ -212,7 +212,7 @@ export function ModeArt({
           />
           <path
             d="M119 54h22m-22 8h22m-22 8h13"
-            stroke="var(--art-paper)"
+            stroke="rgb(var(--art-paper))"
             strokeOpacity=".8"
             strokeWidth="2"
             strokeLinecap="round"
@@ -223,7 +223,7 @@ export function ModeArt({
             width="49"
             height="36"
             rx="7"
-            fill="var(--art-paper)"
+            fill="rgb(var(--art-paper))"
             stroke="currentColor"
             strokeOpacity=".3"
           />

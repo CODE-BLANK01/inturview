@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { createResetToken } from "@/lib/passwordReset";
 import { sendEmail, appUrl, emailConfigurationError } from "@/lib/email";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
+import { inlineColors } from "@/lib/theme";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -142,17 +143,17 @@ export async function POST(req: NextRequest) {
           "",
           "— inturview",
         ].join("\n"),
-        html: `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FAF7F2;color:#1A1410;padding:32px;line-height:1.6">
+        html: `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:${inlineColors.page};color:${inlineColors.text};padding:32px;line-height:1.6">
   <p>Hi${htmlFirst ? ` ${htmlFirst}` : ""},</p>
   <p>You (or someone using your email) asked to reset your inturview account password.<br>
   Click below to set a new one. The link expires <strong>in 1 hour</strong>.</p>
   <p style="margin:24px 0">
-    <a href="${resetUrl}" style="background:#1A1410;color:#FAF7F2;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Reset password</a>
+    <a href="${resetUrl}" style="background:${inlineColors.button};color:${inlineColors.buttonText};padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Reset password</a>
   </p>
-  <p style="font-size:13px;color:#6B5E54">Or copy this link into your browser:<br><code style="word-break:break-all;font-size:12px">${resetUrl}</code></p>
-  <hr style="border:none;border-top:1px solid #E8E2D9;margin:32px 0">
-  <p style="font-size:13px;color:#6B5E54">If you didn't request this, ignore this email — your password stays the same.</p>
-  <p style="font-size:13px;color:#6B5E54">— inturview</p>
+  <p style="font-size:13px;color:${inlineColors.muted}">Or copy this link into your browser:<br><code style="word-break:break-all;font-size:12px">${resetUrl}</code></p>
+  <hr style="border:none;border-top:1px solid ${inlineColors.rule};margin:32px 0">
+  <p style="font-size:13px;color:${inlineColors.muted}">If you didn't request this, ignore this email — your password stays the same.</p>
+  <p style="font-size:13px;color:${inlineColors.muted}">— inturview</p>
 </body></html>`,
       });
       if (!delivery.ok) throw new Error(delivery.error);

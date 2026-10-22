@@ -6,14 +6,7 @@
   --marketing-space-md: clamp(3.5rem, 7vw, 6rem);
   --marketing-space-lg: clamp(4.5rem, 9vw, 8rem);
 }
-.public-site {
-  --bg-inverse: 14 12 10;
-  --bg-surface: 253 251 247;
-}
-[data-theme="dark"] .public-site {
-  --bg-inverse: 240 235 227;
-  --bg-surface: 20 18 16;
-}
+/* The public site's surface colors are set in lib/theme.ts (publicSite). */
 .marketing {
   overflow: clip;
 }
@@ -1010,7 +1003,7 @@
   height: 4.4rem;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.55), transparent 42%),
+    radial-gradient(circle at 35% 30%, rgb(var(--highlight) / 0.55), transparent 42%),
     radial-gradient(circle at 60% 70%, rgb(var(--preview-accent)), rgb(var(--preview-accent) / 0.55) 70%);
   box-shadow: 0 0 calc(18px + var(--level) * 40px) rgb(var(--preview-accent) / calc(0.25 + var(--level) * 0.4));
   transform: scale(calc(1 + var(--level) * 0.1));

@@ -313,7 +313,7 @@ function PlanCard({ plan }: { plan: PlanDefinition }) {
             className="badge"
             style={{
               background: "rgb(var(--bg-inset))",
-              color: "rgb(var(--text-muted))",
+              color: "rgb(var(--text-secondary))",
               borderColor: "rgb(var(--border-base))",
             }}
           >

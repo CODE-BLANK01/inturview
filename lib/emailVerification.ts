@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from "crypto";
 import { prisma } from "./db";
 import { sendEmail, appUrl } from "./email";
+import { inlineColors } from "./theme";
 
 const TOKEN_TTL_MS = 24 * 60 * 60_000; // 24 hours
 
@@ -106,16 +107,16 @@ export async function sendVerificationEmail(opts: {
       "",
       "— inturview",
     ].join("\n"),
-    html: `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FAF7F2;color:#1A1410;padding:32px;line-height:1.6">
+    html: `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:${inlineColors.page};color:${inlineColors.text};padding:32px;line-height:1.6">
   <p>Hi${first ? ` ${first}` : ""},</p>
   <p>Welcome to <strong>inturview</strong>. Click below to verify your email so we know we can reach you. The link expires <strong>in 24 hours</strong>.</p>
   <p style="margin:24px 0">
-    <a href="${verifyUrl}" style="background:#1A1410;color:#FAF7F2;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Verify email</a>
+    <a href="${verifyUrl}" style="background:${inlineColors.button};color:${inlineColors.buttonText};padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Verify email</a>
   </p>
-  <p style="font-size:13px;color:#6B5E54">Or copy this link into your browser:<br><code style="word-break:break-all;font-size:12px">${verifyUrl}</code></p>
-  <hr style="border:none;border-top:1px solid #E8E2D9;margin:32px 0">
-  <p style="font-size:13px;color:#6B5E54">If you didn't sign up for inturview, ignore this email — the account stays inactive without verification.</p>
-  <p style="font-size:13px;color:#6B5E54">— inturview</p>
+  <p style="font-size:13px;color:${inlineColors.muted}">Or copy this link into your browser:<br><code style="word-break:break-all;font-size:12px">${verifyUrl}</code></p>
+  <hr style="border:none;border-top:1px solid ${inlineColors.rule};margin:32px 0">
+  <p style="font-size:13px;color:${inlineColors.muted}">If you didn't sign up for inturview, ignore this email — the account stays inactive without verification.</p>
+  <p style="font-size:13px;color:${inlineColors.muted}">— inturview</p>
 </body></html>`,
   });
 }

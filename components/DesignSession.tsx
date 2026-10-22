@@ -323,7 +323,8 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
         elements: scene.elements,
         // Keep appState minimal — viewBackgroundColor etc — to avoid pulling
         // in collaborator maps / non-serializable things.
-        appState: { viewBackgroundColor: scene.appState.viewBackgroundColor ?? "#ffffff" },
+        // Saved scene data in Excalidraw's own format, not a product color.
+        appState: { viewBackgroundColor: scene.appState.viewBackgroundColor ?? "#ffffff" }, // color-literal-ok
         files: scene.files,
       });
       fetch("/api/design/canvas", {

@@ -100,7 +100,7 @@ export default async function HistoryDetailPage({
             className="text-xs"
             style={{
               color: isAbandoned
-                ? "rgb(var(--text-muted))"
+                ? "rgb(var(--text-secondary))"
                 : "rgb(var(--text-tertiary))",
             }}
           >
@@ -233,7 +233,7 @@ function Bubble({ role, text }: { role: string; text: string }) {
       <div
         className={`max-w-[85%] whitespace-pre-wrap text-sm rounded-lg px-3 py-2 ${
           isUser
-            ? "bg-accent text-white dark:text-text-inverse"
+            ? "bg-accent text-text-on-accent"
             : "bg-bg-surface border border-border text-text"
         }`}
       >

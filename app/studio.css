@@ -20,6 +20,7 @@
   display: block;
   width: 136px;
   height: auto;
+  color: rgb(var(--brand-logo));
   flex-shrink: 0;
 }
 
@@ -323,7 +324,7 @@
 }
 
 .workspace-drawer::backdrop {
-  background: #1a141066;
+  background: rgb(var(--shadow) / 0.4);
   backdrop-filter: blur(3px);
 }
 
@@ -483,7 +484,7 @@
 
 .studio-button-outline:hover {
   background: rgb(var(--bg-surface));
-  box-shadow: 0 3px 9px #1a141006;
+  box-shadow: 0 3px 9px rgb(var(--shadow) / 0.024);
 }
 
 .studio-button-dark {
@@ -494,7 +495,7 @@
 
 .studio-button-dark:hover {
   background: rgb(var(--text-primary));
-  box-shadow: 0 5px 15px #1a141015;
+  box-shadow: 0 5px 15px rgb(var(--shadow) / 0.082);
 }
 
 .studio-text-link {
@@ -668,7 +669,7 @@
 .practice-card:hover, .practice-card:focus-visible {
   background: rgb(var(--brand-soft) / .6);
   border-color: rgb(var(--text-ember) / .4);
-  box-shadow: 0 4px 15px #1a141006;
+  box-shadow: 0 4px 15px rgb(var(--shadow) / 0.024);
 }
 
 .practice-mode-icon {
@@ -723,23 +724,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0e5da;
-  color: #b47450;
+  background: rgb(var(--art-recruiter-bg));
+  color: rgb(var(--art-recruiter-ink));
 }
 
 .practice-card-behavioral .practice-card-art {
-  background: #f7eee2;
-  color: #b58b52;
+  background: rgb(var(--art-behavioral-bg));
+  color: rgb(var(--art-behavioral-ink));
 }
 
 .practice-card-coding .practice-card-art {
-  background: #f0e8de;
-  color: #80624e;
+  background: rgb(var(--art-coding-bg));
+  color: rgb(var(--art-coding-ink));
 }
 
 .practice-card-design .practice-card-art {
-  background: #f3ede5;
-  color: #8a705d;
+  background: rgb(var(--art-design-bg));
+  color: rgb(var(--art-design-ink));
 }
 
 [data-theme="dark"] .practice-card-art {
@@ -1387,7 +1388,7 @@
 }
 
 .workspace-page a.panel:hover {
-  box-shadow: 0 6px 20px #1a141008;
+  box-shadow: 0 6px 20px rgb(var(--shadow) / 0.031);
 }
 
 .auth-shell {

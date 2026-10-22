@@ -32,6 +32,8 @@ jobs:
         run: npm run lint
       - name: Every env var is documented
         run: npm run check:env
+      - name: Every color comes from lib/theme.ts
+        run: npm run check:colors
       - name: Unit tests
         run: npm run test:unit
       - name: Production build

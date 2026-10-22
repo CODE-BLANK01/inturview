@@ -1231,7 +1231,7 @@ function LiveView({
           {avatarLive ? (
             <>
               <AvatarView onVideo={onAvatarVideo} />
-              <div className="absolute bottom-3 right-3 w-1/4 min-w-[120px] rounded-lg shadow-lg ring-1 ring-white/20">
+              <div className="absolute bottom-3 right-3 w-1/4 min-w-[120px] rounded-lg shadow-lg ring-1 ring-stage-edge/20">
                 <SelfView stream={stream} cameraOff={cameraOff} className="aspect-video w-full" />
               </div>
             </>
@@ -1287,7 +1287,7 @@ function AvatarView({ onVideo }: { onVideo: (el: HTMLVideoElement | null) => voi
   return (
     <div
       className="relative aspect-video w-full overflow-hidden rounded-lg"
-      style={{ background: "rgb(14 12 10)" }}
+      style={{ background: "rgb(var(--stage-bg))" }}
     >
       {/* The face's voice plays through a separate element; this only shows video. */}
       <video ref={onVideo} autoPlay playsInline muted className="h-full w-full object-cover" />
@@ -1319,7 +1319,7 @@ function SelfView({
   return (
     <div
       className={`relative overflow-hidden rounded-lg ${className ?? ""}`}
-      style={{ background: "rgb(14 12 10)" }}
+      style={{ background: "rgb(var(--stage-bg))" }}
     >
       <video
         ref={ref}
@@ -1331,7 +1331,7 @@ function SelfView({
       {cameraOff && (
         <div
           className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm"
-          style={{ color: "rgb(240 235 227 / 0.7)" }}
+          style={{ color: "rgb(var(--stage-text) / 0.7)" }}
         >
           <CameraOff className="h-6 w-6" />
           Camera off

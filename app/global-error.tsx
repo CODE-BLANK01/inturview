@@ -3,6 +3,8 @@
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 import { sentryOptions } from "@/lib/sentryOptions";
+// This page renders without the stylesheet, so it takes hex values.
+import { inlineColors } from "@/lib/theme";
 
 /**
  * Last-resort error page for crashes in the root layout. Sentry runs
@@ -23,21 +25,21 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
-          background: "#FAF7F2",
-          color: "#1A1410",
+          background: inlineColors.page,
+          color: inlineColors.text,
           fontFamily: "system-ui, -apple-system, sans-serif",
           padding: "24px",
         }}
       >
         <main style={{ maxWidth: 420, textAlign: "center" }}>
           <h1 style={{ fontSize: 24, margin: "0 0 8px" }}>Something broke on our side.</h1>
-          <p style={{ color: "#6B5E54", margin: "0 0 20px", lineHeight: 1.5 }}>
+          <p style={{ color: inlineColors.muted, margin: "0 0 20px", lineHeight: 1.5 }}>
             We&apos;ve been notified. Try again, and if it keeps happening, email hello@inturview.com.
           </p>
           <button
             type="button"
             onClick={reset}
-            style={{ background: "#1A1410", color: "#FAF7F2", border: 0, padding: "10px 18px", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}
+            style={{ background: inlineColors.button, color: inlineColors.buttonText, border: 0, padding: "10px 18px", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}
           >
             Try again
           </button>

@@ -42,7 +42,7 @@ export function EndDesignDialog({ sessionId, onClose }: EndDesignDialogProps) {
       aria-modal="true"
       aria-label="End design session?"
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: "rgb(0 0 0 / 0.55)" }}
+      style={{ background: "rgb(var(--overlay) / 0.55)" }}
       onClick={onClose}
     >
       <div className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
