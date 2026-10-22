@@ -8,7 +8,7 @@ Every color in inturview is defined in one file: [`lib/theme.ts`](../lib/theme.t
 - the error page
 - the 2FA QR code
 
-`npm run check:colors` runs in CI. It fails the build if a color is written anywhere else.
+`npm run check:colors` runs in CI. It fails the build if a color is written anywhere else in `app/`, `components/` or `lib/` (`.ts`, `.tsx` and `.css` files). Static files in `public/`, and the Python service in `services/`, are outside it (see Static files).
 
 ## How it fits together
 
