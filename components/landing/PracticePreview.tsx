@@ -95,6 +95,8 @@ export function PracticePreview() {
   const soundRef = useRef(false);
   const interactedRef = useRef(false);
   const autoplayedRef = useRef(false);
+  const visibleRef = useRef(false);
+  const selectedRef = useRef(0);
   const cleanupRef = useRef<(() => void) | null>(null);
   const energyRef = useRef(0);
   const speakingRef = useRef(false);
@@ -228,6 +230,7 @@ export function PracticePreview() {
       const id = runRef.current;
       const ex = examples[index]!;
       setSelected(index);
+      selectedRef.current = index;
       setStarted(true);
       setNotes(0);
       setElapsed(0);
@@ -280,21 +283,27 @@ export function PracticePreview() {
     }
   };
 
-  // Starts silently once the card is on screen, unless motion is reduced.
+  // Plays silently while the card is on screen, unless motion is reduced.
+  // Scrolling away pauses it; coming back picks the round up from the top.
   useEffect(() => {
     const el = rootRef.current;
     if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (!entry?.isIntersecting || interactedRef.current || autoplayedRef.current) return;
+        visibleRef.current = !!entry?.isIntersecting;
+        if (interactedRef.current) return;
+        if (!visibleRef.current) {
+          if (autoplayedRef.current) stop();
+          return;
+        }
         autoplayedRef.current = true;
-        void play(0);
+        void play(selectedRef.current);
       },
       { threshold: 0.4 },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [play]);
+  }, [play, stop]);
 
   useEffect(() => {
     const onHide = () => {
@@ -309,7 +318,7 @@ export function PracticePreview() {
 
   useEffect(() => {
     if (!started || phase === "done") return;
-    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    const t = setInterval(() => visibleRef.current && setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [started, phase]);
 
@@ -319,7 +328,7 @@ export function PracticePreview() {
     let frame = 0;
     const loop = (t: number) => {
       const el = orbRef.current;
-      if (el) {
+      if (el && visibleRef.current) {
         const talking = speakingRef.current && speaker === "interviewer" && phase === "speaking";
         energyRef.current *= 0.9;
         const wobble = Math.abs(Math.sin(t / 97) * Math.sin(t / 151));
@@ -356,7 +365,7 @@ export function PracticePreview() {
         <div className="preview-top">
           <span className="preview-room-label">
             <span className={`preview-dot${started && phase !== "done" ? " demo-live-dot" : ""}`} aria-hidden="true" />
-            {started && phase !== "done" ? "Live" : "The practice room"}
+            {started && phase !== "done" ? "Playing" : "The practice room"}
             <span className="demo-clock" aria-hidden="true">
               {clock}
             </span>
