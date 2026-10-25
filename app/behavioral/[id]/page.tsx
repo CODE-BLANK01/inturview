@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { BEHAVIORAL_SCENARIOS, getBehavioralScenario } from "@/lib/behavioralScenarios";
-import { ConversationSession } from "@/components/ConversationSession";
+import { ConversationRound } from "@/components/ConversationRound";
 
 export function generateStaticParams() {
   return BEHAVIORAL_SCENARIOS.map((s) => ({ id: s.id }));
@@ -14,7 +14,7 @@ export default function BehavioralSessionPage({
   const scenario = getBehavioralScenario(params.id);
   if (!scenario) notFound();
   return (
-    <ConversationSession
+    <ConversationRound
       kind="BEHAVIORAL"
       scenarioId={scenario.id}
       title={scenario.title}

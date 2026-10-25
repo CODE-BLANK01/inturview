@@ -7,6 +7,8 @@ import { getBehavioralScenario } from "@/lib/behavioralScenarios";
 import { ConversationKind } from "@prisma/client";
 import { captureProductEvent } from "@/lib/analytics";
 import { acquireSessionStartLock } from "@/lib/sessionStartLock";
+import { newVoicePlan, readVoicePlan, voiceDeadlineMs } from "@/lib/voicePlan";
+import { voiceEnabledFor } from "@/lib/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +16,8 @@ export const dynamic = "force-dynamic";
 const Body = z.object({
   kind: z.enum(["BEHAVIORAL", "RECRUITER_SCREEN"]),
   scenario_id: z.string().min(1).optional(),
+  /** Run the session as a spoken interview (OpenAI Realtime). */
+  voice: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -58,6 +62,9 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  if (parsed.voice && !voiceEnabledFor(parsed.kind)) {
+    return Response.json({ error: "Voice interviews are turned off" }, { status: 403 });
+  }
 
   const plan = getEffectivePlan(profile.plan, user.email, profile.planExpiresAt);
   const cap =
@@ -96,9 +103,31 @@ export async function POST(req: NextRequest) {
         status: "IN_PROGRESS",
       },
       orderBy: { startedAt: "desc" },
-      select: { id: true, startedAt: true },
+      select: { id: true, startedAt: true, plan: true },
     });
-    if (existing) return { outcome: "resumed" as const, session: existing };
+    if (existing) {
+      // Continuing a typed session by voice: start its voice clock now. A
+      // voice session that reconnects keeps the clock it already has, unless
+      // it ran out without the candidate ever answering: nothing was used, so
+      // it gets a fresh clock instead of a dead "time is up" session.
+      const voicePlan = readVoicePlan(existing.plan);
+      const expiredUnused =
+        voicePlan &&
+        Date.now() > voiceDeadlineMs(voicePlan) &&
+        (await tx.conversationMessage.count({
+          where: { sessionId: existing.id, role: "user" },
+        })) === 0;
+      if (parsed.voice && (!voicePlan || expiredUnused)) {
+        await tx.conversationSession.update({
+          where: { id: existing.id },
+          data: { plan: newVoicePlan(parsed.kind) as unknown as object },
+        });
+      }
+      return {
+        outcome: "resumed" as const,
+        session: { id: existing.id, startedAt: existing.startedAt },
+      };
+    }
 
     if (cap !== null) {
       const used = await tx.conversationSession.count({
@@ -116,6 +145,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         kind: parsed.kind as ConversationKind,
         scenarioId: parsed.scenario_id ?? null,
+        ...(parsed.voice ? { plan: newVoicePlan(parsed.kind) as unknown as object } : {}),
       },
       select: { id: true, startedAt: true },
     });

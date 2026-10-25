@@ -12,7 +12,12 @@ import {
   type ConversationDebrief,
 } from "@/lib/conversationTypes";
 import { getBehavioralScenario } from "@/lib/behavioralScenarios";
-import { faceToFaceDebriefSystemPrompt, type TurnMetrics } from "@/lib/faceToFacePrompts";
+import {
+  faceToFaceDebriefSystemPrompt,
+  summarizeDeliveryMetrics,
+  type TurnMetrics,
+} from "@/lib/faceToFacePrompts";
+import { readVoicePlan, voiceMinutesUsed } from "@/lib/voicePlan";
 import type { FaceToFacePlan } from "@/lib/faceToFaceQuestions";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
@@ -97,6 +102,20 @@ export async function POST(req: NextRequest) {
     metrics: m.metrics as TurnMetrics | null,
   }));
 
+  // Set for spoken recruiter/behavioral sessions; typed ones have no plan.
+  const voicePlan = session.kind === "FACE_TO_FACE" ? null : readVoicePlan(session.plan);
+  // A dropped connection can leave a voice session with nothing saved;
+  // don't score an empty transcript and burn the session.
+  if (voicePlan && !transcript.some((t) => t.role === "user")) {
+    return Response.json(
+      { error: "None of your answers were saved, so there's nothing to score yet." },
+      { status: 409 }
+    );
+  }
+  const spoken = voicePlan
+    ? { delivery: summarizeDeliveryMetrics(transcript), notes: voicePlan.interviewerNotes }
+    : undefined;
+
   let system: string;
   if (session.kind === "BEHAVIORAL") {
     if (!session.scenarioId) {
@@ -104,7 +123,7 @@ export async function POST(req: NextRequest) {
     }
     const scenario = getBehavioralScenario(session.scenarioId);
     if (!scenario) return Response.json({ error: "Unknown scenario" }, { status: 404 });
-    system = behavioralDebriefSystemPrompt(scenario, transcript);
+    system = behavioralDebriefSystemPrompt(scenario, transcript, spoken);
   } else if (session.kind === "FACE_TO_FACE") {
     if (!session.plan) return Response.json({ error: "Plan missing" }, { status: 500 });
     if (session.status !== "IN_PROGRESS") {
@@ -120,7 +139,7 @@ export async function POST(req: NextRequest) {
     }
     system = faceToFaceDebriefSystemPrompt(session.plan as unknown as FaceToFacePlan, transcript);
   } else {
-    system = recruiterDebriefSystemPrompt(transcript);
+    system = recruiterDebriefSystemPrompt(transcript, spoken);
   }
 
   let anthropic;
@@ -228,6 +247,13 @@ export async function POST(req: NextRequest) {
         const capMinutes = Number(process.env.FACE_TO_FACE_MAX_MINUTES ?? 20) + 3;
         const minutes = Math.min((Date.now() - session.startedAt.getTime()) / 60_000, capMinutes);
         await trackLiveMinutes(user.id, { sessionId: session.id, minutes, avatar: FACE_TO_FACE_AVATAR_ENABLED });
+      } else if (voicePlan) {
+        await trackLiveMinutes(user.id, {
+          sessionId: session.id,
+          minutes: voiceMinutesUsed(voicePlan),
+          avatar: false,
+          category: session.kind === "BEHAVIORAL" ? "behavioral" : "recruiter_screen",
+        });
       }
 
       return Response.json(debrief);
