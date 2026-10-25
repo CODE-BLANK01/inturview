@@ -12,6 +12,14 @@ const nextConfig = {
     serverComponentsExternalPackages: ["@anthropic-ai/sdk"],
     instrumentationHook: true,
   },
+  webpack(config) {
+    // MediaPipe loads its WASM with a dynamic import webpack can't trace. Harmless.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /@mediapipe[\\/]tasks-vision/, message: /Critical dependency/ },
+    ];
+    return config;
+  },
   async redirects() {
     // The platform library moved under /admin/content when hiring moved into workspaces.
     return [
