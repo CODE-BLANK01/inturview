@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ConversationSession } from "@/components/ConversationSession";
+import { ConversationRound } from "@/components/ConversationRound";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -18,10 +18,10 @@ export default async function RecruiterScreenPage() {
   if (!profile.onboardingCompletedAt) redirect("/onboarding");
 
   return (
-    <ConversationSession
+    <ConversationRound
       kind="RECRUITER_SCREEN"
       title="Recruiter screen"
-      subtitle="Text-based initial recruiter screen"
+      subtitle="Initial recruiter screen"
       prompt="A recruiter is calling you for an initial screen. They'll walk through your resume, ask why you're looking now, probe compensation expectations, and run logistics. Treat it like the real call — clear, professional, two-way."
       backHref="/dashboard"
       backLabel="Dashboard"

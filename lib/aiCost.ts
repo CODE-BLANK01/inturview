@@ -76,13 +76,13 @@ function ratePerMinute(value: string | undefined, fallback: number) {
  */
 export async function trackLiveMinutes(
   userId: string,
-  opts: { sessionId: string; minutes: number; avatar: boolean },
+  opts: { sessionId: string; minutes: number; avatar: boolean; category?: Category },
 ): Promise<void> {
   const minutes = Math.max(0, Math.round(opts.minutes * 100) / 100);
   if (!minutes) return;
   const voiceRate = ratePerMinute(process.env.COST_REALTIME_VOICE_PER_MIN, 0.075);
   const avatarRate = ratePerMinute(process.env.COST_AVATAR_PER_MIN, 0.1);
-  const base = { category: "face_to_face" as const, session_id: opts.sessionId, minutes, estimated: true };
+  const base = { category: opts.category ?? "face_to_face", session_id: opts.sessionId, minutes, estimated: true };
   await captureProductEvent(userId, {
     event: "ai_usage",
     properties: { ...base, provider: "openai_realtime", model: "realtime", purpose: "live_voice", cost_usd: round(minutes * voiceRate) },
