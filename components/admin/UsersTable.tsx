@@ -376,7 +376,7 @@ function FlagDialog({
   const [submitting, setSubmitting] = useState(false);
   return (
     <div
-      className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-40 bg-overlay/60 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div

@@ -180,7 +180,7 @@ function EmailPreview({
         <dd>{email.replyTo}</dd>
       </dl>
       {/* Sandboxed: the email's HTML can't run anything here. */}
-      <iframe title="Email preview" sandbox="" srcDoc={email.html} className="w-full h-[420px] bg-white" />
+      <iframe title="Email preview" sandbox="" srcDoc={email.html} className="w-full h-[420px] bg-email-canvas" />
     </div>
   );
 }

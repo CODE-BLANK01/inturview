@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { encryptString } from "@/lib/crypto";
 import { createOtpAuthUrl, createTotpSecret } from "@/lib/twoFactor";
+import { inlineColors } from "@/lib/theme";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,8 +27,8 @@ export async function POST() {
     margin: 1,
     width: 220,
     color: {
-      dark: "#1A1410",
-      light: "#FAF7F2",
+      dark: inlineColors.text,
+      light: inlineColors.page,
     },
   });
 

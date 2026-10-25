@@ -20,6 +20,7 @@
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "postinstall": "prisma generate",
     "check:env": "node scripts/check-env.mjs",
+    "check:colors": "node scripts/check-colors.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "db:new-migration": "node scripts/new-migration.mjs",
     "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",

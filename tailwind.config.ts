@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
+import { cssVariables } from "./lib/theme";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
@@ -6,7 +8,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // All color tokens point at CSS variables defined in globals.css.
+        // All color tokens point at CSS variables generated from lib/theme.ts.
         // Values are stored as space-separated RGB triplets so Tailwind's
         // /<alpha> modifier works (e.g. bg-bg/85, text-text-ember/50).
         bg: {
@@ -27,7 +29,15 @@ const config: Config = {
           dim: "rgb(var(--text-tertiary) / <alpha-value>)",
           ember: "rgb(var(--text-ember) / <alpha-value>)",
           inverse: "rgb(var(--text-inverse) / <alpha-value>)",
+          "on-accent": "rgb(var(--text-on-accent) / <alpha-value>)",
         },
+        overlay: "rgb(var(--overlay) / <alpha-value>)",
+        stage: {
+          DEFAULT: "rgb(var(--stage-bg) / <alpha-value>)",
+          text: "rgb(var(--stage-text) / <alpha-value>)",
+          edge: "rgb(var(--stage-edge) / <alpha-value>)",
+        },
+        "email-canvas": "rgb(var(--email-canvas) / <alpha-value>)",
         // `accent` aliases ember so existing components inherit the brand color
         // without a sweeping rename. On the landing page the Ember rule applies
         // strictly; inside the product UI it's the primary action color.
@@ -64,7 +74,8 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  // The color variables themselves, light, dark and the public site.
+  plugins: [plugin(({ addBase }) => addBase(cssVariables()))],
 };
 
 export default config;

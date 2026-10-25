@@ -7,6 +7,7 @@ import { prisma } from "./db";
 import { appUrl, sendEmail, type SendEmailParams } from "./email";
 import { can, canManageRole, ROLE_LABELS, type Permission } from "./permissions";
 import { isValidSlug, slugify } from "./slug";
+import { inlineColors } from "./theme";
 
 export { isValidSlug, slugify };
 
@@ -155,12 +156,12 @@ export function memberInviteEmail(i: {
     "",
     "— inturview",
   ].join("\n");
-  const html = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FAF7F2;color:#1A1410;padding:32px;line-height:1.6">
+  const html = `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:${inlineColors.page};color:${inlineColors.text};padding:32px;line-height:1.6">
   <p>${esc(who)} to join <strong>${esc(i.orgName)}</strong> on inturview Hire as ${/^[aeiou]/.test(role) ? "an" : "a"} ${esc(role)}.</p>
-  <p style="margin:24px 0"><a href="${esc(i.link)}" style="background:#1A1410;color:#FAF7F2;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Accept invitation</a></p>
-  <p style="font-size:13px;color:#6B5E54">Sign in or create an account with <strong>${esc(i.to)}</strong> to accept. The link works until ${esc(when)}.</p>
-  <p style="font-size:13px;color:#6B5E54">If you weren't expecting this, you can ignore it.</p>
-  <p style="font-size:13px;color:#6B5E54">— inturview</p>
+  <p style="margin:24px 0"><a href="${esc(i.link)}" style="background:${inlineColors.button};color:${inlineColors.buttonText};padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block">Accept invitation</a></p>
+  <p style="font-size:13px;color:${inlineColors.muted}">Sign in or create an account with <strong>${esc(i.to)}</strong> to accept. The link works until ${esc(when)}.</p>
+  <p style="font-size:13px;color:${inlineColors.muted}">If you weren't expecting this, you can ignore it.</p>
+  <p style="font-size:13px;color:${inlineColors.muted}">— inturview</p>
 </body></html>`;
   return { to: i.to, subject: `Join ${i.orgName} on inturview`, text, html };
 }
