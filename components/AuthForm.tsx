@@ -24,7 +24,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const callbackUrl =
     mode === "signup"
       ? `/verify-email${afterSignup ? `?next=${encodeURIComponent(afterSignup)}` : ""}`
-      : intended || "/dashboard";
+      : intended || "/start";
   const [email, setEmail] = useState(() => params.get("email")?.slice(0, 200) ?? "");
   // Switching between sign in and sign up keeps the destination and email.
   const carry = (path: string) => {

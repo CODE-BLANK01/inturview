@@ -8,7 +8,7 @@ export const metadata = { title: "Sign up — inturview" };
 
 export default async function SignUpPage() {
   const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect("/start");
   return (
     <AuthShell>
       <Suspense>

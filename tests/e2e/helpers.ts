@@ -11,6 +11,7 @@ export interface Fixtures {
   owner: string;
   reviewer: string;
   outsider: string;
+  both: string;
   loopId: string;
   roleId: string;
   questionId: string;

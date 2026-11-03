@@ -25,3 +25,17 @@ test("signing in from a verification link returns to it, but verifying never loo
   assert.equal(afterVerify("/verify-email?token=x"), null);
   assert.equal(afterVerify("/hire/join/abc"), "/hire/join/abc");
 });
+
+test("landing: people using both products go back to the one they used last", async () => {
+  const { pickLanding, parseProduct } = await import("../lib/landingRule");
+  const both = { practiceSetUp: true, inWorkspace: true };
+  assert.equal(pickLanding({ ...both, last: "hire" }), "/hire");
+  assert.equal(pickLanding({ ...both, last: "practice" }), "/dashboard");
+  assert.equal(pickLanding({ ...both, last: null }), "/dashboard", "no signal: Practice, which they set up");
+  assert.equal(pickLanding({ practiceSetUp: false, inWorkspace: true, last: null }), "/hire");
+  assert.equal(pickLanding({ practiceSetUp: false, inWorkspace: true, last: "practice" }), "/hire", "no Practice set up: the workspace");
+  assert.equal(pickLanding({ practiceSetUp: true, inWorkspace: false, last: "hire" }), "/dashboard", "left the workspace: Practice");
+  assert.equal(pickLanding({ practiceSetUp: false, inWorkspace: false, last: null }), "/onboarding");
+  assert.equal(parseProduct("hire"), "hire");
+  assert.equal(parseProduct("anything else"), null);
+});
