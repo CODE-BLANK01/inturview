@@ -117,7 +117,7 @@ function Bubble({
       <div
         className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 ${
           isUser
-            ? "bg-accent text-white"
+            ? "bg-accent text-white dark:text-text-inverse"
             : "bg-bg-surface border border-border text-text"
         }`}
       >

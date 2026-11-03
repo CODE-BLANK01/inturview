@@ -1,56 +1,61 @@
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import type { DashboardData } from "@/lib/dashboard";
 
-export function TopicMastery({ topics }: { topics: DashboardData["topicMastery"] }) {
-  const totalAttempted = topics.reduce((acc, t) => acc + t.attempted, 0);
-
-  return (
-    <section className="panel p-5">
-      <div className="flex items-end justify-between mb-4">
+export function TopicMastery({
+  topics,
+}: {
+  topics: DashboardData["topicMastery"];
+}) {
+  const attempted = topics.reduce((sum, t) => sum + t.attempted, 0);
+  const total = topics.reduce((sum, t) => sum + t.total, 0);
+  const sorted = [...topics].sort((a, b) => b.attempted - a.attempted);
+  function row(t: DashboardData["topicMastery"][number]) {
+    return (
+      <li key={t.topic} className="topic-row">
         <div>
-          <h2 className="font-semibold">Topic coverage</h2>
-          <p className="text-xs text-text-dim mt-0.5">
-            Unique problems attempted per NeetCode topic.
+          <span>{t.topic}</span>
+          <span>
+            {t.attempted}
+            <span className="text-text-dim"> / {t.total}</span>
+          </span>
+        </div>
+        <div className="topic-track">
+          <div
+            style={{
+              width: `${t.total ? Math.min(100, (t.attempted / t.total) * 100) : 0}%`,
+            }}
+          />
+        </div>
+      </li>
+    );
+  }
+  return (
+    <section className="studio-panel topic-panel">
+      <div className="section-heading">
+        <div>
+          <h2>Build your range</h2>
+          <p>
+            Coding topics · {attempted} of {total} problems completed
           </p>
         </div>
-        <span className="text-xs text-text-dim tabular-nums">
-          {totalAttempted}/{topics.reduce((acc, t) => acc + t.total, 0)} problems
-        </span>
+        <Link
+          href="/problems"
+          className="studio-icon-button"
+          aria-label="Browse coding problems"
+        >
+          <ArrowUpRight size={17} />
+        </Link>
       </div>
-
-      <ul className="space-y-2.5">
-        {topics.map((t) => {
-          const pct = t.total > 0 ? (t.attempted / t.total) * 100 : 0;
-          const color =
-            t.avgScore === null
-              ? "bg-border-strong"
-              : t.avgScore >= 20
-              ? "bg-easy"
-              : t.avgScore >= 15
-              ? "bg-accent"
-              : "bg-medium";
-          return (
-            <li key={t.topic} className="grid grid-cols-[1fr_72px_56px] gap-3 items-center text-sm">
-              <div className="min-w-0">
-                <div className="truncate">{t.topic}</div>
-                <div className="mt-1 h-1.5 w-full rounded-full bg-bg-surface overflow-hidden">
-                  <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-              <div className="text-xs text-text-dim tabular-nums text-right">
-                {t.attempted}/{t.total}
-              </div>
-              <div className="text-xs tabular-nums text-right">
-                {t.avgScore !== null ? (
-                  <span className="text-text">{t.avgScore.toFixed(1)}</span>
-                ) : (
-                  <span className="text-text-dim">—</span>
-                )}
-                <span className="text-text-dim"> avg</span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <ul className="topic-list">{sorted.slice(0, 5).map(row)}</ul>
+      {sorted.length > 5 && (
+        <details className="topic-expand">
+          <summary>
+            Explore all {sorted.length} topics <span aria-hidden="true">+</span>
+          </summary>
+          <ul className="topic-list">{sorted.slice(5).map(row)}</ul>
+        </details>
+      )}
     </section>
   );
 }

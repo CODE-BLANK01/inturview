@@ -1,4 +1,6 @@
 import { prisma } from "./db";
+import { FACE_TO_FACE_ENABLED } from "./features";
+import { summarizeRounds, type CompletedRound } from "./dashboardSummary";
 import { PROBLEMS, TOPICS } from "./problems";
 import type { Problem } from "./types";
 
@@ -13,18 +15,13 @@ export interface DashboardData {
   };
   inProgress: {
     id: string;
-    problemId: string;
+    title: string;
+    href: string;
+    mode: string;
     startedAt: Date;
-    problem: { title: string; difficulty: string; topic: string };
   } | null;
-  recent: Array<{
-    id: string;
-    problemId: string;
-    totalScore: number | null;
-    recommendation: string | null;
-    completedAt: Date | null;
-    problem: { title: string; difficulty: string; topic: string };
-  }>;
+  recent: CompletedRound[];
+  activity: Array<{ date: string; count: number }>;
   topicMastery: Array<{
     topic: string;
     attempted: number;
@@ -44,8 +41,17 @@ export interface DashboardData {
 
 const DIFFICULTY_ORDER = { Easy: 0, Medium: 1, Hard: 2 } as const;
 
-export async function loadDashboardData(userId: string): Promise<DashboardData> {
-  const [completed, inProgress] = await Promise.all([
+export async function loadDashboardData(
+  userId: string,
+): Promise<DashboardData> {
+  const [
+    completed,
+    codingInProgress,
+    designCompleted,
+    conversationCompleted,
+    designInProgress,
+    conversationsInProgress,
+  ] = await Promise.all([
     prisma.interview.findMany({
       where: { userId, status: "COMPLETED" },
       orderBy: { completedAt: "desc" },
@@ -68,52 +74,164 @@ export async function loadDashboardData(userId: string): Promise<DashboardData> 
         problem: { select: { title: true, difficulty: true, topic: true } },
       },
     }),
+    prisma.designSession.findMany({
+      where: { userId, status: "COMPLETED" },
+      select: {
+        id: true,
+        totalScore: true,
+        completedAt: true,
+        problem: { select: { title: true } },
+      },
+    }),
+    prisma.conversationSession.findMany({
+      where: { userId, status: "COMPLETED" },
+      select: {
+        id: true,
+        kind: true,
+        totalScore: true,
+        completedAt: true,
+        scenario: { select: { title: true } },
+      },
+    }),
+    prisma.designSession.findFirst({
+      where: { userId, status: "IN_PROGRESS" },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        problemId: true,
+        startedAt: true,
+        problem: { select: { title: true } },
+      },
+    }),
+    prisma.conversationSession.findMany({
+      where: { userId, status: "IN_PROGRESS" },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        kind: true,
+        scenarioId: true,
+        startedAt: true,
+        plan: true,
+        scenario: { select: { title: true } },
+      },
+    }),
   ]);
 
-  // Stats
-  const interviewsCompleted = completed.length;
-  const uniqueProblemsAttempted = new Set(completed.map((c) => c.problemId)).size;
-  const scores = completed.map((c) => c.totalScore).filter((s): s is number => s !== null);
-  const averageScore = scores.length
-    ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
-    : null;
-  const bestScore = scores.length ? Math.max(...scores) : null;
-  const daysActive = new Set(
-    completed
-      .map((c) => c.completedAt?.toISOString().slice(0, 10))
-      .filter((d): d is string => Boolean(d))
-  ).size;
+  const conversationMode = (kind: string) =>
+    kind === "BEHAVIORAL"
+      ? "Behavioral"
+      : kind === "FACE_TO_FACE"
+        ? "Face-to-face"
+        : "Recruiter screen";
+  const summary = summarizeRounds([
+    ...completed.map((iv) => ({
+      ...iv,
+      title: iv.problem.title,
+      href: `/history/${iv.id}`,
+      mode: "Coding",
+    })),
+    ...designCompleted.map((iv) => ({
+      ...iv,
+      title: iv.problem.title,
+      href: `/history/design/${iv.id}`,
+      mode: "System design",
+    })),
+    ...conversationCompleted.map((iv) => ({
+      ...iv,
+      title: iv.scenario?.title ?? conversationMode(iv.kind),
+      href: `/history/conversation/${iv.id}`,
+      mode: conversationMode(iv.kind),
+    })),
+  ]);
+  const resumable: NonNullable<DashboardData["inProgress"]>[] = [];
+  if (codingInProgress)
+    resumable.push({
+      id: codingInProgress.id,
+      title: codingInProgress.problem.title,
+      href: `/interview/${codingInProgress.problemId}`,
+      mode: "Coding",
+      startedAt: codingInProgress.startedAt,
+    });
+  if (designInProgress)
+    resumable.push({
+      id: designInProgress.id,
+      title: designInProgress.problem.title,
+      href: `/design/${designInProgress.problemId}`,
+      mode: "System design",
+      startedAt: designInProgress.startedAt,
+    });
+  for (const iv of conversationsInProgress) {
+    if (iv.kind === "FACE_TO_FACE") {
+      const plan = iv.plan as { maxDurationSec?: number } | null;
+      if (
+        !FACE_TO_FACE_ENABLED ||
+        !plan?.maxDurationSec ||
+        iv.startedAt.getTime() + plan.maxDurationSec * 1000 <= Date.now()
+      )
+        continue;
+    }
+    if (iv.kind === "BEHAVIORAL" && !iv.scenarioId) continue;
+    resumable.push({
+      id: iv.id,
+      title: iv.scenario?.title ?? conversationMode(iv.kind),
+      href:
+        iv.kind === "BEHAVIORAL"
+          ? `/behavioral/${iv.scenarioId}`
+          : iv.kind === "FACE_TO_FACE"
+            ? "/face-to-face"
+            : "/recruiter-screen",
+      mode: conversationMode(iv.kind),
+      startedAt: iv.startedAt,
+    });
+  }
+  const inProgress =
+    resumable.sort(
+      (a, b) => b.startedAt.getTime() - a.startedAt.getTime(),
+    )[0] ?? null;
+  const uniqueProblemsAttempted = new Set(completed.map((c) => c.problemId))
+    .size;
 
   // Topic stats
-  const topicAcc: Record<string, { count: number; sum: number; uniqueProblems: Set<string> }> = {};
+  const topicAcc: Record<
+    string,
+    { count: number; sum: number; scored: number; uniqueProblems: Set<string> }
+  > = {};
   for (const iv of completed) {
     const t = iv.problem.topic;
-    if (!topicAcc[t]) topicAcc[t] = { count: 0, sum: 0, uniqueProblems: new Set() };
+    if (!topicAcc[t])
+      topicAcc[t] = { count: 0, sum: 0, scored: 0, uniqueProblems: new Set() };
     topicAcc[t].count += 1;
-    if (iv.totalScore !== null) topicAcc[t].sum += iv.totalScore;
+    if (iv.totalScore !== null) {
+      topicAcc[t].sum += iv.totalScore;
+      topicAcc[t].scored += 1;
+    }
     topicAcc[t].uniqueProblems.add(iv.problemId);
   }
   let strongestTopic: DashboardData["stats"]["strongestTopic"] = null;
   for (const [name, agg] of Object.entries(topicAcc)) {
-    if (agg.count < 1) continue;
-    const avg = agg.sum / agg.count;
+    if (agg.scored < 1) continue;
+    const avg = agg.sum / agg.scored;
     if (!strongestTopic || avg > strongestTopic.avg) {
       strongestTopic = { name, avg: Math.round(avg * 10) / 10 };
     }
   }
 
   const topicTotals: Record<string, number> = {};
-  for (const p of PROBLEMS) topicTotals[p.topic] = (topicTotals[p.topic] ?? 0) + 1;
+  for (const p of PROBLEMS)
+    topicTotals[p.topic] = (topicTotals[p.topic] ?? 0) + 1;
 
   const topicMastery: DashboardData["topicMastery"] = TOPICS.filter(
-    (t) => (topicTotals[t] ?? 0) > 0
+    (t) => (topicTotals[t] ?? 0) > 0,
   ).map((topic) => {
     const agg = topicAcc[topic];
     return {
       topic,
       attempted: agg?.uniqueProblems.size ?? 0,
       total: topicTotals[topic] ?? 0,
-      avgScore: agg && agg.count > 0 ? Math.round((agg.sum / agg.count) * 10) / 10 : null,
+      avgScore:
+        agg && agg.scored > 0
+          ? Math.round((agg.sum / agg.scored) * 10) / 10
+          : null,
     };
   });
 
@@ -121,29 +239,31 @@ export async function loadDashboardData(userId: string): Promise<DashboardData> 
   // user has at least one completion (otherwise the "Run your first interview"
   // copy in ResumeRow does the job).
   const attemptedIds = new Set(completed.map((c) => c.problemId));
-  const suggestion = !inProgress && completed.length > 0
-    ? suggestNextProblem({
-        completed: completed.map((c) => ({
-          problemId: c.problemId,
-          topic: c.problem.topic,
-          difficulty: c.problem.difficulty,
-        })),
-        attemptedIds,
-        strongestTopic,
-      })
-    : null;
+  const suggestion =
+    !inProgress && completed.length > 0
+      ? suggestNextProblem({
+          completed: completed.map((c) => ({
+            problemId: c.problemId,
+            topic: c.problem.topic,
+            difficulty: c.problem.difficulty,
+          })),
+          attemptedIds,
+          strongestTopic,
+        })
+      : null;
 
   return {
     stats: {
-      interviewsCompleted,
+      interviewsCompleted: summary.interviewsCompleted,
       uniqueProblemsAttempted,
-      averageScore,
-      bestScore,
-      daysActive,
+      averageScore: summary.averageScore,
+      bestScore: summary.bestScore,
+      daysActive: summary.daysActive,
       strongestTopic,
     },
     inProgress,
-    recent: completed.slice(0, 5),
+    recent: summary.recent,
+    activity: summary.activity,
     topicMastery,
     suggestion,
   };
@@ -173,19 +293,20 @@ function suggestNextProblem(opts: {
     const lastDifficultyIdx =
       DIFFICULTY_ORDER[last.difficulty as keyof typeof DIFFICULTY_ORDER] ?? 0;
     const nextDifficultyIdx = Math.min(lastDifficultyIdx + 1, 2);
-    const nextDifficulty = (Object.keys(DIFFICULTY_ORDER) as (keyof typeof DIFFICULTY_ORDER)[])
-      .find((k) => DIFFICULTY_ORDER[k] === nextDifficultyIdx);
+    const nextDifficulty = (
+      Object.keys(DIFFICULTY_ORDER) as (keyof typeof DIFFICULTY_ORDER)[]
+    ).find((k) => DIFFICULTY_ORDER[k] === nextDifficultyIdx);
 
     // Strategy 1: same topic, next difficulty up
     const sameTopicLevelUp = unattempted.find(
-      (p) => p.topic === last.topic && p.difficulty === nextDifficulty
+      (p) => p.topic === last.topic && p.difficulty === nextDifficulty,
     );
     if (sameTopicLevelUp) {
       return toSuggestion(
         sameTopicLevelUp,
         nextDifficulty === last.difficulty
           ? `More from ${last.topic}.`
-          : `One step up from your last ${last.topic} problem.`
+          : `One step up from your last ${last.topic} problem.`,
       );
     }
 
@@ -198,11 +319,13 @@ function suggestNextProblem(opts: {
 
   // Strategy 3: strongest topic, unattempted
   if (strongestTopic) {
-    const inStrongest = unattempted.find((p) => p.topic === strongestTopic.name);
+    const inStrongest = unattempted.find(
+      (p) => p.topic === strongestTopic.name,
+    );
     if (inStrongest) {
       return toSuggestion(
         inStrongest,
-        `You're strongest in ${strongestTopic.name} (${strongestTopic.avg}/25 avg) — try one more.`
+        `You're strongest in ${strongestTopic.name} (${strongestTopic.avg}/25 avg) — try one more.`,
       );
     }
   }

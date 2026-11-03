@@ -12,8 +12,17 @@ const DIMENSION_LABELS: Record<keyof Debrief["scores"], string> = {
   communication: "Communication",
 };
 
-export function DebriefView({ debrief }: { debrief: Debrief }) {
-  const dims = Object.entries(debrief.scores) as [keyof Debrief["scores"], Debrief["scores"][keyof Debrief["scores"]]][];
+export function DebriefView({
+  debrief,
+  dimensionLabels = {},
+}: {
+  debrief: Debrief;
+  dimensionLabels?: Partial<Record<keyof Debrief["scores"], string>>;
+}) {
+  const dims = Object.entries(debrief.scores) as [
+    keyof Debrief["scores"],
+    Debrief["scores"][keyof Debrief["scores"]],
+  ][];
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -25,7 +34,9 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
           <div>
-            <h3 className="text-sm font-medium text-text-muted mb-2">Strengths</h3>
+            <h3 className="text-sm font-medium text-text-muted mb-2">
+              Strengths
+            </h3>
             <ul className="space-y-1.5">
               {debrief.strengths.map((s, i) => (
                 <li key={i} className="flex gap-2 text-sm">
@@ -36,7 +47,9 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
             </ul>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-text-muted mb-2">Improvements</h3>
+            <h3 className="text-sm font-medium text-text-muted mb-2">
+              Improvements
+            </h3>
             <ul className="space-y-1.5">
               {debrief.improvements.map((s, i) => (
                 <li key={i} className="flex gap-2 text-sm">
@@ -49,7 +62,9 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
         </div>
 
         <div>
-          <h3 className="text-sm font-medium text-text-muted mb-2">Optimal solution notes</h3>
+          <h3 className="text-sm font-medium text-text-muted mb-2">
+            Optimal solution notes
+          </h3>
           <p className="text-sm text-text whitespace-pre-wrap">
             {debrief.optimal_solution_notes}
           </p>
@@ -72,7 +87,7 @@ export function DebriefView({ debrief }: { debrief: Debrief }) {
           {dims.map(([key, dim]) => (
             <ScoreBar
               key={key}
-              label={DIMENSION_LABELS[key]}
+              label={dimensionLabels[key] ?? DIMENSION_LABELS[key]}
               score={dim.score}
               max={dim.max}
               evidence={dim.evidence}

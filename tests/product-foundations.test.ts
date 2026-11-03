@@ -3,6 +3,7 @@ import test from "node:test";
 import { PlanTier } from "@prisma/client";
 import { cachedInterviewPrompt } from "../lib/anthropic";
 import { captureProductEvent } from "../lib/analytics";
+import { addAccessDays, nextAccessWindow } from "../lib/billing";
 import {
   CANDIDATE_PLANS,
   PLANS,
@@ -36,6 +37,40 @@ test("candidate pricing stays separate from employer screening", () => {
   const employerPlans = PLANS.filter((plan) => plan.audience === "employer");
   assert.equal(employerPlans.length, 3);
   assert.ok(employerPlans.every((plan) => !plan.name.toLowerCase().includes("team")));
+});
+
+test("expired paid access falls back to Free while active access remains Pro", () => {
+  const now = new Date("2026-09-25T12:00:00.000Z");
+  const expired = getEffectivePlan(
+    PlanTier.PRO,
+    "candidate@example.com",
+    new Date("2026-09-24T12:00:00.000Z"),
+    now
+  );
+  const active = getEffectivePlan(
+    PlanTier.PRO,
+    "candidate@example.com",
+    new Date("2026-09-26T12:00:00.000Z"),
+    now
+  );
+  assert.equal(expired.tier, PlanTier.FREE);
+  assert.equal(active.tier, PlanTier.PRO);
+});
+
+test("repeat Sprint purchases preserve unused time", () => {
+  const now = new Date("2026-09-25T12:00:00.000Z");
+  const currentExpiry = addAccessDays(now, 10);
+  const extension = nextAccessWindow(currentExpiry, now);
+  assert.equal(extension.wasExtension, true);
+  assert.equal(extension.startsAt.toISOString(), currentExpiry.toISOString());
+  assert.equal(
+    extension.endsAt.toISOString(),
+    "2026-11-04T12:00:00.000Z"
+  );
+
+  const fresh = nextAccessWindow(new Date("2026-09-01T00:00:00.000Z"), now);
+  assert.equal(fresh.wasExtension, false);
+  assert.equal(fresh.startsAt.toISOString(), now.toISOString());
 });
 
 test("cache markers stay on stable prompt content before changing live context", () => {

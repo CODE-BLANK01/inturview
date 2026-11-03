@@ -59,9 +59,8 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
   const [followUpStreaming, setFollowUpStreaming] = useState(false);
   const followUpWriter = useTypewriter(45);
 
-  const [startedAt, setStartedAt] = useState<number>(0);
+  const [timerResumed, setTimerResumed] = useState(false);
   const [paused, setPaused] = useState(false);
-  const pausedAtRef = useRef<number | null>(null);
   const [endDialogOpen, setEndDialogOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -70,16 +69,10 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
 
   const pauseSession = useCallback(() => {
     if (phase === "debrief") return;
-    pausedAtRef.current = Date.now();
     setPaused(true);
   }, [phase]);
 
   const resumeSession = useCallback(() => {
-    if (pausedAtRef.current !== null) {
-      const pausedDuration = Date.now() - pausedAtRef.current;
-      pausedAtRef.current = null;
-      setStartedAt((prev) => prev + pausedDuration);
-    }
     setPaused(false);
   }, []);
 
@@ -112,8 +105,7 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
         };
         if (cancelled) return;
 
-        const persistedStart = new Date(data.startedAt).getTime();
-        if (Number.isFinite(persistedStart)) setStartedAt(persistedStart);
+        setTimerResumed(data.resumed);
 
         if (!data.resumed) {
           setSessionId(data.id);
@@ -128,7 +120,6 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
         }
         const detailJson = (await detail.json()) as {
           session: {
-            startedAt: string;
             scopeAcceptedAt: string | null;
             canvasJson: unknown;
             messages: { phase: string; role: "user" | "assistant"; content: string }[];
@@ -137,8 +128,6 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
         if (cancelled) return;
 
         const s = detailJson.session;
-        const sStart = new Date(s.startedAt).getTime();
-        if (Number.isFinite(sStart)) setStartedAt(sStart);
         const scopeMsgs: ChatMessage[] = s.messages
           .filter((m) => m.phase === "scope")
           .map((m) => ({ role: m.role, content: m.content }));
@@ -433,7 +422,11 @@ export function DesignSession({ problem }: { problem: SystemDesignProblemDef }) 
             <span className="text-sm text-text-muted">{problem.title}</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <Timer startedAt={startedAt} paused={phase === "debrief" || paused} />
+            <Timer
+              sessionId={sessionId}
+              resumed={timerResumed}
+              paused={phase === "debrief" || paused}
+            />
             <DesignPhaseIndicator current={phase} />
             {phase !== "debrief" && (
               <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">

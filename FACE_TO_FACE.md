@@ -2,7 +2,7 @@
 
 A live, spoken technical round over video. The candidate turns on camera + mic, an AI interviewer talks to them in real time (OpenAI Realtime, speech-to-speech), and at the end Claude scores the transcript plus measured delivery metrics (pace, filler words, pauses) and body-language metrics (eye contact, posture, restlessness, hands) tracked on-device with MediaPipe.
 
-This document covers: how to run it locally, how it's built, what changed in the repo, and the errors you're most likely to hit.
+This document covers how to run it locally and how it's built.
 
 ---
 
@@ -24,6 +24,7 @@ npm install
 Add these to `.env.local` (see `.env.local.example`):
 
 ```
+NEXT_PUBLIC_FACE_TO_FACE_ENABLED=true
 REALTIME_SERVICE_SECRET=<32+ random chars — openssl rand -base64 32>
 NEXT_PUBLIC_REALTIME_SERVICE_URL=http://localhost:8000
 FACE_TO_FACE_MAX_MINUTES=20
@@ -55,6 +56,8 @@ Edit `services/realtime/.env`:
 ```
 OPENAI_API_KEY=sk-...
 REALTIME_SERVICE_SECRET=<the SAME value as in .env.local>
+NEXTJS_INTERNAL_URL=http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Start it **from `services/realtime`** (not from inside `app/` — the package uses relative imports and reads `.env` from the current directory):
@@ -70,6 +73,30 @@ You should see `Application startup complete.` and `curl http://localhost:8000/h
 Sign in, open **Practice → Face-to-face** (or `/face-to-face`), enable camera & mic, wait for "Loading camera tracking…" to finish (first load downloads ~9 MB of MediaPipe models), click **Calibrate (2s)** while looking straight at the camera lens, pick a track and level, then **Start interview**. Within a few seconds the status pill should read *Listening* and the interviewer greets you out loud. Use headphones if you can, and keep your shoulders in frame.
 
 Never commit `.env.local` or `services/realtime/.env` — both hold secrets and are git-ignored.
+
+### 1d. Optional HeyGen interviewer video
+
+The avatar is available in face-to-face interviews. It renders the interviewer's face and lip-syncs the OpenAI voice; it does not change the interview questions or scoring.
+
+Enable it locally in the root `.env.local`:
+
+```dotenv
+NEXT_PUBLIC_FACE_TO_FACE_ENABLED=true
+NEXT_PUBLIC_FACE_TO_FACE_AVATAR_ENABLED=true
+```
+
+Set these in **`services/realtime/.env`**:
+
+```dotenv
+LIVEAVATAR_API_KEY=<your LiveAvatar API key>
+LIVEAVATAR_SANDBOX=true
+```
+
+Use a key from the LiveAvatar dashboard. The Python service does not read the root `.env.local`. Sandbox mode selects the test avatar automatically, so `LIVEAVATAR_AVATAR_ID` can stay empty. The sandbox trial lasts 60 seconds, after which the interview continues with voice only. For a longer avatar session, set `LIVEAVATAR_SANDBOX=false` and a valid `LIVEAVATAR_AVATAR_ID`; the provider account's limits apply.
+
+Restart both servers after changing environment variables, then follow the camera, calibration, and **Start interview** steps above. Keep both public feature flags `false` in production while face-to-face is on the waitlist.
+
+If port 8000 is already occupied, start the service with `--port 8001` and set `NEXT_PUBLIC_REALTIME_SERVICE_URL=http://localhost:8001` in the root `.env.local`. `NEXTJS_INTERNAL_URL` must point to the actual Next.js port, and `ALLOWED_ORIGINS` must include the exact browser origin (including its port). Check `/health` on the chosen realtime port before starting an interview.
 
 ---
 
@@ -91,15 +118,17 @@ Finish ─▶ POST /api/conversation/debrief ─▶ Next.js ─▶ Claude scores
 
 **Why two backends.** Next.js on Vercel can't hold long-lived WebSockets and has a ~4.5 MB body limit, and the OpenAI key must never reach the browser. So FastAPI mints a short-lived *ephemeral* key with the interviewer prompt baked in, and the browser talks to OpenAI directly over WebRTC (lowest latency; OpenAI handles echo cancellation and barge-in). Next.js keeps everything it already owns — auth, plan caps, Prisma, the Claude debrief.
 
+**Avatar transport.** When the avatar connects, microphone audio goes through FastAPI's `/sessions/{id}/voice` WebSocket relay to OpenAI. The returned PCM audio is sent to LiveAvatar's command WebSocket, and the browser receives the rendered video and voice through LiveKit. FastAPI creates and stops the avatar through `/sessions/{id}/avatar` and `/sessions/{id}/avatar/stop`; the LiveAvatar API key stays on the server. If the avatar cannot connect, the interview starts voice-only over WebRTC. If it ends during an interview, the relay continues and the browser plays the voice directly.
+
 **Trust boundary.** The browser gets a 15-minute HS256 JWT bound to one session id (`lib/faceToFaceToken.ts`, verified by `services/realtime/app/auth.py` with the shared `REALTIME_SERVICE_SECRET`). FastAPI → Next.js calls carry the same secret in an `x-service-secret` header. FastAPI, not the browser, is the writer of record for transcript turns.
 
 ### The noise problem, and the fix
 
 The Realtime API's voice-activity detector is sensitive: breathing or a keyboard click can open a "turn", and the transcriber then hallucinates text for it — often in another language ("ご視聴ありがとうございました", "Thank you.") — and the model answers nonsense. Three layers stop that:
 
-1. **Browser noise gate** (`lib/realtimeClient.ts`, `buildGatedAudio`). A Web Audio gain node sits in front of the outbound track and only opens when RMS exceeds ~3× the measured room floor. The floor is learned only while the gate is closed, so a long answer can't raise it and choke itself off. The threshold doubles while the interviewer is speaking so speaker bleed doesn't count as barge-in.
-2. **Session config** (`services/realtime/app/realtime.py`). `noise_reduction: near_field`; `server_vad` with `threshold 0.8` and `silence_duration_ms 900`; transcription pinned to `language: "en"` (this alone removes the foreign-language hallucinations); and critically **`create_response: false`** and **`interrupt_response: false`** — the model never replies or gets cut off on its own.
-3. **Transcript gate**. The browser only sends `response.create` after a transcript comes back *and* passes `isUsableTranscript()` (min two words unless it's "yes"/"no"-style, <30% non-Latin characters, not on a known-hallucination list), *and* 1.2 s passes with no new speech. Junk items are deleted from the conversation (`conversation.item.delete`). FastAPI applies the same filter (`app/metrics.py`) before persisting, so junk never reaches the DB either.
+1. **Browser noise gate** (`lib/realtimeClient.ts`, `buildGatedAudio`). A Web Audio gain node sits in front of the outbound track and only opens when RMS exceeds ~3× the measured room floor. The floor is learned only while the gate is closed, so a long answer can't raise it and choke itself off. The threshold doubles while the interviewer is speaking so speaker bleed doesn't count as barge-in. Outgoing audio is delayed 250 ms (`gatePrerollMs`) so the gate is already open when a word's first syllable arrives, and it stays open for 900 ms of quiet (`gateReleaseMs`) so pauses between words don't chop an answer into fragments — both were the cause of clipped, garbled transcripts.
+2. **Session config** (`services/realtime/app/realtime.py`). `noise_reduction: near_field`; `semantic_vad` with `eagerness: low` by default, so the turn ends when the candidate *sounds* finished rather than after a fixed silence (thinking pauses mid-answer no longer end the turn). Set `RT_TURN_DETECTION=server_vad` to go back to the fixed-silence detector (`threshold 0.8`, `silence_duration_ms 900`), which is more robust in noisy rooms; transcription pinned to `language: "en"` (this alone removes the foreign-language hallucinations); and critically **`create_response: false`** and **`interrupt_response: false`** — the model never replies or gets cut off on its own.
+3. **Transcript gate**. The browser only sends `response.create` after a transcript comes back *and* passes `isUsableTranscript()` (min two words unless it's "yes"/"no"-style, <30% non-Latin characters, not on a known-hallucination list), *and* 1.2 s passes with no new speech — or 3.5 s when the answer so far looks unfinished (`looksUnfinished()`: ends on "and"/"so"/"because"/"um"…, trails off with a comma or ellipsis, or a 3+-word answer lacks a full stop). Junk items are deleted from the conversation (`conversation.item.delete`). FastAPI applies the same filter (`app/metrics.py`) before persisting, so junk never reaches the DB either.
 
 Barge-in is decided from speech duration: if the candidate talks for ≥ 700 ms while the interviewer is speaking, the client sends `response.cancel` + `output_audio_buffer.clear`. Short blips are ignored. A `response.create` is never sent while another response is in flight — it's queued and fired on `response.done`.
 
@@ -109,7 +138,7 @@ Barge-in is decided from speech duration: if the candidate talks for ≥ 700 ms 
 - The transcript WebSocket reconnects with exponential backoff (5 attempts) and queues turns while it's down; if it can't recover, a banner tells the candidate that further answers won't be saved. Finishing flushes the last answer and waits for acks before requesting the debrief; the debrief route refuses to score a face-to-face session with no saved answers.
 - Calibration stretches its window up to 6 s on slow (CPU-only) machines, and the candidate can skip body-language scoring if it still can't see them.
 
-All the knobs are env vars in `services/realtime/.env.example` (`RT_VAD_THRESHOLD`, `RT_VAD_SILENCE_MS`, …). If it still triggers on breathing in a noisy room, raise the threshold first.
+All the knobs are env vars in `services/realtime/.env.example` (`RT_VAD_THRESHOLD`, `RT_VAD_SILENCE_MS`, …). If it still triggers on breathing in a noisy room, switch to `RT_TURN_DETECTION=server_vad` and raise the threshold.
 
 ### Questions and scoring
 
@@ -137,60 +166,3 @@ All the knobs are env vars in `services/realtime/.env.example` (`RT_VAD_THRESHOL
 Models load from Google's CDN on first use (`storage.googleapis.com/mediapipe-models/…`, ~9 MB, cached by the browser) and the WASM runtime from jsDelivr, pinned to the installed `@mediapipe/tasks-vision` version. To avoid third-party requests entirely, copy both into `public/` and point `FACE_MODEL`, `POSE_MODEL`, and `WASM_BASE` at them.
 
 If the models fail to load (old GPU, blocked CDN), the session still runs; the debrief scores `body_language` 3 with the evidence "Not measured this session." — an explicitly labelled placeholder, never an invented number.
-
----
-
-## 3. What changed, file by file
-
-### New
-
-| File | Purpose |
-| --- | --- |
-| `app/face-to-face/page.tsx` | Route. Same auth → verify-email → onboarding gate as the recruiter screen. |
-| `components/FaceToFaceSession.tsx` | The whole UI: setup (camera check, mic meter, body-language calibration, track/level picker) → live (self-view, interviewer tile, mute/camera/end, live captions, timer) → debrief + follow-up chat. |
-| `lib/realtimeClient.ts` | WebRTC connection to OpenAI, noise gate, manual response gating, barge-in, event forwarding. |
-| `lib/bodyLanguage.ts` | On-device MediaPipe face + pose tracking, calibration, per-window body-language aggregation. |
-| `lib/faceToFaceQuestions.ts` | Question bank, tracks/levels, seeded plan builder. |
-| `lib/faceToFacePrompts.ts` | Interviewer instructions, debrief prompt + JSON schema text, follow-up prompt, metrics summariser. |
-| `lib/faceToFaceToken.ts` | HS256 JWT signer for the browser → FastAPI hop; constant-time check for the service secret header. |
-| `app/api/face-to-face/start/route.ts` | Creates/resumes the session, enforces the monthly cap, builds the plan, returns the JWT. |
-| `app/api/internal/face-to-face/[id]/route.ts` | Server-to-server: returns plan + rendered instructions (+ prior transcript on resume). |
-| `app/api/internal/face-to-face/[id]/turns/route.ts` | Server-to-server: persists one transcript turn with optional metrics. |
-| `services/realtime/` | FastAPI service: `config.py` (settings), `auth.py` (JWT), `nextjs.py` (internal client), `realtime.py` (session config + client-secret minting), `metrics.py` (junk filter, WPM/fillers/pauses), `main.py` (routes + WebSocket). |
-| `FACE_TO_FACE.md` | This file. |
-
-### Modified
-
-| File | Change |
-| --- | --- |
-| `prisma/schema.prisma` | `ConversationKind.FACE_TO_FACE`; `ConversationSession.plan Json?`; `ConversationMessage.metrics Json?`. |
-| `lib/plans.ts` | `faceToFaceSessionsPerMonth` per tier (Free = 2, env-overridable). |
-| `lib/conversationTypes.ts` | `FaceToFaceDebriefSchema`; added to the `ConversationDebrief` union. |
-| `app/api/conversation/debrief/route.ts` | `FACE_TO_FACE` branch: loads `plan` and per-message `metrics`, uses the new prompt + schema. |
-| `app/api/conversation/message/route.ts` | Rejects `mode: "live"` for face-to-face (live turns go through the realtime service); follow-up prompt for the new kind. |
-| `components/conversation/ConversationDebriefView.tsx` | Dimension labels for the new kind; `kind` prop widened. |
-| `components/TopNav.tsx`, `components/dashboard/PracticeModes.tsx` | Nav entry and dashboard card (grid now 2 → 3 → 5 columns). |
-| `app/history/page.tsx`, `app/history/conversation/[id]/page.tsx` | Kind labels, track/level subtitle. |
-| `.env.local.example`, `.gitignore` | New env vars documented; `.venv` and `__pycache__` ignored. |
-
-Reused unchanged: `ConversationSession` / `ConversationMessage` / `ConversationDebrief` tables, `EndConversationDialog`, `ChatPanel`, `Timer`, `useTypewriter`, `streamConversationMessage`, the abandon route, and the Claude debrief loop.
-
----
-
-## 4. Troubleshooting
-
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `POST /api/face-to-face/start 500` and server log `REALTIME_SERVICE_SECRET is not set` | Var missing from `.env.local`, or `next dev` was started before it was added | Add it, restart `next dev` (env is read at startup). |
-| `Invalid value for argument kind. Expected ConversationKind.` | Prisma client in memory predates the schema change | Stop `next dev`, `npx prisma generate`, start again. |
-| `EPERM ... query_engine-windows.dll.node` during `db:push` / `generate` | Running dev server holds the engine file | Same as above. The schema push itself still succeeds. |
-| Browser: `:8000/... ERR_CONNECTION_REFUSED` | FastAPI isn't running | Start uvicorn (section 1b). |
-| `ImportError: attempted relative import with no known parent package` | uvicorn launched from inside `app/` | Run `uvicorn app.main:app` from `services/realtime`. |
-| `pydantic ValidationError ... realtime_service_secret` on startup | Secret missing or under 32 chars in `services/realtime/.env` | Set it to the same 32+ char value as `.env.local`. |
-| `api.openai.com/v1/realtime/calls 429` | `insufficient_quota` — the project has no prepaid credits. Minting the ephemeral key succeeds anyway because that endpoint doesn't check balance. | Add credits on the OpenAI billing page. The setup page banner shows OpenAI's exact message. |
-| Interviewer replies to breathing / random noise | Room noisier than the defaults expect | Raise `RT_VAD_THRESHOLD` (try 0.85–0.9) and/or `RT_VAD_SILENCE_MS`; restart uvicorn. |
-| Interviewer waits too long before answering | Grace window + silence window add up (~2.1 s by default) | Lower `RT_VAD_SILENCE_MS` or `responseGraceMs` in `lib/realtimeClient.ts`. |
-| "Loading camera tracking…" never finishes | CDN blocked, or WASM/GPU init failed | Check the browser console; self-host the models (see Body language). The session can still start; body language is just not scored. |
-| Calibration keeps failing | Face or shoulders not in frame | Sit centred, camera at eye level, shoulders visible; ensure decent light. Or click **Skip body language** — the session runs without that dimension. |
-| Start says "Session time is up" | An old in-progress session outlived the cap | Click Start again — the stale session is abandoned and a fresh one created. |
-| Eye contact scores look wrong | Calibrated while looking at the screen, not the lens | Click **Redo** and look at the camera itself for the two seconds. |

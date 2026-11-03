@@ -1,3 +1,4 @@
+import { AuthShell } from "@/components/AuthShell";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -7,12 +8,12 @@ export const metadata = { title: "Sign in — inturview" };
 
 export default async function SignInPage() {
   const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect("/start");
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-12">
+    <AuthShell>
       <Suspense>
         <AuthForm mode="signin" />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }

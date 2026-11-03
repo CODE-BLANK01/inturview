@@ -10,12 +10,17 @@ const PROTECTED_PREFIXES = [
   "/onboarding",
   "/verify-email",
   "/account",
+  "/hire",
 ];
+// Teammate invitation links must open signed out so the invitee can pick sign in or sign up.
+const PUBLIC_EXCEPTIONS = ["/hire/join/"];
 const ADMIN_PREFIXES = ["/admin", "/api/admin"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const needsAuth = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const needsAuth =
+    PROTECTED_PREFIXES.some((p) => pathname.startsWith(p)) &&
+    !PUBLIC_EXCEPTIONS.some((p) => pathname.startsWith(p));
   const needsAdmin = ADMIN_PREFIXES.some((p) => pathname.startsWith(p));
 
   if (!needsAuth && !needsAdmin) return NextResponse.next();
@@ -53,5 +58,6 @@ export const config = {
     "/onboarding/:path*",
     "/verify-email/:path*",
     "/account/:path*",
+    "/hire/:path*",
   ],
 };

@@ -31,7 +31,7 @@ export function PauseOverlay({ onResume, onEnd }: PauseOverlayProps) {
         <h2 className="t-section-headline text-3xl sm:text-[34px] leading-tight">
           The clock&apos;s stopped.
           <br />
-          <span className="t-italic">So is the practice.</span>
+          <span>So is the practice.</span>
         </h2>
         <p className="t-body text-text-muted mt-5 max-w-md mx-auto">
           Better to practice right in the moment. Pausing and taking time to

@@ -10,9 +10,44 @@ export type AuditAction =
   | "USER_ENABLED"
   | "USER_ROLE_CHANGED"
   | "USER_DELETED"
-  | "INTERVIEW_DELETED";
+  | "INTERVIEW_DELETED"
+  | "QUESTION_CREATED"
+  | "QUESTION_UPDATED"
+  | "QUESTION_PUBLISHED"
+  | "QUESTION_RETIRED"
+  | "QUESTION_RESTORED"
+  | "QUESTIONS_DRAFTED"
+  | "LOOP_CREATED"
+  | "LOOP_UPDATED"
+  | "LOOP_PUBLISHED"
+  | "LOOP_ARCHIVED"
+  | "LOOP_RESTORED"
+  | "ROLE_CREATED"
+  | "ROLE_UPDATED"
+  | "REVIEW_NOTE_ADDED"
+  | "REVIEW_RATED"
+  | "CANDIDATE_DECIDED"
+  | "REVIEWER_ASSIGNED"
+  | "REVIEWER_UNASSIGNED"
+  | "APPLICANT_EXPORTED"
+  | "APPLICANT_DELETED"
+  | "CAMPAIGN_CREATED"
+  | "CAMPAIGN_RECIPIENTS_ADDED"
+  | "INVITES_SENT"
+  | "INVITE_RESENT"
+  | "INVITE_REVOKED"
+  | "ROUND_RESCORED"
+  | "ORG_CREATED"
+  | "ORG_UPDATED"
+  | "MEMBER_INVITED"
+  | "MEMBER_INVITE_REVOKED"
+  | "MEMBER_JOINED"
+  | "MEMBER_ROLE_CHANGED"
+  | "MEMBER_REMOVED"
+  | "SUPPORT_ACCESS_GRANTED"
+  | "SUPPORT_ACCESS_ENDED";
 
-export type AuditTargetType = "user" | "problem" | "interview";
+export type AuditTargetType = "user" | "problem" | "interview" | "question" | "loop" | "campaign" | "invite" | "organization" | "member" | "member_invitation" | "role";
 
 export async function writeAudit(opts: {
   adminId: string;

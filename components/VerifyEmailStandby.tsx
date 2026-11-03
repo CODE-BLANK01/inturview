@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { Mail, Loader2, Check, AlertTriangle } from "lucide-react";
+import { signOutTo } from "@/lib/signOutTo";
 
 interface VerifyEmailStandbyProps {
   email: string;
   /** Optional banner shown above the form — explains why the user landed here
    *  (expired link, used link, etc.). */
   topMessage?: { tone: "error" | "info"; text: string };
+  /** Where to land after verifying; kept in the resent link. */
+  next?: string | null;
 }
 
-export function VerifyEmailStandby({ email, topMessage }: VerifyEmailStandbyProps) {
+export function VerifyEmailStandby({ email, topMessage, next }: VerifyEmailStandbyProps) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,11 @@ export function VerifyEmailStandby({ email, topMessage }: VerifyEmailStandbyProp
     setSending(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/resend-verification", { method: "POST" });
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ next: next ?? undefined }),
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || `Failed (${res.status})`);
@@ -108,7 +114,7 @@ export function VerifyEmailStandby({ email, topMessage }: VerifyEmailStandbyProp
           <br />
           <button
             type="button"
-            onClick={() => signOut({ callbackUrl: "/signup" })}
+            onClick={() => void signOutTo("/signup")}
             className="underline underline-offset-2 hover:text-text-muted mt-1"
           >
             Sign out

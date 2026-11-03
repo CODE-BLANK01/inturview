@@ -2,18 +2,41 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { createResetToken } from "@/lib/passwordReset";
-import { sendEmail, appUrl } from "@/lib/email";
+import { sendEmail, appUrl, emailConfigurationError } from "@/lib/email";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const Body = z.object({ email: z.string().email().max(200) });
+const Body = z.object({ email: z.string().trim().email().max(200) });
+
+function limited(resetMs: number) {
+  const minutes = Math.max(1, Math.ceil(resetMs / 60_000));
+  return Response.json(
+    {
+      error: `Too many reset requests. Please try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+    },
+    {
+      status: 429,
+      headers: { "Retry-After": String(Math.ceil(resetMs / 1000)) },
+    },
+  );
+}
+
+function unavailable() {
+  return Response.json(
+    {
+      error:
+        "Password reset is temporarily unavailable. Please try again shortly, or contact hello@inturview.com.",
+    },
+    { status: 503 },
+  );
+}
 
 /**
- * Generic-success endpoint: ALWAYS returns 200 with the same response shape
- * regardless of whether the email matches an account. This prevents account
- * enumeration via the forgot-password form.
+ * Account lookup and delivery outcomes have the same public response. Input,
+ * request limits, and service-wide configuration failures can be reported
+ * before looking up an account, without revealing whether it exists.
  *
  * Disabled accounts (`disabledAt !== null`) are skipped silently — same
  * generic response, no email sent.
@@ -25,20 +48,23 @@ export async function POST(req: NextRequest) {
   // signin form. Per-IP cap prevents email bombing across different inboxes.
   const key = clientKey(req.headers);
   const limit = Number(process.env.RL_FORGOT_PASSWORD_PER_HOUR ?? 5);
-  const rl = checkRateLimit({ key: `forgot:${key}`, limit, windowMs: 60 * 60_000 });
+  const rl = checkRateLimit({
+    key: `forgot:${key}`,
+    limit,
+    windowMs: 60 * 60_000,
+  });
   if (!rl.ok) {
-    return Response.json(
-      { ok: true }, // still generic — don't tell attackers they hit the limit
-      { status: 200 }
-    );
+    return limited(rl.resetMs);
   }
 
   let parsed: z.infer<typeof Body>;
   try {
     parsed = Body.parse(await req.json());
   } catch {
-    // Even bad input gets the generic response.
-    return Response.json({ ok: true });
+    return Response.json(
+      { error: "Enter a valid email address." },
+      { status: 400 },
+    );
   }
 
   const email = parsed.email.toLowerCase().trim();
@@ -55,23 +81,53 @@ export async function POST(req: NextRequest) {
     windowMs: 60 * 60_000,
   });
   if (!targetRl.ok) {
-    // Same generic 200 — the rate limit must not double as an enumeration oracle.
-    return Response.json({ ok: true });
+    // This counts attempts for EVERY address, before any account lookup.
+    return limited(targetRl.resetMs);
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, email: true, name: true, disabledAt: true },
-  });
+  let baseUrl: string;
+  try {
+    const configError = emailConfigurationError();
+    if (configError) throw new Error(configError);
+    baseUrl = appUrl();
+  } catch (err) {
+    console.error(
+      "[forgot-password] configuration error:",
+      err instanceof Error ? err.message : "Invalid email configuration",
+    );
+    return unavailable();
+  }
+
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, disabledAt: true },
+    });
+  } catch {
+    console.error("[forgot-password] account lookup failed");
+    return unavailable();
+  }
 
   // Send only if the account exists AND is enabled.
   if (user && !user.disabledAt) {
     try {
-      const { rawToken, expiresAt } = await createResetToken(user.id);
-      const resetUrl = `${appUrl()}/reset-password?token=${encodeURIComponent(rawToken)}`;
+      const { rawToken } = await createResetToken(user.id);
+      const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
       const first = user.name?.split(/\s+/)[0]?.trim();
+      const htmlFirst = first?.replace(
+        /[&<>"']/g,
+        (char) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[char]!,
+      );
 
-      await sendEmail({
+      const delivery = await sendEmail({
         to: user.email,
         subject: "Reset your inturview account password",
         text: [
@@ -87,7 +143,7 @@ export async function POST(req: NextRequest) {
           "— inturview",
         ].join("\n"),
         html: `<!doctype html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FAF7F2;color:#1A1410;padding:32px;line-height:1.6">
-  <p>Hi${first ? ` ${first}` : ""},</p>
+  <p>Hi${htmlFirst ? ` ${htmlFirst}` : ""},</p>
   <p>You (or someone using your email) asked to reset your inturview account password.<br>
   Click below to set a new one. The link expires <strong>in 1 hour</strong>.</p>
   <p style="margin:24px 0">
@@ -99,11 +155,14 @@ export async function POST(req: NextRequest) {
   <p style="font-size:13px;color:#6B5E54">— inturview</p>
 </body></html>`,
       });
-      // Token expiry is informational for logs; don't return it to the client.
-      void expiresAt;
+      if (!delivery.ok) throw new Error(delivery.error);
+      console.info("[forgot-password] email accepted:", delivery.messageId);
     } catch (err) {
       // Swallow — never reveal failure mode to the client. Log for ops.
-      console.error("[forgot-password] send failed:", err instanceof Error ? err.message : err);
+      console.error(
+        "[forgot-password] send failed:",
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 

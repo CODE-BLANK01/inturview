@@ -17,7 +17,9 @@ import type { FaceToFacePlan } from "@/lib/faceToFaceQuestions";
 import { checkRateLimit, clientKey, pruneExpired } from "@/lib/rateLimit";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { captureProductEvent } from "@/lib/analytics";
+import { captureProductEvent, type Category } from "@/lib/analytics";
+import { trackClaudeUsage, trackLiveMinutes } from "@/lib/aiCost";
+import { FACE_TO_FACE_AVATAR_ENABLED } from "@/lib/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   const session = await prisma.conversationSession.findFirst({
     where: { id: parsed.session_id, userId: user.id },
-    select: { id: true, kind: true, scenarioId: true, status: true, plan: true },
+    select: { id: true, kind: true, scenarioId: true, status: true, plan: true, startedAt: true },
   });
   if (!session) return Response.json({ error: "Session not found" }, { status: 404 });
 
@@ -145,6 +147,7 @@ export async function POST(req: NextRequest) {
         system,
         messages: [{ role: "user", content: userTurn }],
       });
+      await trackClaudeUsage(user.id, { category: session.kind.toLowerCase() as Category, sessionId: session.id, model: MODEL, purpose: "debrief", usage: resp.usage });
       const text = resp.content
         .map((b) => (b.type === "text" ? b.text : ""))
         .join("")
@@ -218,6 +221,14 @@ export async function POST(req: NextRequest) {
           score: total,
         },
       });
+
+      if (session.kind === "FACE_TO_FACE") {
+        // Live time is billed per minute. Capped at the session limit plus the
+        // relay's 3-minute wrap-up grace, in case the debrief runs much later.
+        const capMinutes = Number(process.env.FACE_TO_FACE_MAX_MINUTES ?? 20) + 3;
+        const minutes = Math.min((Date.now() - session.startedAt.getTime()) / 60_000, capMinutes);
+        await trackLiveMinutes(user.id, { sessionId: session.id, minutes, avatar: FACE_TO_FACE_AVATAR_ENABLED });
+      }
 
       return Response.json(debrief);
     } catch (err) {

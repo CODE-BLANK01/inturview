@@ -1,8 +1,12 @@
 import Link from "next/link";
-import { TopNav } from "@/components/TopNav";
+import { PracticeWorkspace } from "@/components/dashboard/PracticeWorkspace";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { DifficultyBadge, RecommendationBadge, TopicBadge } from "@/components/Badges";
+import {
+  DifficultyBadge,
+  RecommendationBadge,
+  TopicBadge,
+} from "@/components/Badges";
 import type { Difficulty, Debrief } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -109,14 +113,14 @@ export default async function HistoryPage() {
       completedAt: cs.completedAt,
       title:
         cs.kind === "BEHAVIORAL"
-          ? cs.scenario?.title ?? "Behavioral"
+          ? (cs.scenario?.title ?? "Behavioral")
           : cs.kind === "FACE_TO_FACE"
             ? "Face-to-face technical round"
             : "Recruiter screen",
       difficulty: null,
       topic:
         cs.kind === "BEHAVIORAL"
-          ? cs.scenario?.category ?? "Behavioral"
+          ? (cs.scenario?.category ?? "Behavioral")
           : cs.kind === "FACE_TO_FACE"
             ? "Live video"
             : "Phone screen",
@@ -136,11 +140,10 @@ export default async function HistoryPage() {
   };
 
   return (
-    <>
-      <TopNav />
-      <main className="mx-auto max-w-5xl px-4 py-8">
+    <PracticeWorkspace user={user}>
+      <div className="workspace-page w-full">
         <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">Your interviews</h1>
+          <h1 className="t-section-headline text-3xl">Your interviews</h1>
           <p className="mt-1 text-text-muted">
             Every mock interview you&apos;ve taken — completed sessions show the
             scorecard, ended sessions show the transcript and code you wrote.
@@ -176,7 +179,7 @@ export default async function HistoryPage() {
                         className="badge"
                         style={{
                           background: "rgb(var(--bg-inset))",
-                          color: "rgb(var(--text-muted))",
+                          color: "rgb(var(--text-secondary))",
                           borderColor: "rgb(var(--border-base))",
                         }}
                       >
@@ -187,7 +190,7 @@ export default async function HistoryPage() {
                           className="badge"
                           style={{
                             background: "rgb(var(--bg-inset))",
-                            color: "rgb(var(--text-muted))",
+                            color: "rgb(var(--text-secondary))",
                             borderColor: "rgb(var(--border-base))",
                           }}
                           title="Session ended without a debrief"
@@ -197,7 +200,9 @@ export default async function HistoryPage() {
                       )}
                     </div>
                     <div className="text-xs text-text-dim mt-0.5">
-                      {iv.completedAt ? new Date(iv.completedAt).toLocaleString() : ""}
+                      {iv.completedAt
+                        ? new Date(iv.completedAt).toLocaleString()
+                        : ""}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -212,7 +217,9 @@ export default async function HistoryPage() {
                         {iv.recommendation && (
                           <div className="mt-1">
                             <RecommendationBadge
-                              value={iv.recommendation as Debrief["overall_recommendation"]}
+                              value={
+                                iv.recommendation as Debrief["overall_recommendation"]
+                              }
                             />
                           </div>
                         )}
@@ -224,7 +231,7 @@ export default async function HistoryPage() {
             })}
           </div>
         )}
-      </main>
-    </>
+      </div>
+    </PracticeWorkspace>
   );
 }

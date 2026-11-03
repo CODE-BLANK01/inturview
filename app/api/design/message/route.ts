@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getDesignProblem } from "@/lib/designProblems";
+import { trackClaudeUsage, type ClaudeUsage } from "@/lib/aiCost";
+import { captureProductEvent, type Category } from "@/lib/analytics";
 import { cachedInterviewPrompt, getAnthropic, logCacheUsage, DESIGN_MODEL } from "@/lib/anthropic";
 import { designLiveContext, designPhasePromptFor } from "@/lib/designPrompts";
 import { describeCanvas } from "@/lib/designCanvas";
@@ -213,9 +215,11 @@ export async function POST(req: NextRequest) {
           { signal: abortController.signal }
         );
 
+        const turnUsage: ClaudeUsage = {};
         for await (const event of upstream) {
           if (event.type === "message_start") {
             logCacheUsage(`design/${parsed.phase}`, event.message.usage);
+            Object.assign(turnUsage, event.message.usage);
           } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             const text = event.delta.text;
             if (!prefixDetected) {
@@ -230,6 +234,8 @@ export async function POST(req: NextRequest) {
             } else {
               emitDelta(text);
             }
+          } else if (event.type === "message_delta") {
+            turnUsage.output_tokens = event.usage.output_tokens;
           } else if (event.type === "message_stop") {
             if (!prefixDetected && prefixBuffer.length > 0) {
               await settlePrefix(prefixBuffer);
@@ -237,6 +243,12 @@ export async function POST(req: NextRequest) {
             }
             controller.enqueue(sseEncode("done", "{}"));
           }
+        }
+        // The reply finished: record its cost, and count debrief follow-up questions.
+        const category: Category = "system_design" as const;
+        await trackClaudeUsage(user.id, { category, sessionId: session.id, model: DESIGN_MODEL, purpose: "interview_turn", usage: turnUsage });
+        if (parsed.phase === "debrief") {
+          await captureProductEvent(user.id, { event: "followup_asked", properties: { mode: category, session_id: session.id } });
         }
       } catch (err) {
         const isAbort =

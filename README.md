@@ -24,7 +24,7 @@ The interviewer is powered by Claude (Anthropic) and behaves like a real one: it
 | **System design** | `/design-problems` → `/design/[id]` | Excalidraw whiteboard + chat | scope → design → debrief |
 | **Face-to-face** | `/face-to-face` | Live voice + camera (OpenAI Realtime) | setup → live → debrief |
 
-The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup, architecture, and troubleshooting.
+The face-to-face mode needs a second server and an OpenAI key — see [FACE_TO_FACE.md](FACE_TO_FACE.md) for setup and architecture.
 
 Every mode green-lights with a gating signal where it makes sense (`[READY]` for coding approach, `[SCOPED]` for design scope), persists every turn, and ends with a 5-dimension scorecard + follow-up Q&A.
 
@@ -92,7 +92,7 @@ cp .env.local.example .env.local
 #   openssl rand -base64 32
 
 # 3. Schema + seed
-npm run db:push             # creates tables in your Postgres
+npm run db:deploy           # applies the migrations to your Postgres
 npm run db:seed             # NeetCode coding problems
 npm run db:seed-design      # system-design problems
 npm run db:seed-behavioral  # behavioral scenarios
@@ -111,6 +111,9 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `DATABASE_URL`     | Postgres connection string.                                        |
 | `NEXTAUTH_SECRET`  | JWT signing secret. `openssl rand -base64 32`.                      |
 | `NEXTAUTH_URL`     | Public app URL (`http://localhost:3000` in dev).                   |
+| `STRIPE_SECRET_KEY` | Secret key used by server-side Checkout and webhook processing.   |
+| `STRIPE_INTERVIEW_SPRINT_PRICE_ID` | Active one-time USD $19 Stripe Price.              |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for `/api/billing/webhook`.                     |
 
 ### Optional
 
@@ -130,6 +133,7 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `FREE_BEHAVIORAL_SESSIONS_PER_MONTH` | `3`     | Free-tier behavioral cap per calendar month.                       |
 | `FREE_RECRUITER_SESSIONS_PER_MONTH` | `2`      | Free-tier recruiter-screen cap per calendar month.                 |
 | `NEXT_PUBLIC_FACE_TO_FACE_ENABLED` | `false` | Exposes the face-to-face route and navigation when the realtime flow is ready. |
+| `NEXT_PUBLIC_FACE_TO_FACE_AVATAR_ENABLED` | `false` | Enables the optional HeyGen interviewer video. Requires LiveAvatar configuration in the Python service; see [local setup](FACE_TO_FACE.md#1d-optional-heygen-interviewer-video). |
 | `FREE_FACE_TO_FACE_SESSIONS_PER_MONTH` | `2`   | Free-tier face-to-face cap per calendar month (realtime audio is the most expensive mode). |
 | `FACE_TO_FACE_MAX_MINUTES` | `20`               | Hard cap on a single face-to-face session.                          |
 | `REALTIME_SERVICE_SECRET` | _(required for face-to-face)_ | Shared secret with the FastAPI realtime service. 32+ chars, same value on both sides. |
@@ -138,13 +142,33 @@ Sign up at `/signup`. If your email is in `ADMIN_EMAILS`, you're auto-promoted t
 | `POSTHOG_PROJECT_TOKEN` | _(disabled)_          | PostHog project token for server-side event capture. |
 | `POSTHOG_HOST` | `https://us.i.posthog.com`  | PostHog ingestion host; use `https://eu.i.posthog.com` for EU projects. |
 
+### Candidate billing
+
+Create one Stripe product named `Interview Sprint` with an active one-time
+USD $19.00 Price. Set its `price_...` ID as
+`STRIPE_INTERVIEW_SPRINT_PRICE_ID`, then configure a webhook endpoint at
+`https://YOUR_DOMAIN/api/billing/webhook` for
+`checkout.session.completed`, `checkout.session.async_payment_succeeded`, and
+`charge.refunded`.
+
+For local testing, install the Stripe CLI and run:
+
+```bash
+stripe listen --forward-to localhost:3000/api/billing/webhook
+```
+
+Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`. Checkout is
+the only entry point; paid access is granted by a verified webhook. Each
+successful payment adds 30 days after the user's current expiry, and webhook
+event and Checkout Session IDs make retries idempotent.
+
 ### Product analytics
 
-Set `POSTHOG_PROJECT_TOKEN` and the matching `POSTHOG_HOST` in the deployed server environment, then run `npm run db:push` to add the retention and phase-transition markers before deploying the new code. The five event names are `signup`, `interview_started`, `phase_advanced`, `debrief_completed`, and `returned_within_7d`. All use the database user ID as the PostHog distinct ID.
+Set `POSTHOG_PROJECT_TOKEN` and the matching `POSTHOG_HOST` in the deployed server environment, and make sure migrations are applied (`npm run db:deploy`). The core event names are `signup_completed`, `interview_started`, `phase_advanced`, `debrief_completed`, and `returned_within_7d`. All use the database user ID as the PostHog distinct ID.
 
 `interview_started` fires only for a newly created session, never for a resume, and carries `mode` (`recruiter_screen`, `behavioral`, `coding`, `system_design`, or `face_to_face`) and `session_id`. `phase_advanced` fires on an explicit move to code/design and on successful debrief completion. `debrief_completed` fires after the debrief transaction succeeds and carries the score. `returned_within_7d` fires once on the first authenticated dashboard visit between 24 hours and seven days after signup; it does not count an uninterrupted first-day visit. These events are disabled when the project token is unset.
 
-In PostHog, build a funnel from `signup` → `interview_started` → `debrief_completed`, break down starts by `mode`, and compare the `returned_within_7d` rate by first mode. Anthropic cache savings depend on repeated prefixes and the model's minimum cacheable token length; set `ANTHROPIC_LOG_CACHE_USAGE=1` to inspect cache-created and cache-read token counts before projecting savings.
+In PostHog, build a funnel from `signup_completed` → `interview_started` → `debrief_completed`, break down starts by `mode`, and compare the `returned_within_7d` rate by first mode. Anthropic cache savings depend on repeated prefixes and the model's minimum cacheable token length; set `ANTHROPIC_LOG_CACHE_USAGE=1` to inspect cache-created and cache-read token counts before projecting savings.
 
 ---
 
@@ -242,7 +266,7 @@ Still ahead:
 1. Push to GitHub
 2. Import the repo into Vercel
 3. Set the env vars from `.env.local.example` in **Settings → Environment Variables**
-4. Run `npm run db:push` from your local machine pointing at the production `DATABASE_URL`, then the three seeders (`db:seed`, `db:seed-design`, `db:seed-behavioral`)
+4. Apply migrations (`npm run db:deploy` against the production database, or `RUN_MIGRATIONS=true` on Netlify; see `docs/runbooks/setup.md`), then the three seeders (`db:seed`, `db:seed-design`, `db:seed-behavioral`)
 5. Trigger a deploy
 
 ### Anywhere with Node

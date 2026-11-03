@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import { useTheme } from "./ThemeProvider";
 
 const Monaco = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function CodeEditor({ value, onChange, language }: Props) {
+  const { theme } = useTheme();
   const options = useMemo(
     () => ({
       minimap: { enabled: false },
@@ -48,7 +50,7 @@ export function CodeEditor({ value, onChange, language }: Props) {
       wordWrap: "on" as const,
       renderLineHighlight: "all" as const,
     }),
-    [language]
+    [language],
   );
 
   return (
@@ -56,7 +58,7 @@ export function CodeEditor({ value, onChange, language }: Props) {
       height="100%"
       language={language}
       value={value}
-      theme="light"
+      theme={theme === "dark" ? "vs-dark" : "light"}
       onChange={(v) => onChange(v ?? "")}
       options={options}
     />

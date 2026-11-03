@@ -133,8 +133,8 @@ export function OnboardingWizard({ initialName, email }: OnboardingWizardProps) 
               Pick your plan.
             </h1>
             <p className="t-body-light text-text-muted mt-2 text-[15px] max-w-xl">
-              Start free. The Interview Sprint opens soon for candidates who want
-              thirty focused days of unlimited practice.
+              Start free, then unlock the Interview Sprint whenever your real
+              interview gets close.
             </p>
           </header>
 
@@ -273,7 +273,7 @@ function GoalCard({
 
 function PlanCard({ plan }: { plan: PlanDefinition }) {
   const isFree = plan.tier === "FREE";
-  const locked = !plan.selectable;
+  const locked = !isFree;
   return (
     <div
       className={`panel p-5 flex flex-col ${
@@ -318,7 +318,7 @@ function PlanCard({ plan }: { plan: PlanDefinition }) {
             }}
           >
             <Lock className="h-3 w-3 mr-1 inline-block" />
-            {plan.availabilityNote ?? "Coming soon"}
+            Buy after setup
           </span>
         )}
       </div>
